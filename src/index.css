@@ -1,0 +1,241 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* ==========================================================
+   SCROLLBAR STYLES
+   ========================================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ==========================================================
+   GLOBAL FROSTED GLASS OVERRIDES
+   ========================================================== */
+
+/* Main canvas reset */
+body {
+  background-color: #020617 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Transform all standard white container panels (Cards, modules, sections) into Glassmorphism */
+.bg-white {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Ensure secondary slate/gray light background elements are styled beautifully as dark glass surfaces */
+.bg-gray-50, 
+.bg-slate-50, 
+.bg-wood-50 {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+  color: #cbd5e1 !important;
+}
+
+.bg-gray-100, 
+.bg-slate-100, 
+.bg-wood-100, 
+.bg-gray-200, 
+.bg-slate-200, 
+.bg-wood-200,
+.bg-gray-900\/40,
+.bg-wood-900\/40 {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #f1f5f9 !important;
+}
+
+/* Seamless mapping of borders to transparent glowing divider lines */
+.border,
+.border-t,
+.border-b,
+.border-r,
+.border-l,
+.divide-y > *,
+.border-gray-50,
+.border-gray-100,
+.border-gray-200,
+.border-gray-300,
+.border-wood-100,
+.border-wood-200,
+.border-wood-900,
+.border-slate-100,
+.border-slate-200 {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ==========================================================
+   TYPOGRAPHY & CONTRAST SAFETY
+   ========================================================== */
+.text-gray-900,
+.text-gray-800,
+.text-wood-900,
+.text-slate-900,
+.text-gray-700,
+.text-slate-800,
+.text-wood-950,
+.text-slate-950 {
+  color: #f8fafc !important; /* Elegant slate off-white */
+}
+
+.text-gray-600, 
+.text-slate-600,
+.text-gray-500,
+.text-gray-400,
+.text-wood-300,
+.text-slate-400,
+.text-slate-500 {
+  color: #94a3b8 !important; /* Muted slate gray */
+}
+
+/* Highlight metrics or labels with gold-amber accent from mockup */
+.text-wood-800, 
+.text-wood-600 {
+  color: #f59e0b !important; /* amber-500 */
+}
+
+/* ==========================================================
+   INPUTS & SELECTION CONTROLS
+   ========================================================== */
+input, 
+select, 
+textarea {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+  border-radius: 0.75rem !important; /* rounded-xl */
+}
+input:focus, 
+select:focus, 
+textarea:focus {
+  border-color: rgba(245, 158, 11, 0.5) !important; /* amber glowing focus state */
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2) !important;
+  outline: none !important;
+}
+input::placeholder, 
+textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Fix dropdown options lists so system option dropdowns are dark and legible */
+option {
+  background-color: #0f172a !important; /* slate-950 */
+  color: #f1f5f9 !important;
+}
+
+/* ==========================================================
+   MODALS AND PORTALS
+   ========================================================== */
+.fixed.inset-0.z-50 .bg-white,
+[role="dialog"] .bg-white,
+.modal-content,
+div[className*="fixed"] div[className*="bg-white"] {
+  background-color: rgba(15, 23, 42, 0.9) !important; /* 90% opaque dark blue-slate */
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* ==========================================================
+   BUTTONS AND GLASS ACCENTS
+   ========================================================== */
+
+/* Primary action buttons mapped to beautiful high-contrast amber */
+.bg-wood-600, 
+.bg-wood-700,
+button.bg-wood-600,
+button.bg-wood-700 {
+  background-color: #f59e0b !important; /* amber-500 */
+  color: #020617 !important; /* slate-950 */
+  font-weight: 700 !important;
+  border: none !important;
+  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.2) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+.bg-wood-600:hover, 
+.bg-wood-700:hover,
+button.bg-wood-600:hover,
+button.bg-wood-700:hover {
+  background-color: #d97706 !important; /* amber-600 */
+  box-shadow: 0 4px 20px 0 rgba(245, 158, 11, 0.45) !important;
+  transform: translateY(-1px);
+}
+
+/* Glassy badge pills mapped to high contrast soft glowing states */
+.bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+}
+.text-emerald-800, 
+.text-emerald-700,
+.text-emerald-600 {
+  color: #34d399 !important; /* emerald-400 */
+}
+
+.bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  border: 1px solid rgba(245, 158, 11, 0.25) !important;
+}
+.text-amber-800, 
+.text-amber-700,
+.text-amber-600 {
+  color: #fbbf24 !important; /* amber-400 */
+}
+
+.bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border: 1px solid rgba(59, 130, 246, 0.25) !important;
+}
+.text-blue-800, 
+.text-blue-700,
+.text-blue-600 {
+  color: #60a5fa !important; /* blue-400 */
+}
+
+.bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+}
+.text-red-800, 
+.text-red-700,
+.text-red-600 {
+  color: #f87171 !important; /* red-400 */
+}
+
+.bg-purple-50 {
+  background-color: rgba(168, 85, 247, 0.15) !important;
+  border: 1px solid rgba(168, 85, 247, 0.25) !important;
+}
+.text-purple-800, 
+.text-purple-700,
+.text-purple-600 {
+  color: #c084fc !important; /* purple-400 */
+}
+
+/* Hover effects for interactive lists or table rows */
+.hover\:bg-wood-50\/30:hover, 
+.hover\:bg-gray-50:hover, 
+.hover\:bg-slate-50:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
