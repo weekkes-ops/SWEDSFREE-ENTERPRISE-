@@ -135,6 +135,17 @@ export interface RegistrationRequest {
   requestDate: string;
 }
 
+export interface WarningLetter {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  date: string; // YYYY-MM-DD
+  type: 'Performance' | 'Conduct' | 'Attendance' | 'Safety' | 'Other';
+  reason: string;
+  severity: 'Low' | 'Medium' | 'High';
+  issuedBy: string;
+}
+
 export function formatCurrency(amount: number, decimals: number = 2): string {
   return `Le ${amount.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 }

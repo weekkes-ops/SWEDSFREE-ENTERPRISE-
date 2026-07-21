@@ -20,6 +20,7 @@ interface CustomerManagerProps {
   customers: Customer[];
   jobs: Job[];
   onAddCustomer: (customer: Omit<Customer, 'id' | 'registrationDate'>) => void;
+  onUpdateCustomer?: (customer: Customer) => void;
   showRegisterModalOnLoad?: boolean;
   onCloseRegisterModal?: () => void;
   currentUser?: Employee | null;
@@ -29,6 +30,7 @@ export default function CustomerManager({
   customers,
   jobs,
   onAddCustomer,
+  onUpdateCustomer,
   showRegisterModalOnLoad = false,
   onCloseRegisterModal,
   currentUser
@@ -37,6 +39,7 @@ export default function CustomerManager({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(customers[0] || null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Form states - Register Customer
   const [name, setName] = useState('');
@@ -46,12 +49,51 @@ export default function CustomerManager({
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Form states - Edit Customer
+  const [editName, setEditName] = useState('');
+  const [editCompany, setEditCompany] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+
   // Handle auto-triggering modal from dashboard action shortcuts
   useState(() => {
     if (showRegisterModalOnLoad) {
       setShowRegisterModal(true);
     }
   });
+
+  const handleOpenEditModal = (cust: Customer) => {
+    setEditName(cust.name);
+    setEditCompany(cust.company || '');
+    setEditPhone(cust.phone);
+    setEditEmail(cust.email);
+    setEditAddress(cust.address);
+    setEditNotes(cust.notes || '');
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer || !editName.trim()) return;
+
+    const updated: Customer = {
+      ...selectedCustomer,
+      name: editName,
+      company: editCompany ? editCompany : undefined,
+      phone: editPhone,
+      email: editEmail,
+      address: editAddress,
+      notes: editNotes ? editNotes : undefined
+    };
+
+    if (onUpdateCustomer) {
+      onUpdateCustomer(updated);
+    }
+    setSelectedCustomer(updated);
+    setShowEditModal(false);
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -209,9 +251,19 @@ export default function CustomerManager({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-lg">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>Registered: <strong className="font-mono text-gray-600">{selectedCustomer.registrationDate}</strong></span>
+                  <div className="flex items-center gap-2">
+                    {!isAuditor && (
+                      <button
+                        onClick={() => handleOpenEditModal(selectedCustomer)}
+                        className="px-2.5 py-1.5 text-xs font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-xl transition"
+                      >
+                        Edit Profile
+                      </button>
+                    )}
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-lg">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Registered: <strong className="font-mono text-gray-600">{selectedCustomer.registrationDate}</strong></span>
+                    </div>
                   </div>
                 </div>
 
@@ -328,6 +380,119 @@ export default function CustomerManager({
         </div>
 
       </div>
+
+      {/* MODAL: Edit Customer Details */}
+      <AnimatePresence>
+        {showEditModal && selectedCustomer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-wood-100 shadow-xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-lg">Edit Client Details</h3>
+                  <p className="text-xs text-wood-200">Modify properties, company, and contact settings.</p>
+                </div>
+                <button 
+                  onClick={() => setShowEditModal(false)}
+                  className="text-wood-300 hover:text-white font-bold text-xl"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Client Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Corporate Company (Optional)</label>
+                    <input
+                      type="text"
+                      value={editCompany}
+                      onChange={(e) => setEditCompany(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Contact Phone *</label>
+                    <input
+                      type="tel"
+                      required
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Site / Delivery Address *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Dossier Notes & Requests (Optional)</label>
+                  <textarea
+                    rows={3}
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowEditModal(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* MODAL: Register New Customer */}
       <AnimatePresence>

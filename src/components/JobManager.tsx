@@ -25,6 +25,7 @@ interface JobManagerProps {
   employees: Employee[];
   inventory: InventoryItem[];
   onCreateJob: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
+  onUpdateJob?: (updatedJob: Job) => void;
   onUpdateJobStatus: (id: string, status: JobStatus) => void;
   onLogJobMaterial: (jobId: string, material: JobMaterial) => void;
   onRecordJobPayment: (jobId: string, payment: Omit<JobPayment, 'id'>) => void;
@@ -39,6 +40,7 @@ export default function JobManager({
   employees,
   inventory,
   onCreateJob,
+  onUpdateJob,
   onUpdateJobStatus,
   onLogJobMaterial,
   onRecordJobPayment,
@@ -53,6 +55,7 @@ export default function JobManager({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showEditJobModal, setShowEditJobModal] = useState(false);
 
   // Form states - Create Job
   const [title, setTitle] = useState('');
@@ -64,6 +67,17 @@ export default function JobManager({
   const [quoteAmount, setQuoteAmount] = useState(5000);
   const [laborCost, setLaborCost] = useState(1000);
   const [otherCosts, setOtherCosts] = useState(200);
+
+  // Form states - Edit Job
+  const [editJobTitle, setEditJobTitle] = useState('');
+  const [editJobCustomerId, setEditJobCustomerId] = useState('');
+  const [editJobDescription, setEditJobDescription] = useState('');
+  const [editJobAssignedStaff, setEditJobAssignedStaff] = useState<string[]>([]);
+  const [editJobStartDate, setEditJobStartDate] = useState('');
+  const [editJobDueDate, setEditJobDueDate] = useState('');
+  const [editJobQuoteAmount, setEditJobQuoteAmount] = useState(5000);
+  const [editJobLaborCost, setEditJobLaborCost] = useState(1000);
+  const [editJobOtherCosts, setEditJobOtherCosts] = useState(200);
 
   // Form states - Log Material
   const [materialItemId, setMaterialItemId] = useState(inventory[0]?.id || '');
@@ -79,6 +93,48 @@ export default function JobManager({
       setShowCreateModal(true);
     }
   });
+
+  const handleOpenEditModal = (job: Job) => {
+    setEditJobTitle(job.title);
+    setEditJobCustomerId(job.customerId);
+    setEditJobDescription(job.description);
+    setEditJobAssignedStaff(job.assignedEmployees);
+    setEditJobStartDate(job.startDate);
+    setEditJobDueDate(job.dueDate);
+    setEditJobQuoteAmount(job.quoteAmount);
+    setEditJobLaborCost(job.laborCost);
+    setEditJobOtherCosts(job.otherCosts);
+    setShowEditJobModal(true);
+  };
+
+  const handleEditJobSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const activeSelectedJob = jobs.find(j => j.id === selectedJob?.id) || selectedJob;
+    if (!activeSelectedJob || !editJobTitle.trim() || !editJobCustomerId) return;
+
+    const customer = customers.find(c => c.id === editJobCustomerId);
+    if (!customer) return;
+
+    const updated: Job = {
+      ...activeSelectedJob,
+      title: editJobTitle,
+      customerId: editJobCustomerId,
+      customerName: customer.name,
+      description: editJobDescription,
+      assignedEmployees: editJobAssignedStaff,
+      startDate: editJobStartDate,
+      dueDate: editJobDueDate,
+      quoteAmount: editJobQuoteAmount,
+      laborCost: editJobLaborCost,
+      otherCosts: editJobOtherCosts
+    };
+
+    if (onUpdateJob) {
+      onUpdateJob(updated);
+    }
+    setSelectedJob(updated);
+    setShowEditJobModal(false);
+  };
 
   const handleCreateJobSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -292,7 +348,17 @@ export default function JobManager({
               <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-base font-bold text-gray-900 font-display">{activeSelectedJob.title}</h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold text-gray-900 font-display">{activeSelectedJob.title}</h2>
+                      {!isAuditor && (
+                        <button
+                          onClick={() => handleOpenEditModal(activeSelectedJob)}
+                          className="px-2 py-0.5 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-400 mt-0.5">Comm ID: {activeSelectedJob.id} &bull; Client: {activeSelectedJob.customerName}</p>
                   </div>
 
@@ -797,6 +863,175 @@ export default function JobManager({
                     className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition shadow-xs"
                   >
                     Clear Payment
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: Edit Job Details */}
+      <AnimatePresence>
+        {showEditJobModal && selectedJob && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-wood-100 shadow-xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-lg">Modify Woodwork Job</h3>
+                  <p className="text-xs text-wood-200">Update specs, allocated artisans, dates, and pricing parameters.</p>
+                </div>
+                <button 
+                  onClick={() => setShowEditJobModal(false)}
+                  className="text-wood-300 hover:text-white font-bold text-xl"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <form onSubmit={handleEditJobSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Commission Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editJobTitle}
+                    onChange={(e) => setEditJobTitle(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Furniture Client *</label>
+                    <select
+                      value={editJobCustomerId}
+                      onChange={(e) => setEditJobCustomerId(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold text-gray-700 bg-white"
+                    >
+                      {customers.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Description / Aesthetic Tastes</label>
+                    <input
+                      type="text"
+                      value={editJobDescription}
+                      onChange={(e) => setEditJobDescription(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Allocate Swedsfree Artisans *</label>
+                  <div className="grid grid-cols-2 gap-2 max-h-[120px] overflow-y-auto p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    {employees.filter(emp => emp.status === 'Active').map(emp => {
+                      const isChecked = editJobAssignedStaff.includes(emp.id);
+                      return (
+                        <label key={emp.id} className="flex items-center gap-2 text-xs font-semibold text-gray-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setEditJobAssignedStaff(prev => prev.filter(id => id !== emp.id));
+                              } else {
+                                setEditJobAssignedStaff(prev => [...prev, emp.id]);
+                              }
+                            }}
+                            className="rounded text-wood-600 focus:ring-wood-500"
+                          />
+                          <span>{emp.name} ({emp.role})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Commencement Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={editJobStartDate}
+                      onChange={(e) => setEditJobStartDate(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Completion Due Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={editJobDueDate}
+                      onChange={(e) => setEditJobDueDate(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Client Quote ($)</label>
+                    <input
+                      type="number"
+                      required
+                      min={100}
+                      value={editJobQuoteAmount}
+                      onChange={(e) => setEditJobQuoteAmount(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Labor Budget ($)</label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={editJobLaborCost}
+                      onChange={(e) => setEditJobLaborCost(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Other Overheads ($)</label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={editJobOtherCosts}
+                      onChange={(e) => setEditJobOtherCosts(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowEditJobModal(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs"
+                  >
+                    Save Changes
                   </button>
                 </div>
               </form>

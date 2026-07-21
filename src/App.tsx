@@ -12,7 +12,8 @@ import {
   X,
   Sparkles,
   Hammer,
-  Camera
+  Camera,
+  Receipt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -25,6 +26,7 @@ import JobManager from './components/JobManager';
 import FinancialLedger from './components/FinancialLedger';
 import ReportGenerator from './components/ReportGenerator';
 import DailyWorkManager from './components/DailyWorkManager';
+import InvoiceReceiptManager from './components/InvoiceReceiptManager';
 import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
 
@@ -52,7 +54,8 @@ import {
   FinancialCategory,
   DailyWorkLog,
   RegistrationRequest,
-  EmployeeRole
+  EmployeeRole,
+  WarningLetter
 } from './types';
 
 export default function App() {
@@ -70,6 +73,7 @@ export default function App() {
   const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>([]);
   const [dailyWorkLogs, setDailyWorkLogs] = useState<DailyWorkLog[]>([]);
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>([]);
+  const [warningLetters, setWarningLetters] = useState<WarningLetter[]>([]);
 
   // 1. Initial Load from localStorage or Seeds
   useEffect(() => {
@@ -80,6 +84,7 @@ export default function App() {
     const localInvTx = localStorage.getItem('swedsfree_inv_transactions');
     const localFinTx = localStorage.getItem('swedsfree_fin_transactions');
     const localWorkLogs = localStorage.getItem('swedsfree_daily_work_logs');
+    const localWarnings = localStorage.getItem('swedsfree_warning_letters');
 
     if (localInv) setInventory(JSON.parse(localInv));
     else setInventory(INITIAL_INVENTORY);
@@ -87,8 +92,26 @@ export default function App() {
     if (localCust) setCustomers(JSON.parse(localCust));
     else setCustomers(INITIAL_CUSTOMERS);
 
-    if (localEmp) setEmployees(JSON.parse(localEmp));
-    else setEmployees(INITIAL_EMPLOYEES);
+    let hasOldNames = false;
+    let finalEmployees = INITIAL_EMPLOYEES;
+    if (localEmp) {
+      try {
+        const parsed = JSON.parse(localEmp);
+        hasOldNames = parsed.some((e: any) => e.name === 'Alimamy Kamara' || e.name === 'Emmanuel Cole');
+        if (hasOldNames) {
+          localStorage.removeItem('swedsfree_current_user');
+          finalEmployees = INITIAL_EMPLOYEES;
+          localStorage.setItem('swedsfree_employees', JSON.stringify(INITIAL_EMPLOYEES));
+        } else {
+          finalEmployees = parsed;
+        }
+      } catch (e) {
+        finalEmployees = INITIAL_EMPLOYEES;
+      }
+    } else {
+      localStorage.setItem('swedsfree_employees', JSON.stringify(INITIAL_EMPLOYEES));
+    }
+    setEmployees(finalEmployees);
 
     if (localJobs) setJobs(JSON.parse(localJobs));
     else setJobs(INITIAL_JOBS);
@@ -101,6 +124,9 @@ export default function App() {
 
     if (localWorkLogs) setDailyWorkLogs(JSON.parse(localWorkLogs));
     else setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
+
+    if (localWarnings) setWarningLetters(JSON.parse(localWarnings));
+    else setWarningLetters([]);
 
     const localRequests = localStorage.getItem('swedsfree_registration_requests');
     if (localRequests) {
@@ -135,7 +161,12 @@ export default function App() {
     const localUser = localStorage.getItem('swedsfree_current_user');
     if (localUser) {
       try {
-        setCurrentUser(JSON.parse(localUser));
+        if (hasOldNames) {
+          localStorage.removeItem('swedsfree_current_user');
+          setCurrentUser(null);
+        } else {
+          setCurrentUser(JSON.parse(localUser));
+        }
       } catch (e) {
         console.error(e);
       }
@@ -190,6 +221,10 @@ export default function App() {
     localStorage.setItem('swedsfree_registration_requests', JSON.stringify(registrationRequests));
   }, [registrationRequests]);
 
+  useEffect(() => {
+    localStorage.setItem('swedsfree_warning_letters', JSON.stringify(warningLetters));
+  }, [warningLetters]);
+
   // RESET DATABASE ACTION
   const handleResetDatabase = () => {
     if (window.confirm('Are you sure you want to reset all records back to Swedsfree Enterprise standard seeds? This will delete custom transactions.')) {
@@ -201,6 +236,7 @@ export default function App() {
       localStorage.removeItem('swedsfree_fin_transactions');
       localStorage.removeItem('swedsfree_daily_work_logs');
       localStorage.removeItem('swedsfree_registration_requests');
+      localStorage.removeItem('swedsfree_warning_letters');
 
       setInventory(INITIAL_INVENTORY);
       setCustomers(INITIAL_CUSTOMERS);
@@ -209,6 +245,7 @@ export default function App() {
       setInventoryTransactions(INITIAL_INVENTORY_TRANSACTIONS);
       setFinancialTransactions(INITIAL_FINANCIALS);
       setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
+      setWarningLetters([]);
       setRegistrationRequests([
         {
           id: 'req-01',
@@ -445,6 +482,33 @@ export default function App() {
     setDailyWorkLogs(prev => [newLog, ...prev]);
   };
 
+  // Record Warning Letter
+  const handleAddWarningLetter = (warning: Omit<WarningLetter, 'id'>) => {
+    const newWarning: WarningLetter = {
+      ...warning,
+      id: `warn-${Date.now()}`
+    };
+    setWarningLetters(prev => [newWarning, ...prev]);
+  };
+
+  // Record Updators
+  const handleUpdateInventoryItem = (updatedItem: InventoryItem) => {
+    setInventory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+  };
+
+  const handleUpdateCustomer = (updatedCustomer: Customer) => {
+    setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+    setJobs(prev => prev.map(j => j.customerId === updatedCustomer.id ? { ...j, customerName: updatedCustomer.name } : j));
+  };
+
+  const handleUpdateEmployee = (updatedEmployee: Employee) => {
+    setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
+  };
+
+  const handleUpdateJob = (updatedJob: Job) => {
+    setJobs(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
+  };
+
   // G. Registration request and approval handlers
   const handleRegisterRequest = (req: { name: string; email: string; phone: string; role: EmployeeRole; password?: string }) => {
     const newRequest: RegistrationRequest = {
@@ -532,6 +596,7 @@ export default function App() {
       { id: 'inventory', label: 'Raw Inventory', icon: Package },
       { id: 'customers', label: 'Clients Directory', icon: UserCheck },
       { id: 'employees', label: 'Artisans Registry', icon: Users },
+      { id: 'invoices', label: 'Invoices & Receipts', icon: Receipt },
     ] : []),
     { id: 'jobs', label: 'Woodwork Jobs', icon: Wrench },
     { id: 'daily-work', label: 'Daily Logs', icon: Camera },
@@ -710,6 +775,7 @@ export default function App() {
                 transactions={inventoryTransactions}
                 onAddInventoryItem={handleAddInventoryItem}
                 onLogTransaction={handleLogTransaction}
+                onUpdateInventoryItem={handleUpdateInventoryItem}
                 currentUser={currentUser}
               />
             )}
@@ -719,6 +785,7 @@ export default function App() {
                 customers={customers}
                 jobs={jobs}
                 onAddCustomer={handleAddCustomer}
+                onUpdateCustomer={handleUpdateCustomer}
                 showRegisterModalOnLoad={quickActionTrigger === 'register-customer'}
                 onCloseRegisterModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
@@ -730,6 +797,7 @@ export default function App() {
                 employees={employees}
                 jobs={jobs}
                 onAddEmployee={handleAddEmployee}
+                onUpdateEmployee={handleUpdateEmployee}
                 onUpdateEmployeeStatus={handleUpdateEmployeeStatus}
                 showRegisterModalOnLoad={quickActionTrigger === 'register-employee'}
                 onCloseRegisterModal={() => setQuickActionTrigger(null)}
@@ -737,6 +805,8 @@ export default function App() {
                 registrationRequests={registrationRequests}
                 onApproveRequest={handleApproveRequest}
                 onRejectRequest={handleRejectRequest}
+                warningLetters={warningLetters}
+                onAddWarningLetter={handleAddWarningLetter}
               />
             )}
 
@@ -747,11 +817,20 @@ export default function App() {
                 employees={employees}
                 inventory={inventory}
                 onCreateJob={handleCreateJob}
+                onUpdateJob={handleUpdateJob}
                 onUpdateJobStatus={handleUpdateJobStatus}
                 onLogJobMaterial={handleLogJobMaterial}
                 onRecordJobPayment={handleRecordJobPayment}
                 showCreateModalOnLoad={quickActionTrigger === 'create-job'}
                 onCloseCreateModal={() => setQuickActionTrigger(null)}
+                currentUser={currentUser}
+              />
+            )}
+
+            {activeTab === 'invoices' && (
+              <InvoiceReceiptManager
+                jobs={jobs}
+                customers={customers}
                 currentUser={currentUser}
               />
             )}
