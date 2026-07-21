@@ -20,6 +20,7 @@ interface InventoryManagerProps {
   onAddInventoryItem: (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => void;
   onLogTransaction: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
   onUpdateInventoryItem?: (item: InventoryItem) => void;
+  onDeleteInventoryItem?: (id: string) => void;
   currentUser?: Employee | null;
 }
 
@@ -29,6 +30,7 @@ export default function InventoryManager({
   onAddInventoryItem,
   onLogTransaction,
   onUpdateInventoryItem,
+  onDeleteInventoryItem,
   currentUser
 }: InventoryManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
@@ -42,6 +44,7 @@ export default function InventoryManager({
 
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Form states - New Item
   const [newItemName, setNewItemName] = useState('');
@@ -373,26 +376,58 @@ export default function InventoryManager({
                             {!isAuditor && (
                               <td className="py-3.5 px-4 text-right whitespace-nowrap">
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    onClick={() => handleOpenEditModal(item)}
-                                    className="px-2 py-1 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button 
-                                    onClick={() => handleOpenLogModal('INWARDS', item.id)}
-                                    className="p-1 hover:bg-emerald-50 rounded text-emerald-600 border border-transparent hover:border-emerald-100 transition"
-                                    title="Add Inwards Log"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleOpenLogModal('OUTWARDS', item.id)}
-                                    className="p-1 hover:bg-amber-50 rounded text-amber-600 border border-transparent hover:border-amber-100 transition"
-                                    title="Add Outwards Log"
-                                  >
-                                    <ArrowUpRight className="w-3.5 h-3.5" />
-                                  </button>
+                                  {confirmDeleteId === item.id ? (
+                                    <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
+                                      <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
+                                      <button
+                                        onClick={() => {
+                                          if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
+                                          setConfirmDeleteId(null);
+                                        }}
+                                        className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
+                                      >
+                                        Yes
+                                      </button>
+                                      <button
+                                        onClick={() => setConfirmDeleteId(null)}
+                                        className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => handleOpenEditModal(item)}
+                                        className="px-2 py-1 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button 
+                                        onClick={() => handleOpenLogModal('INWARDS', item.id)}
+                                        className="p-1 hover:bg-emerald-50 rounded text-emerald-600 border border-transparent hover:border-emerald-100 transition"
+                                        title="Add Inwards Log"
+                                      >
+                                        <Plus className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleOpenLogModal('OUTWARDS', item.id)}
+                                        className="p-1 hover:bg-amber-50 rounded text-amber-600 border border-transparent hover:border-amber-100 transition"
+                                        title="Add Outwards Log"
+                                      >
+                                        <ArrowUpRight className="w-3.5 h-3.5" />
+                                      </button>
+                                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager') && onDeleteInventoryItem && (
+                                        <button 
+                                          onClick={() => setConfirmDeleteId(item.id)}
+                                          className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition"
+                                          title="Delete Material"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
                                 </div>
                               </td>
                             )}
@@ -469,28 +504,60 @@ export default function InventoryManager({
                         <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-dashed border-gray-100 text-[10px]">
                           <span className="text-gray-400 font-medium">Min Threshold: {item.minStockThreshold} {item.unit}</span>
                           <div className="flex items-center gap-1.5">
-                            {!isAuditor && (
-                              <button
-                                onClick={() => handleOpenEditModal(item)}
-                                className="px-2 py-0.5 text-[9px] font-bold uppercase text-wood-700 hover:underline"
-                              >
-                                Edit
-                              </button>
+                            {confirmDeleteId === item.id ? (
+                              <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
+                                <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
+                                <button
+                                  onClick={() => {
+                                    if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
+                                    setConfirmDeleteId(null);
+                                  }}
+                                  className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                {!isAuditor && (
+                                  <button
+                                    onClick={() => handleOpenEditModal(item)}
+                                    className="px-2 py-0.5 text-[9px] font-bold uppercase text-wood-700 hover:underline"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={() => handleOpenLogModal('INWARDS', item.id)}
+                                  className="p-1 hover:bg-emerald-50 rounded text-emerald-600 border border-transparent hover:border-emerald-100 transition"
+                                  title="Add Inwards Log"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                </button>
+                                <button 
+                                  onClick={() => handleOpenLogModal('OUTWARDS', item.id)}
+                                  className="p-1 hover:bg-amber-50 rounded text-amber-600 border border-transparent hover:border-amber-100 transition"
+                                  title="Add Outwards Log"
+                                >
+                                  <ArrowUpRight className="w-3.5 h-3.5" />
+                                </button>
+                                {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager') && onDeleteInventoryItem && (
+                                  <button 
+                                    onClick={() => setConfirmDeleteId(item.id)}
+                                    className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition"
+                                    title="Delete Material"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </>
                             )}
-                            <button 
-                              onClick={() => handleOpenLogModal('INWARDS', item.id)}
-                              className="p-1 hover:bg-emerald-50 rounded text-emerald-600 border border-transparent hover:border-emerald-100 transition"
-                              title="Add Inwards Log"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                            <button 
-                              onClick={() => handleOpenLogModal('OUTWARDS', item.id)}
-                              className="p-1 hover:bg-amber-50 rounded text-amber-600 border border-transparent hover:border-amber-100 transition"
-                              title="Add Outwards Log"
-                            >
-                              <ArrowUpRight className="w-3.5 h-3.5" />
-                            </button>
                           </div>
                         </div>
                       </div>

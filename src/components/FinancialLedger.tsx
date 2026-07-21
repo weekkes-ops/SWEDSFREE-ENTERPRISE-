@@ -10,7 +10,9 @@ import {
   ArrowUpRight, 
   PieChart as PieIcon, 
   BarChart as BarIcon,
-  ShieldAlert
+  ShieldAlert,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -30,12 +32,16 @@ import {
 interface FinancialLedgerProps {
   transactions: FinancialTransaction[];
   onAddTransaction: (transaction: Omit<FinancialTransaction, 'id'>) => void;
+  onUpdateTransaction?: (transaction: FinancialTransaction) => void;
+  onDeleteTransaction?: (id: string) => void;
   currentUser?: Employee | null;
 }
 
 export default function FinancialLedger({
   transactions,
   onAddTransaction,
+  onUpdateTransaction,
+  onDeleteTransaction,
   currentUser
 }: FinancialLedgerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
@@ -49,6 +55,14 @@ export default function FinancialLedger({
   const [date, setDate] = useState('2026-07-20');
   const [description, setDescription] = useState('');
 
+  // Form states - Edit Transaction
+  const [editingTransaction, setEditingTransaction] = useState<FinancialTransaction | null>(null);
+  const [editType, setEditType] = useState<'INCOME' | 'EXPENDITURE'>('INCOME');
+  const [editCategory, setEditCategory] = useState<FinancialCategory>('Job Payment');
+  const [editAmount, setEditAmount] = useState(1500);
+  const [editDate, setEditDate] = useState('2026-07-20');
+  const [editDescription, setEditDescription] = useState('');
+
   const handleTypeChange = (newType: 'INCOME' | 'EXPENDITURE') => {
     setType(newType);
     if (newType === 'INCOME') {
@@ -56,6 +70,24 @@ export default function FinancialLedger({
     } else {
       setCategory('Material Purchase');
     }
+  };
+
+  const handleEditTypeChange = (newType: 'INCOME' | 'EXPENDITURE') => {
+    setEditType(newType);
+    if (newType === 'INCOME') {
+      setEditCategory('Job Payment');
+    } else {
+      setEditCategory('Material Purchase');
+    }
+  };
+
+  const handleStartEdit = (t: FinancialTransaction) => {
+    setEditingTransaction(t);
+    setEditType(t.type);
+    setEditCategory(t.category);
+    setEditAmount(t.amount);
+    setEditDate(t.date);
+    setEditDescription(t.description);
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -74,6 +106,32 @@ export default function FinancialLedger({
     setDescription('');
     setAmount(1000);
     setShowAddModal(false);
+  };
+
+  const handleEditSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction || !editDescription.trim() || editAmount <= 0) return;
+
+    if (onUpdateTransaction) {
+      onUpdateTransaction({
+        ...editingTransaction,
+        type: editType,
+        category: editCategory,
+        amount: editAmount,
+        date: editDate,
+        description: editDescription
+      });
+    }
+
+    setEditingTransaction(null);
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm("Are you sure you want to permanently delete this transaction record?")) {
+      if (onDeleteTransaction) {
+        onDeleteTransaction(id);
+      }
+    }
   };
 
   // Calculations
@@ -248,6 +306,7 @@ export default function FinancialLedger({
                   <th className="py-3 px-4">Cost Category</th>
                   <th className="py-3 px-4 text-center">Inflow / Outflow</th>
                   <th className="py-3 px-4 text-right">Cleared Amount</th>
+                  {!isAuditor && <th className="py-3 px-4 text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-sm">
@@ -272,6 +331,26 @@ export default function FinancialLedger({
                       <td className={`py-3.5 px-4 text-right font-mono font-bold whitespace-nowrap ${isInc ? 'text-emerald-700' : 'text-red-700'}`}>
                         {isInc ? '+' : '-'}{formatCurrency(t.amount)}
                       </td>
+                      {!isAuditor && (
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <div className="inline-flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handleStartEdit(t)}
+                              className="p-1 text-slate-400 hover:text-wood-700 rounded-lg hover:bg-slate-100 transition"
+                              title="Edit Transaction"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(t.id)}
+                              className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50/50 transition"
+                              title="Delete Transaction"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -478,6 +557,141 @@ export default function FinancialLedger({
                     className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs"
                   >
                     Post Transaction
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {editingTransaction && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-wood-100 shadow-xl w-full max-w-md overflow-hidden"
+            >
+              <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-lg">Edit Cash Transaction</h3>
+                  <p className="text-xs text-wood-200">Modify the record properties inside the ledger.</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setEditingTransaction(null)}
+                  className="text-wood-300 hover:text-white font-bold text-xl"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+                
+                {/* Flow Type selector buttons */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase">Cash Flow Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEditTypeChange('INCOME')}
+                      className={`py-2 text-xs font-bold rounded-xl border transition ${editType === 'INCOME' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
+                    >
+                      Inwards (Income)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleEditTypeChange('EXPENDITURE')}
+                      className={`py-2 text-xs font-bold rounded-xl border transition ${editType === 'EXPENDITURE' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
+                    >
+                      Outwards (Expense)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Category</label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value as FinancialCategory)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 bg-white"
+                    >
+                      {editType === 'INCOME' ? (
+                        <>
+                          <option value="Job Payment">Job Payment</option>
+                          <option value="Custom Commission">Custom Commission</option>
+                          <option value="Scrap wood sale">Scrap wood sale</option>
+                          <option value="Other">Other Miscellaneous</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Material Purchase">Material Purchase</option>
+                          <option value="Employee Wages">Employee Wages</option>
+                          <option value="Rent">Rent</option>
+                          <option value="Tools & Maintenance">Tools & Maintenance</option>
+                          <option value="Utilities">Utilities</option>
+                          <option value="Overhead">Overhead</option>
+                          <option value="Other">Other Expenses</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Transaction Date</label>
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Amount (Le) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(Number(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Memo / Description *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Cleared electricity electric saw utility bill"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium"
+                  />
+                </div>
+
+                {editingTransaction.referenceId && (
+                  <p className="text-[10px] text-gray-400 font-semibold italic">
+                    Note: This is linked to system reference ID: {editingTransaction.referenceId}
+                  </p>
+                )}
+
+                <div className="flex gap-2 pt-4">
+                  <button 
+                    type="button" 
+                    onClick={() => setEditingTransaction(null)}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs"
+                  >
+                    Save Changes
                   </button>
                 </div>
               </form>

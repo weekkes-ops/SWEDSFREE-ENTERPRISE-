@@ -117,7 +117,7 @@ export default function ReportGenerator({
   };
 
   const handleExportCSV = () => {
-    alert("Drafting Excel CSV Summary for Swedsfree Enterprise. Export compiled successfully!");
+    alert("Drafting Excel CSV Summary for SWED WOOD WORK. Export compiled successfully!");
   };
 
   return (
@@ -127,7 +127,7 @@ export default function ReportGenerator({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs print:hidden">
         <div>
           <h1 className="text-2xl font-display font-bold text-wood-900 tracking-tight">
-            Swedsfree Reports Ledger
+            SWED WOOD WORK Reports Ledger
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Generate and audit Daily, Weekly, Monthly, and Yearly operational dossiers.
@@ -180,7 +180,7 @@ export default function ReportGenerator({
 
       {/* Printable Report Header */}
       <div className="hidden print:block text-center border-b pb-6 space-y-1">
-        <h1 className="text-2xl font-serif font-bold text-gray-900 uppercase">SWEDSFREE ENTERPRISE</h1>
+        <h1 className="text-2xl font-serif font-bold text-gray-900 uppercase">SWED WOOD WORK</h1>
         <p className="text-sm text-gray-500">Professional Woodwork & Bespoke Furniture Workshop</p>
         <p className="text-xs font-mono font-bold text-gray-700">{selectedPeriod.toUpperCase()} GENERAL AUDIT REPORT &mdash; PIVOT DATE: {currentDateStr}</p>
       </div>

@@ -24,7 +24,7 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ employees, onLogin, onRegisterRequest }: LoginScreenProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [selectedEmpId, setSelectedEmpId] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState(false);
@@ -41,9 +41,64 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
     e.preventDefault();
     setError('');
 
-    const emp = employees.find(e => e.id === selectedEmpId);
+    if (!username.trim()) {
+      setError('Please enter your username or email address.');
+      return;
+    }
+
+    // Match by full name, email, or simple bypass keywords (e.g., typing 'admin')
+    let emp = employees.find(emp => 
+      emp.name.toLowerCase() === username.trim().toLowerCase() ||
+      emp.email.toLowerCase() === username.trim().toLowerCase()
+    );
+
+    if (!emp && username.trim().toLowerCase() === 'admin') {
+      emp = employees.find(e => e.role === 'Admin') || {
+        id: 'emp-01',
+        name: 'Mohamed Kamara',
+        role: 'Admin',
+        phone: '+232 76 111 2222',
+        email: 'mohamed.kamara@swedsfree.com',
+        status: 'Active',
+        baseSalary: 9500,
+        dailyRate: 350,
+        hireDate: '2024-01-10',
+        password: 'admin',
+      };
+    }
+
+    if (!emp && username.trim().toLowerCase() === 'manager') {
+      emp = employees.find(e => e.role === 'Manager') || {
+        id: 'emp-manager-bypass',
+        name: 'Amadu Sesay',
+        role: 'Manager',
+        phone: '+232 76 333 4444',
+        email: 'amadu.sesay@swedsfree.com',
+        status: 'Active',
+        baseSalary: 7200,
+        dailyRate: 250,
+        hireDate: '2024-05-15',
+        password: 'manager',
+      };
+    }
+
+    if (!emp && username.trim().toLowerCase() === 'auditor') {
+      emp = employees.find(e => e.role === 'Auditor') || {
+        id: 'emp-auditor-bypass',
+        name: 'Kadiatu Bangura',
+        role: 'Auditor',
+        phone: '+232 77 555 6666',
+        email: 'kadiatu.b@swedsfree.com',
+        status: 'Active',
+        baseSalary: 6800,
+        dailyRate: 230,
+        hireDate: '2024-06-01',
+        password: 'audit',
+      };
+    }
+
     if (!emp) {
-      setError('Please select an employee profile.');
+      setError('Username or email not found. (Hint: Try "Mohamed Kamara" or "James Weekes")');
       return;
     }
 
@@ -52,10 +107,11 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
       emp.role === 'Manager' ? 'manager' : 
       emp.role === 'Auditor' ? 'audit' : '1234'
     );
+
     if (password === expectedPassword) {
       onLogin(emp);
     } else {
-      setError('Incorrect password / PIN. Hint: use "admin" for Admin, "manager" for Manager, "audit" for Auditor, "1234" for Employees.');
+      setError('Incorrect password or PIN. (Hint: Use "admin" for Admin or "1234" for standard workers).');
     }
   };
 
@@ -107,19 +163,63 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
   };
 
   const handleQuickBypass = (roleType: 'Admin' | 'Manager' | 'Employee' | 'Auditor') => {
-    if (roleType === 'Admin') {
-      const admin = employees.find(e => e.role === 'Admin');
-      if (admin) onLogin(admin);
-    } else if (roleType === 'Manager') {
-      const manager = employees.find(e => e.role === 'Manager');
-      if (manager) onLogin(manager);
-    } else if (roleType === 'Auditor') {
-      const auditor = employees.find(e => e.role === 'Auditor');
-      if (auditor) onLogin(auditor);
-    } else {
-      const artisan = employees.find(e => e.role !== 'Admin' && e.role !== 'Manager' && e.role !== 'Auditor');
-      if (artisan) onLogin(artisan);
+    let emp = employees.find(e => e.role === roleType);
+    if (!emp) {
+      if (roleType === 'Admin') {
+        emp = employees.find(e => e.role === 'Admin') || {
+          id: 'emp-admin-bypass',
+          name: 'Mohamed Kamara',
+          role: 'Admin',
+          phone: '+232 76 111 2222',
+          email: 'mohamed.kamara@swedsfree.com',
+          status: 'Active',
+          baseSalary: 9500,
+          dailyRate: 350,
+          hireDate: '2024-01-10',
+          password: 'admin',
+        };
+      } else if (roleType === 'Manager') {
+        emp = employees.find(e => e.role === 'Manager') || {
+          id: 'emp-manager-bypass',
+          name: 'Amadu Sesay',
+          role: 'Manager',
+          phone: '+232 76 333 4444',
+          email: 'amadu.sesay@swedsfree.com',
+          status: 'Active',
+          baseSalary: 7200,
+          dailyRate: 250,
+          hireDate: '2024-05-15',
+          password: 'manager',
+        };
+      } else if (roleType === 'Auditor') {
+        emp = employees.find(e => e.role === 'Auditor') || {
+          id: 'emp-auditor-bypass',
+          name: 'Kadiatu Bangura',
+          role: 'Auditor',
+          phone: '+232 77 555 6666',
+          email: 'kadiatu.b@swedsfree.com',
+          status: 'Active',
+          baseSalary: 6800,
+          dailyRate: 230,
+          hireDate: '2024-06-01',
+          password: 'audit',
+        };
+      } else {
+        emp = employees.find(e => e.role === 'Employee') || {
+          id: 'emp-worker-bypass',
+          name: 'James Weekes',
+          role: 'Employee',
+          phone: '+232 76 333 4444',
+          email: 'james.weekes@swedsfree.com',
+          status: 'Active',
+          baseSalary: 5200,
+          dailyRate: 190,
+          hireDate: '2025-02-15',
+          password: '1234',
+        };
+      }
     }
+    if (emp) onLogin(emp);
   };
 
   return (
@@ -347,27 +447,22 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                   {/* User Selection */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Select Profile / Account *
+                      Username / Email Address *
                     </label>
                     <div className="relative">
                       <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4.5 h-4.5" />
-                      <select
+                      <input
+                        type="text"
                         required
-                        value={selectedEmpId}
+                        placeholder="e.g. Mohamed Kamara or admin"
+                        value={username}
                         onChange={(e) => {
-                          setSelectedEmpId(e.target.value);
+                          setUsername(e.target.value);
                           setError('');
                         }}
-                        className="w-full pl-11 pr-4 py-3 bg-slate-950/60 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 text-slate-200"
-                        id="login-employee-select"
-                      >
-                        <option value="" className="bg-slate-950">-- Choose your profile --</option>
-                        {employees.map(emp => (
-                          <option key={emp.id} value={emp.id} className="bg-slate-950 text-slate-200">
-                            {emp.name} ({emp.role})
-                          </option>
-                        ))}
-                      </select>
+                        className="w-full pl-11 pr-4 py-3 bg-slate-950/60 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 text-slate-200 placeholder-slate-600"
+                        id="login-username-input"
+                      />
                     </div>
                   </div>
 

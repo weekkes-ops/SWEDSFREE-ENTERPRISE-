@@ -239,3 +239,154 @@ button.bg-wood-700:hover {
 .hover\:bg-slate-50:hover {
   background-color: rgba(255, 255, 255, 0.05) !important;
 }
+
+/* ==========================================================
+   REFINE PROFESSIONAL PRINT STYLESHEET
+   ========================================================== */
+@media print {
+  /* Set document size and printable margins */
+  @page {
+    size: A4 portrait;
+    margin: 1.6cm !important;
+  }
+
+  /* Reset layout for white printing paper */
+  html, body {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Undo dark mode glassmorphic styles for print-area content */
+  .bg-white,
+  .bg-slate-950,
+  .bg-slate-900,
+  .bg-slate-900\/60,
+  .bg-slate-950\/60,
+  .bg-slate-950\/40,
+  .bg-gray-50,
+  .bg-slate-50,
+  .bg-wood-50,
+  .bg-wood-50\/50,
+  .bg-gray-50\/50,
+  .bg-emerald-50\/30,
+  .bg-emerald-50,
+  .bg-amber-50,
+  .bg-blue-50,
+  .bg-red-50,
+  .bg-purple-50,
+  #print-area {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Soft gray shading for table header or specific callouts on print */
+  .bg-gray-100,
+  .bg-slate-100,
+  .bg-wood-100,
+  thead,
+  tr.bg-gray-50 {
+    background-color: #f1f5f9 !important;
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+  }
+
+  /* Clean solid borders for printing */
+  .border,
+  .border-t,
+  .border-b,
+  .border-r,
+  .border-l,
+  .border-gray-100,
+  .border-gray-200,
+  .border-wood-100,
+  .border-slate-200,
+  .divide-y > * {
+    border-color: #94a3b8 !important;
+    border-width: 1px !important;
+  }
+
+  /* Text colors for black ink */
+  h1, h2, h3, h4, h5, h6, strong, b, td, th {
+    color: #0f172a !important;
+    font-weight: bold !important;
+  }
+
+  p, span, div, li, option {
+    color: #334155 !important;
+  }
+
+  /* Branded color accents for print - fine elegant deep gold/amber */
+  .text-amber-500,
+  .text-amber-400,
+  .text-wood-900,
+  .text-wood-800,
+  .text-wood-600,
+  .text-emerald-700,
+  .text-emerald-800 {
+    color: #78350f !important; /* deep golden-brown for print legibility */
+  }
+
+  /* Hide UI elements on print */
+  .no-print,
+  .print\:hidden,
+  button,
+  select,
+  input,
+  form,
+  aside,
+  header:not(.print-header),
+  footer:not(.print-footer) {
+    display: none !important;
+  }
+
+  /* Ensure the main container prints cleanly without offset */
+  #print-area {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  /* Branded print-only header and footer styles */
+  .print-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #78350f !important;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+
+  .print-footer {
+    display: block !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 8pt !important;
+    color: #64748b !important;
+    border-top: 1px solid #cbd5e1 !important;
+    padding-top: 8px;
+  }
+
+  /* Prevent page breaks inside tables and cards */
+  tr, .bg-white {
+    page-break-inside: avoid !important;
+  }
+}

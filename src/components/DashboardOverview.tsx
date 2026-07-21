@@ -13,7 +13,8 @@ import {
   UserCheck,
   UserPlus,
   Check,
-  X
+  X,
+  Download
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -87,6 +88,34 @@ export default function DashboardOverview({
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } }
   };
 
+  const handleExportMetricsCSV = () => {
+    const data = [
+      ["Metric", "Value", "Context"],
+      ["Total Active Jobs", activeJobs.length, "Unfinished commissions"],
+      ["Completed Projects", completedJobsCount, "Finished or delivered commissions"],
+      ["Total Revenue", formatCurrency(totalRevenue), "Total payments received"],
+      ["Outstanding Balance", formatCurrency(totalOutstanding), "Unpaid quote amounts"],
+      ["Total Inventory Value", formatCurrency(totalInventoryValue), "Sum of current stock * unit cost"],
+      ["Low Stock Alerts", lowStockItems.length, "Materials at or below threshold"],
+      ["Active Workforce Count", activeEmployees.length, "Artisans registry count"],
+      ["Registered Customers", customers.length, "Clients directory count"]
+    ];
+
+    const csvContent = "\uFEFF" + data.map(row => row.map(val => {
+      const stringified = String(val).replace(/"/g, '""');
+      return `"${stringified}"`;
+    }).join(",")).join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `SWED_WORKSHOP_METRICS_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <motion.div 
       variants={containerVariants}
@@ -98,20 +127,29 @@ export default function DashboardOverview({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs">
         <div>
           <h1 className="text-2xl md:text-3xl font-display font-bold text-wood-900 tracking-tight">
-            {isManager ? 'Swedsfree Workshop Hub' : `Swedsfree Hub: Welcome, ${currentUser?.name}!`}
+            {isManager ? 'SWED Woodwork Workshop Hub' : `SWED Hub: Welcome, ${currentUser?.name}!`}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             {isManager 
-              ? 'Real-time operations, inventory reserves, and financial metrics for SWEDSFREE ENTERPRISE.'
+              ? 'Real-time operations, inventory reserves, and financial metrics for SWED WOOD WORK MANAGEMENT SYSTEM.'
               : `You are authenticated as an artisan (${currentUser?.role}). Log your work and view assigned commissions.`
             }
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-wood-50 px-4 py-2 rounded-xl border border-wood-200">
-          <Clock className="w-4 h-4 text-wood-600 animate-pulse" />
-          <span className="font-mono text-xs font-semibold text-wood-800">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
-          </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleExportMetricsCSV}
+            className="flex items-center gap-1.5 px-4 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-amber-500" />
+            <span>Export Metrics CSV</span>
+          </button>
+          <div className="flex items-center gap-2 bg-wood-50 px-4 py-2 rounded-xl border border-wood-200">
+            <Clock className="w-4 h-4 text-wood-600 animate-pulse" />
+            <span className="font-mono text-xs font-semibold text-wood-800">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          </div>
         </div>
       </div>
 

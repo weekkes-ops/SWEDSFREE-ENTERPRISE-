@@ -18,7 +18,8 @@ import {
   UserPlus,
   Check,
   X,
-  Users
+  Users,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -27,6 +28,7 @@ interface EmployeeManagerProps {
   jobs: Job[];
   onAddEmployee: (employee: Omit<Employee, 'id' | 'hireDate'>) => void;
   onUpdateEmployee?: (employee: Employee) => void;
+  onDeleteEmployee?: (id: string) => void;
   onUpdateEmployeeStatus: (id: string, status: EmployeeStatus) => void;
   showRegisterModalOnLoad?: boolean;
   onCloseRegisterModal?: () => void;
@@ -43,6 +45,7 @@ export default function EmployeeManager({
   jobs,
   onAddEmployee,
   onUpdateEmployee,
+  onDeleteEmployee,
   onUpdateEmployeeStatus,
   showRegisterModalOnLoad = false,
   onCloseRegisterModal,
@@ -64,6 +67,7 @@ export default function EmployeeManager({
     registrationRequests.length > 0 ? registrationRequests[0].id : ''
   );
   const selectedReq = registrationRequests.find(r => r.id === selectedRequestId);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Form states - Register Employee
   const [name, setName] = useState('');
@@ -372,19 +376,51 @@ export default function EmployeeManager({
                       <h3 className="text-lg font-bold font-display text-gray-900">{selectedEmployee.name}</h3>
                       <p className="text-xs font-semibold text-wood-600 uppercase tracking-wide mt-0.5 flex items-center gap-1">
                         <ShieldCheck className="w-3.5 h-3.5" />
-                        Swedsfree {selectedEmployee.role} specialist
+                        SWED {selectedEmployee.role} specialist
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {!isAuditor && (
                       <button
                         onClick={() => handleOpenEditModal(selectedEmployee)}
-                        className="px-2.5 py-1.5 text-xs font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-xl transition"
+                        className="px-2.5 py-1.5 text-xs font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-xl transition cursor-pointer"
                       >
                         Edit Details
                       </button>
+                    )}
+                    {currentUser?.role === 'Admin' && onDeleteEmployee && (
+                      confirmDeleteId === selectedEmployee.id ? (
+                        <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 p-1.5 rounded-xl">
+                          <span className="text-[10px] font-bold text-red-700 uppercase px-1">Confirm?</span>
+                          <button
+                            onClick={() => {
+                              onDeleteEmployee(selectedEmployee.id);
+                              setConfirmDeleteId(null);
+                              setSelectedEmployee(employees.find(emp => emp.id !== selectedEmployee.id) || null);
+                            }}
+                            className="px-2 py-1 text-[10px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-lg transition cursor-pointer"
+                          >
+                            Yes, Delete
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-1 text-[10px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(selectedEmployee.id)}
+                          className="px-2.5 py-1.5 text-xs font-black uppercase text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                          title="Delete this worker permanently"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete Worker</span>
+                        </button>
+                      )
                     )}
                     <span className="text-xs text-gray-400 font-bold uppercase">Status:</span>
                     <select

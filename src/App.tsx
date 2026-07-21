@@ -62,6 +62,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [quickActionTrigger, setQuickActionTrigger] = useState<string | null>(null);
+  const [invoiceJobId, setInvoiceJobId] = useState<string | null>(null);
 
   // Core workshop state modules
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
@@ -278,12 +279,44 @@ export default function App() {
 
   // A. Inventory mutators
   const handleAddInventoryItem = (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => {
+    const itemId = `inv-${Date.now()}`;
+    const dateStr = new Date().toISOString().split('T')[0];
     const newItem: InventoryItem = {
       ...item,
-      id: `inv-${Date.now()}`,
-      lastUpdated: new Date().toISOString().split('T')[0]
+      id: itemId,
+      lastUpdated: dateStr
     };
     setInventory(prev => [newItem, ...prev]);
+
+    // Log inwards transaction & financial expenditure if initial stock > 0
+    if (item.currentStock > 0) {
+      const txId = `tx-inv-init-${Date.now()}`;
+      const totalValue = item.currentStock * item.unitCost;
+      const initTx: InventoryTransaction = {
+        id: txId,
+        itemId: itemId,
+        itemName: item.name,
+        type: 'INWARDS',
+        quantity: item.currentStock,
+        unitCost: item.unitCost,
+        totalValue: totalValue,
+        date: dateStr,
+        purpose: 'Initial Stock Registration'
+      };
+      setInventoryTransactions(prev => [...prev, initTx]);
+
+      const finId = `fin-inv-init-${Date.now()}`;
+      const finTx: FinancialTransaction = {
+        id: finId,
+        type: 'EXPENDITURE',
+        category: 'Material Purchase',
+        amount: totalValue,
+        date: dateStr,
+        description: `Initial Stock Registration: ${item.currentStock} units of ${item.name}`,
+        referenceId: txId
+      };
+      setFinancialTransactions(prev => [...prev, finTx]);
+    }
   };
 
   const handleLogTransaction = (tx: Omit<InventoryTransaction, 'id' | 'date'>) => {
@@ -312,16 +345,43 @@ export default function App() {
     // 2. Append transaction log
     setInventoryTransactions(prev => [...prev, newTx]);
 
-    // 3. Post to Financial Ledger as well
+    // 3. Post to Financial Ledger correctly (avoiding treating internal consumption as scrap sales income)
     const financialId = `fin-inv-${Date.now()}`;
     const isPurchase = tx.type === 'INWARDS';
+    
+    let finType: 'INCOME' | 'EXPENDITURE';
+    let finCategory: FinancialCategory;
+    let finDescription = `${tx.type} LOG: ${tx.quantity} ${tx.itemName}`;
+    
+    if (isPurchase) {
+      finType = 'EXPENDITURE';
+      finCategory = 'Material Purchase';
+      finDescription += ` - Supplier Restock: ${tx.purpose}`;
+    } else {
+      // Check if it is a scrap sale or similar revenue generator
+      const isSale = tx.purpose.toLowerCase().includes('sale') || 
+                     tx.purpose.toLowerCase().includes('sold') || 
+                     tx.purpose.toLowerCase().includes('customer') ||
+                     tx.purpose.toLowerCase().includes('revenue');
+      if (isSale) {
+        finType = 'INCOME';
+        finCategory = 'Scrap wood sale';
+        finDescription += ` - Sale: ${tx.purpose}`;
+      } else {
+        // It's internal consumption, workshop dispatch, damage, or waste
+        finType = 'EXPENDITURE';
+        finCategory = 'Material Purchase';
+        finDescription += ` - Workshop Dispatch / Waste: ${tx.purpose}`;
+      }
+    }
+
     const newFinTx: FinancialTransaction = {
       id: financialId,
-      type: isPurchase ? 'EXPENDITURE' : 'INCOME',
-      category: isPurchase ? 'Material Purchase' : 'Scrap wood sale',
+      type: finType,
+      category: finCategory,
       amount: tx.totalValue,
       date: dateStr,
-      description: `${tx.type} LOG: ${tx.quantity} ${tx.itemName} - Purpose: ${tx.purpose}`,
+      description: finDescription,
       referenceId: transactionId
     };
     setFinancialTransactions(prev => [...prev, newFinTx]);
@@ -473,6 +533,14 @@ export default function App() {
     setFinancialTransactions(prev => [...prev, newTx]);
   };
 
+  const handleUpdateFinancialTransaction = (updatedTx: FinancialTransaction) => {
+    setFinancialTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
+  };
+
+  const handleDeleteFinancialTransaction = (id: string) => {
+    setFinancialTransactions(prev => prev.filter(t => t.id !== id));
+  };
+
   // F. Daily work upload mutators
   const handleAddDailyWorkLog = (log: Omit<DailyWorkLog, 'id'>) => {
     const newLog: DailyWorkLog = {
@@ -493,7 +561,50 @@ export default function App() {
 
   // Record Updators
   const handleUpdateInventoryItem = (updatedItem: InventoryItem) => {
+    const originalItem = inventory.find(item => item.id === updatedItem.id);
+    
     setInventory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+
+    // Log adjustment if stock level changed
+    if (originalItem && originalItem.currentStock !== updatedItem.currentStock) {
+      const stockDiff = updatedItem.currentStock - originalItem.currentStock;
+      const absDiff = Math.abs(stockDiff);
+      const isUp = stockDiff > 0;
+      
+      const txId = `tx-inv-adj-${Date.now()}`;
+      const dateStr = new Date().toISOString().split('T')[0];
+      const totalValue = absDiff * updatedItem.unitCost;
+
+      const adjTx: InventoryTransaction = {
+        id: txId,
+        itemId: updatedItem.id,
+        itemName: updatedItem.name,
+        type: isUp ? 'INWARDS' : 'OUTWARDS',
+        quantity: absDiff,
+        unitCost: updatedItem.unitCost,
+        totalValue: totalValue,
+        date: dateStr,
+        purpose: `Manual Stock Adjustment (${originalItem.currentStock} -> ${updatedItem.currentStock})`
+      };
+      setInventoryTransactions(prev => [...prev, adjTx]);
+
+      // Post the adjustment to the financial ledger as EXPENDITURE/Loss
+      const finId = `fin-inv-adj-${Date.now()}`;
+      const finTx: FinancialTransaction = {
+        id: finId,
+        type: 'EXPENDITURE',
+        category: 'Material Purchase',
+        amount: totalValue,
+        date: dateStr,
+        description: `Manual Stock Adjustment: ${originalItem.currentStock} -> ${updatedItem.currentStock} units of ${updatedItem.name}`,
+        referenceId: txId
+      };
+      setFinancialTransactions(prev => [...prev, finTx]);
+    }
+  };
+
+  const handleDeleteInventoryItem = (id: string) => {
+    setInventory(prev => prev.filter(item => item.id !== id));
   };
 
   const handleUpdateCustomer = (updatedCustomer: Customer) => {
@@ -507,6 +618,15 @@ export default function App() {
 
   const handleUpdateJob = (updatedJob: Job) => {
     setJobs(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
+  };
+
+  const handleDeleteCustomer = (id: string) => {
+    setCustomers(prev => prev.filter(c => c.id !== id));
+    // Also, clear/adjust jobs that might refer to this customer or keep them as is
+  };
+
+  const handleDeleteEmployee = (id: string) => {
+    setEmployees(prev => prev.filter(emp => emp.id !== id));
   };
 
   // G. Registration request and approval handlers
@@ -632,7 +752,7 @@ export default function App() {
       <div className="md:hidden bg-slate-900/60 backdrop-blur-md text-white p-4 flex items-center justify-between border-b border-white/10 sticky top-0 z-40 print:hidden relative z-10">
         <div className="flex items-center gap-2">
           <Hammer className="w-5 h-5 text-amber-500 animate-spin-slow" />
-          <span className="font-display font-black text-sm uppercase tracking-wider text-amber-500">SWEDSFREE<span className="text-white ml-1">ENT.</span></span>
+          <span className="font-display font-black text-sm uppercase tracking-wider text-amber-500">SWED WOOD<span className="text-white ml-1">WORK</span></span>
         </div>
         
         <button 
@@ -654,8 +774,8 @@ export default function App() {
                 <Hammer className="w-5 h-5 text-amber-500 animate-spin-slow" />
               </div>
               <div>
-                <h2 className="font-display font-black text-base uppercase tracking-wider text-amber-500">SWEDSFREE<span className="text-white ml-1">ENT.</span></h2>
-                <p className="text-[10px] text-slate-400 font-semibold tracking-widest uppercase">Woodwork Management</p>
+                <h2 className="font-display font-black text-base uppercase tracking-wider text-amber-500">SWED WOOD<span className="text-white ml-1">WORK</span></h2>
+                <p className="text-[10px] text-slate-400 font-semibold tracking-widest uppercase">Management System</p>
               </div>
             </div>
 
@@ -776,6 +896,7 @@ export default function App() {
                 onAddInventoryItem={handleAddInventoryItem}
                 onLogTransaction={handleLogTransaction}
                 onUpdateInventoryItem={handleUpdateInventoryItem}
+                onDeleteInventoryItem={handleDeleteInventoryItem}
                 currentUser={currentUser}
               />
             )}
@@ -786,6 +907,7 @@ export default function App() {
                 jobs={jobs}
                 onAddCustomer={handleAddCustomer}
                 onUpdateCustomer={handleUpdateCustomer}
+                onDeleteCustomer={handleDeleteCustomer}
                 showRegisterModalOnLoad={quickActionTrigger === 'register-customer'}
                 onCloseRegisterModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
@@ -798,6 +920,7 @@ export default function App() {
                 jobs={jobs}
                 onAddEmployee={handleAddEmployee}
                 onUpdateEmployee={handleUpdateEmployee}
+                onDeleteEmployee={handleDeleteEmployee}
                 onUpdateEmployeeStatus={handleUpdateEmployeeStatus}
                 showRegisterModalOnLoad={quickActionTrigger === 'register-employee'}
                 onCloseRegisterModal={() => setQuickActionTrigger(null)}
@@ -824,6 +947,10 @@ export default function App() {
                 showCreateModalOnLoad={quickActionTrigger === 'create-job'}
                 onCloseCreateModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
+                onTriggerInvoice={(jobId) => {
+                  setInvoiceJobId(jobId);
+                  setActiveTab('invoices');
+                }}
               />
             )}
 
@@ -832,6 +959,8 @@ export default function App() {
                 jobs={jobs}
                 customers={customers}
                 currentUser={currentUser}
+                invoiceJobId={invoiceJobId}
+                onClearInvoiceJobId={() => setInvoiceJobId(null)}
               />
             )}
 
@@ -849,6 +978,8 @@ export default function App() {
               <FinancialLedger
                 transactions={financialTransactions}
                 onAddTransaction={handleAddFinancialTransaction}
+                onUpdateTransaction={handleUpdateFinancialTransaction}
+                onDeleteTransaction={handleDeleteFinancialTransaction}
                 currentUser={currentUser}
               />
             )}
