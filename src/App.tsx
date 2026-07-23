@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
 import { 
   LayoutDashboard, 
   Package, 
@@ -13,8 +14,14 @@ import {
   Sparkles,
   Hammer,
   Camera,
-  Receipt
+  Receipt,
+  Wifi,
+  WifiOff,
+  Download,
+  Upload,
+  HardDrive
 } from 'lucide-react';
+
 import { motion, AnimatePresence } from 'motion/react';
 
 // Child components
@@ -64,7 +71,79 @@ export default function App() {
   const [quickActionTrigger, setQuickActionTrigger] = useState<string | null>(null);
   const [invoiceJobId, setInvoiceJobId] = useState<string | null>(null);
 
+  // Offline network status & file backup ref
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Offline Database Export (JSON)
+  const handleExportBackup = () => {
+    const backupData = {
+      appName: 'Sweds Wood Enterprise',
+      exportDate: new Date().toISOString(),
+      inventory,
+      customers,
+      employees,
+      jobs,
+      inventoryTransactions,
+      financialTransactions,
+      dailyWorkLogs,
+      registrationRequests,
+      warningLetters
+    };
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SwedsWood_Offline_Database_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Offline Database Import (JSON)
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.inventory) setInventory(data.inventory);
+        if (data.customers) setCustomers(data.customers);
+        if (data.employees) setEmployees(data.employees);
+        if (data.jobs) setJobs(data.jobs);
+        if (data.inventoryTransactions) setInventoryTransactions(data.inventoryTransactions);
+        if (data.financialTransactions) setFinancialTransactions(data.financialTransactions);
+        if (data.dailyWorkLogs) setDailyWorkLogs(data.dailyWorkLogs);
+        if (data.registrationRequests) setRegistrationRequests(data.registrationRequests);
+        if (data.warningLetters) setWarningLetters(data.warningLetters);
+        alert('Offline database backup imported successfully! All records updated.');
+      } catch (err) {
+        alert('Failed to parse backup file. Please upload a valid JSON backup file.');
+      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   // Core workshop state modules
+
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -842,12 +921,47 @@ export default function App() {
 
           {(isAdmin || isManager || isAuditor) && (
             <div className="space-y-3 pt-1">
-              <div className="bg-white/5 p-3 rounded-xl border border-white/10 text-[10px] text-slate-400 space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-slate-200">
-                  <Database className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Offline Database</span>
+              <div className="bg-white/5 p-3 rounded-xl border border-white/10 text-[10px] text-slate-400 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                    <Database className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Offline Database</span>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                    isOnline 
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {isOnline ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+                    {isOnline ? 'Online' : 'Offline'}
+                  </span>
                 </div>
                 <p className="leading-relaxed">All woodwork logs are secured in sandboxed LocalStorage cache.</p>
+                
+                {/* Backup & Restore Action Buttons */}
+                <div className="pt-1 flex flex-col gap-1.5">
+                  <button
+                    onClick={handleExportBackup}
+                    className="w-full py-1.5 px-2 bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Download className="w-3 h-3 text-amber-400" />
+                    <span>Backup Database (.JSON)</span>
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-1.5 px-2 bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Upload className="w-3 h-3 text-sky-400" />
+                    <span>Restore Database (.JSON)</span>
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImportBackup}
+                    accept=".json"
+                    className="hidden"
+                  />
+                </div>
               </div>
 
               {isAdmin && (
@@ -865,7 +979,60 @@ export default function App() {
 
       {/* Main Panel Frame */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-w-[1300px] mx-auto w-full relative z-10 print:p-0">
+        
+        {/* Offline Status Top Banner */}
+        <div className="mb-6 bg-slate-900/80 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 flex flex-wrap items-center justify-between gap-3 shadow-lg print:hidden">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl border ${
+              isOnline 
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+            }`}>
+              {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4 animate-pulse" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-100">
+                  {isOnline ? 'System Online & Synced' : 'Offline Mode Active'}
+                </h4>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase ${
+                  isOnline 
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
+                  {isOnline ? 'Network Connected' : '100% Local Storage Operating'}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                {isOnline 
+                  ? 'All records and bulk PDF invoice generators are running with full local cache persistence.'
+                  : 'No internet required! Inventory, job logs, financial transactions, and PDF invoice generation work completely offline.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportBackup}
+              className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="Download local database as JSON backup file"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span>Backup DB</span>
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="Upload JSON backup file to restore database"
+            >
+              <Upload className="w-3.5 h-3.5 text-sky-400" />
+              <span>Restore DB</span>
+            </button>
+          </div>
+        </div>
+
         <AnimatePresence mode="wait">
+
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}

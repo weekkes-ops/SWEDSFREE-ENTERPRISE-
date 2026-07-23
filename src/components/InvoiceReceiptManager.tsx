@@ -20,9 +20,16 @@ import {
   Edit2,
   Eye,
   Plus,
-  Trash2
+  Trash2,
+  FolderArchive,
+  Download,
+  CheckSquare,
+  Square,
+  FileDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { jsPDF } from 'jspdf';
+import JSZip from 'jszip';
 
 interface InvoiceReceiptManagerProps {
   jobs: Job[];
@@ -46,6 +53,10 @@ export default function InvoiceReceiptManager({
   // Top level tabs: Invoice Workspace vs Receipt Workspace
   const [subTab, setSubTab] = useState<'INVOICE' | 'RECEIPT'>('INVOICE');
 
+  // Template format selection: 'SWEDS_WOOD' (scanned paper style) or 'MODERN' (original template)
+  const [invoiceTemplate, setInvoiceTemplate] = useState<'SWEDS_WOOD' | 'MODERN'>('SWEDS_WOOD');
+  const [invoiceCustomerMessage, setInvoiceCustomerMessage] = useState<string>("");
+
   // Custom states for Invoice customization prior to print
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [taxPercent, setTaxPercent] = useState<number>(15); // Sierra Leone GST is 15%
@@ -53,6 +64,14 @@ export default function InvoiceReceiptManager({
   // Active documents being viewed in "PDF Form"
   const [activeInvoice, setActiveInvoice] = useState<Job | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<{ job: Job; payment: JobPayment } | null>(null);
+
+  // Bulk PDF Export States
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [selectedBulkJobIds, setSelectedBulkJobIds] = useState<string[]>([]);
+  const [bulkSearchTerm, setBulkSearchTerm] = useState('');
+  const [bulkTemplate, setBulkTemplate] = useState<'SWEDS_WOOD' | 'MODERN'>('SWEDS_WOOD');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
 
   // PDF Preview Modes: 'VIEW' (A4 mockup) or 'EDIT' (Interactive inputs)
   const [invoicePdfMode, setInvoicePdfMode] = useState<'VIEW' | 'EDIT'>('VIEW');
@@ -123,11 +142,21 @@ export default function InvoiceReceiptManager({
   // Sync Invoice local editable states when an activeInvoice is selected/opened
   useEffect(() => {
     if (activeInvoice) {
-      setInvoiceCompany("SWED WOOD WORK");
-      setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: Wilkinson Road, Freetown.\nContact: info@swedwoodwork.com | +232 76 112 3344");
+      if (invoiceTemplate === 'SWEDS_WOOD') {
+        setInvoiceCompany("Sweds Wood Enterprise");
+        setInvoiceCompanyContact("2 Sweds free Avenue");
+        setInvoiceTerms("");
+        setInvoiceBankInstructions("");
+        setInvoiceCustomerMessage("Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!");
+      } else {
+        setInvoiceCompany("SWED WOOD WORK");
+        setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: Wilkinson Road, Freetown.\nContact: info@swedwoodwork.com | +232 76 112 3344");
+        setInvoiceTerms("Payment Clear / Standard Log");
+        setInvoiceBankInstructions(`Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${activeInvoice.id.slice(4).toUpperCase()}`);
+        setInvoiceCustomerMessage("");
+      }
       setInvoiceNo(`INV-${activeInvoice.id.slice(4).toUpperCase()}`);
       setInvoiceDate(new Date().toISOString().split('T')[0]);
-      setInvoiceTerms("Payment Clear / Standard Log");
       setInvoiceCustomerName(activeInvoice.customerName);
       
       const cust = customers.find(c => c.id === activeInvoice.customerId);
@@ -141,11 +170,10 @@ export default function InvoiceReceiptManager({
       setInvoiceTimeline(`${activeInvoice.startDate} to ${activeInvoice.dueDate}`);
       setInvoiceCommissionAmount(activeInvoice.quoteAmount);
       
-      setInvoiceBankInstructions(`Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${activeInvoice.id.slice(4).toUpperCase()}`);
       setInvoicePreparedBy(currentUser?.name || 'Managing Director');
       setCustomInvoiceItems([]); // Reset custom line items
     }
-  }, [activeInvoice, customers, currentUser]);
+  }, [activeInvoice, customers, currentUser, invoiceTemplate]);
 
   // Sync Receipt local editable states when an activeReceipt is selected/opened
   useEffect(() => {
@@ -193,6 +221,28 @@ export default function InvoiceReceiptManager({
     setCustomInvoiceItems(prev => prev.filter(item => item.id !== id));
   };
 
+  const handleLoadScannedSample = () => {
+    setInvoiceTemplate('SWEDS_WOOD');
+    setInvoiceNo("042");
+    setInvoiceDate("7/13/2026");
+    setInvoiceTerms("");
+    setInvoiceCustomerName("Mr Kabba( P )");
+    setInvoiceCustomerCompany("");
+    setInvoiceCustomerPhone("");
+    setInvoiceCustomerEmail("0");
+    setInvoiceCustomerAddress("POTTY NEW ROAD");
+    setInvoiceProjectTitle("Commission Woodwork Suite");
+    setInvoiceProjectDescription("Three bespoke living & dining items as per contract specification.");
+    setInvoiceTimeline("7/13/2026");
+    setInvoiceCommissionAmount(0);
+    setCustomInvoiceItems([
+      { id: 'line-scanned-1', description: 'Kitchen drawers complete as per specification', unitRate: '1', amount: 65000 },
+      { id: 'line-scanned-2', description: 'Dinning room shelves complete as specified', unitRate: '1', amount: 25000 },
+      { id: 'line-scanned-3', description: 'Dinning table with 4chairs complete', unitRate: '1', amount: 12500 }
+    ]);
+    setInvoiceCustomerMessage("");
+  };
+
   // Live calculation of Invoice Totals
   const getCalculatedTotals = () => {
     // base commission amount
@@ -224,6 +274,62 @@ export default function InvoiceReceiptManager({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleBulkPdfExport = async () => {
+    if (selectedBulkJobIds.length === 0) return;
+    setIsExporting(true);
+    setExportProgress(0);
+    
+    try {
+      const zip = new JSZip();
+      const selectedJobs = jobs.filter(job => selectedBulkJobIds.includes(job.id));
+      
+      let count = 0;
+      for (const job of selectedJobs) {
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+        
+        const customer = customers.find(c => c.id === job.customerId);
+        
+        buildInvoicePdfContent(doc, job, customer, bulkTemplate, currentUser);
+        
+        const pdfArrayBuffer = doc.output('arraybuffer');
+        
+        const cleanCustomerName = job.customerName.replace(/[^a-zA-Z0-9]/g, '_');
+        const cleanJobTitle = job.title.replace(/[^a-zA-Z0-9]/g, '_');
+        const filename = `Invoice_INV-${job.id.slice(4).toUpperCase()}_${cleanCustomerName}_${cleanJobTitle}.pdf`;
+        
+        zip.file(filename, pdfArrayBuffer);
+        
+        count++;
+        setExportProgress(Math.round((count / selectedJobs.length) * 100));
+        
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SwedsWood_Bulk_Invoices_${bulkTemplate === 'SWEDS_WOOD' ? 'PaperStyle' : 'Modern'}_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      setIsBulkModalOpen(false);
+      setSelectedBulkJobIds([]);
+    } catch (error) {
+      console.error("Bulk export failed:", error);
+      alert("Something went wrong during bulk PDF export. Please try again.");
+    } finally {
+      setIsExporting(false);
+      setExportProgress(0);
+    }
   };
 
   return (
@@ -267,29 +373,43 @@ export default function InvoiceReceiptManager({
           </p>
         </div>
 
-        {/* Sub-tab Switcher: Invoices vs Receipts */}
-        <div className="flex bg-gray-100 p-1 rounded-xl self-start md:self-auto border border-gray-200">
+        {/* Sub-tab Switcher: Invoices vs Receipts & Bulk Export */}
+        <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
+          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+            <button
+              onClick={() => setSubTab('INVOICE')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                subTab === 'INVOICE' 
+                  ? 'bg-white text-wood-950 shadow-xs' 
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>Invoice Workspace</span>
+            </button>
+            <button
+              onClick={() => setSubTab('RECEIPT')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                subTab === 'RECEIPT' 
+                  ? 'bg-white text-emerald-950 shadow-xs' 
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <Receipt className="w-4 h-4" />
+              <span>Receipt Desk</span>
+            </button>
+          </div>
+
           <button
-            onClick={() => setSubTab('INVOICE')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              subTab === 'INVOICE' 
-                ? 'bg-white text-wood-950 shadow-xs' 
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
+            onClick={() => {
+              setSelectedBulkJobIds(jobs.map(j => j.id));
+              setBulkTemplate(invoiceTemplate);
+              setIsBulkModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-black uppercase transition shadow-xs cursor-pointer"
           >
-            <FileText className="w-4 h-4" />
-            <span>Invoice Workspace</span>
-          </button>
-          <button
-            onClick={() => setSubTab('RECEIPT')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              subTab === 'RECEIPT' 
-                ? 'bg-white text-emerald-950 shadow-xs' 
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <Receipt className="w-4 h-4" />
-            <span>Receipt Desk</span>
+            <FolderArchive className="w-4 h-4 text-amber-500" />
+            <span>Bulk PDF Export</span>
           </button>
         </div>
       </div>
@@ -546,7 +666,41 @@ export default function InvoiceReceiptManager({
                 </div>
 
                 {/* PDF VIEW / INTERACTIVE EDIT SWITCH */}
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Template Format Selector */}
+                  <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
+                    <button
+                      onClick={() => setInvoiceTemplate('SWEDS_WOOD')}
+                      className={`px-3 py-1.5 rounded-md text-[11px] font-black uppercase transition-all ${
+                        invoiceTemplate === 'SWEDS_WOOD' 
+                          ? 'bg-[#0f52ba] text-white shadow-2xs' 
+                          : 'text-gray-600 hover:text-gray-950'
+                      }`}
+                    >
+                      Sweds Wood Paper Style
+                    </button>
+                    <button
+                      onClick={() => setInvoiceTemplate('MODERN')}
+                      className={`px-3 py-1.5 rounded-md text-[11px] font-black uppercase transition-all ${
+                        invoiceTemplate === 'MODERN' 
+                          ? 'bg-wood-950 text-white shadow-2xs' 
+                          : 'text-gray-600 hover:text-gray-950'
+                      }`}
+                    >
+                      Modern Digital
+                    </button>
+                  </div>
+
+                  {invoiceTemplate === 'SWEDS_WOOD' && (
+                    <button
+                      onClick={handleLoadScannedSample}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1 transition shadow-2xs"
+                      title="Load exact items and pricing from the physical paper scan"
+                    >
+                      <span>Load Scanned Image Sample</span>
+                    </button>
+                  )}
+
                   <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
                     <button
                       onClick={() => setInvoicePdfMode('VIEW')}
@@ -592,376 +746,754 @@ export default function InvoiceReceiptManager({
               {/* THE FLOATING PAPER (styled to look like an A4 page with high-contrast) */}
               <div className="bg-white p-8 sm:p-12 border border-gray-200 rounded-xl shadow-xl space-y-6 print:p-0 print:border-none print:shadow-none print:rounded-none">
                 
-                {/* Letterhead Header */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b-2 border-wood-950">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="p-1.5 bg-wood-950 text-white rounded-lg">
-                        <Wrench className="w-4 h-4" />
-                      </span>
-                      {invoicePdfMode === 'EDIT' ? (
-                        <input
-                          type="text"
-                          value={invoiceCompany}
-                          onChange={(e) => setInvoiceCompany(e.target.value)}
-                          className="font-display font-black text-lg uppercase tracking-wider text-wood-900 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 outline-hidden"
-                        />
-                      ) : (
-                        <span className="font-display font-black text-lg uppercase tracking-wider text-wood-900">
-                          {invoiceCompany}
-                        </span>
-                      )}
+                {invoiceTemplate === 'SWEDS_WOOD' ? (
+                  /* ==========================================
+                     SWEDS WOOD ENTERPRISE OFFICIAL PAPER PATTERN
+                     ========================================== */
+                  <div className="space-y-6 text-[#1e3a8a] font-sans antialiased">
+                    {/* Logo Header Banner */}
+                    <div className="flex flex-col md:flex-row md:items-stretch justify-between gap-6 pb-4 border-b-2 border-gray-300">
+                      <div className="flex flex-col justify-between">
+                        {/* Company Logo and Name */}
+                        <div className="flex items-center gap-3">
+                          {/* Custom Yellow Sun SVG Logo */}
+                          <div className="relative w-12 h-12 flex items-center justify-center bg-transparent">
+                            <svg viewBox="0 0 100 100" className="w-12 h-12 text-amber-500 fill-amber-400">
+                              <circle cx="50" cy="50" r="18" className="fill-amber-400 stroke-amber-500 stroke-2" />
+                              <line x1="50" y1="12" x2="50" y2="24" className="stroke-amber-500 stroke-[5px] stroke-round" />
+                              <line x1="50" y1="76" x2="50" y2="88" className="stroke-amber-500 stroke-[5px] stroke-round" />
+                              <line x1="12" y1="50" x2="24" y2="50" className="stroke-amber-500 stroke-[5px] stroke-round" />
+                              <line x1="76" y1="50" x2="88" y2="50" className="stroke-amber-500 stroke-[5px] stroke-round" />
+                              <line x1="23" y1="23" x2="32" y2="32" className="stroke-amber-500 stroke-[5px] stroke-round" />
+                              <line x1="68" y1="68" x2="77" y2="77" className="stroke-amber-500 stroke-[5px] stroke-round" />
+                              <line x1="77" y1="23" x2="68" y2="32" className="stroke-amber-500 stroke-[5px] stroke-round" />
+                              <line x1="32" y1="68" x2="23" y2="77" className="stroke-amber-500 stroke-[5px] stroke-round" />
+                            </svg>
+                          </div>
+                          <div className="flex flex-col">
+                            <h1 className="font-sans font-black text-2xl tracking-tight text-[#0f52ba] flex items-center gap-1.5 uppercase">
+                              Sweds Wood Enterprise
+                            </h1>
+                            <div className="w-full h-[3px] bg-[#0f52ba] mt-0.5" />
+                          </div>
+                        </div>
+
+                        {/* Small Metadata Table */}
+                        <div className="mt-4 w-72 border border-gray-400 bg-white text-xs text-[#1e3a8a] rounded-xs shadow-xs overflow-hidden">
+                          <table className="w-full border-collapse">
+                            <tbody>
+                              <tr className="border-b border-gray-300">
+                                <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 w-28 uppercase text-[10px]">Invoice No.</td>
+                                <td className="p-1.5 font-mono font-bold text-gray-800">
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <input
+                                      type="text"
+                                      value={invoiceNo}
+                                      onChange={(e) => setInvoiceNo(e.target.value)}
+                                      className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden font-bold"
+                                    />
+                                  ) : (
+                                    invoiceNo
+                                  )}
+                                </td>
+                              </tr>
+                              <tr className="border-b border-gray-300">
+                                <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Address</td>
+                                <td className="p-1.5 text-gray-700 font-semibold">
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <input
+                                      type="text"
+                                      value={invoiceCompanyContact}
+                                      onChange={(e) => setInvoiceCompanyContact(e.target.value)}
+                                      className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden"
+                                    />
+                                  ) : (
+                                    invoiceCompanyContact
+                                  )}
+                                </td>
+                              </tr>
+                              <tr className="border-b border-gray-300">
+                                <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Date</td>
+                                <td className="p-1.5 font-mono text-gray-800">
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <input
+                                      type="text"
+                                      value={invoiceDate}
+                                      onChange={(e) => setInvoiceDate(e.target.value)}
+                                      className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden"
+                                    />
+                                  ) : (
+                                    invoiceDate
+                                  )}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Terms (days)</td>
+                                <td className="p-1.5 text-gray-700 font-mono">
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <input
+                                      type="text"
+                                      value={invoiceTerms}
+                                      onChange={(e) => setInvoiceTerms(e.target.value)}
+                                      className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden"
+                                    />
+                                  ) : (
+                                    invoiceTerms
+                                  )}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Blue INVOICE Badge */}
+                      <div className="flex flex-col justify-start md:items-end">
+                        <div className="bg-[#38bdf8] text-white py-4 px-12 rounded-xs border-2 border-[#0f52ba] text-center font-sans font-black text-3xl tracking-widest uppercase shadow-md md:w-64">
+                          INVOICE
+                        </div>
+                      </div>
                     </div>
 
-                    {invoicePdfMode === 'EDIT' ? (
-                      <textarea
-                        rows={4}
-                        value={invoiceCompanyContact}
-                        onChange={(e) => setInvoiceCompanyContact(e.target.value)}
-                        className="text-xs text-gray-600 leading-relaxed font-semibold bg-amber-50/50 border border-amber-200 rounded p-1.5 outline-hidden w-full"
-                      />
-                    ) : (
-                      <p className="text-xs text-gray-500 leading-relaxed font-semibold whitespace-pre-line">
-                        {invoiceCompanyContact}
-                      </p>
-                    )}
-                  </div>
+                    {/* "Invoice to:" Customer Information Box */}
+                    <div className="space-y-1">
+                      <span className="font-sans font-black text-xs uppercase text-[#0f52ba]">Invoice to:</span>
+                      <div className="border border-gray-400 bg-white rounded-xs p-4 space-y-2 text-xs">
+                        <div className="bg-[#e0f2fe] px-2 py-1 border-b border-gray-300 font-bold uppercase text-[10px] text-[#0f52ba] tracking-wider">
+                          Customer Information
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 pt-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-gray-500 w-16 uppercase text-[9px]">Name:</span>
+                            {invoicePdfMode === 'EDIT' ? (
+                              <input
+                                type="text"
+                                value={invoiceCustomerName}
+                                onChange={(e) => setInvoiceCustomerName(e.target.value)}
+                                className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden font-bold text-gray-800"
+                              />
+                            ) : (
+                              <span className="font-bold text-gray-900">{invoiceCustomerName}</span>
+                            )}
+                          </div>
 
-                  <div className="md:text-right space-y-2">
-                    <h2 className="text-xl font-black uppercase text-wood-950 tracking-wider font-display">COMMERCIAL INVOICE</h2>
-                    <div className="text-xs text-gray-500 font-semibold space-y-1 md:inline-block md:text-right">
-                      <div className="flex md:justify-end items-center gap-1">
-                        <span>Invoice No:</span>
-                        {invoicePdfMode === 'EDIT' ? (
-                          <input
-                            type="text"
-                            value={invoiceNo}
-                            onChange={(e) => setInvoiceNo(e.target.value)}
-                            className="font-mono text-gray-800 font-bold bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-28 text-right"
-                          />
-                        ) : (
-                          <span className="font-mono text-gray-800 font-bold">{invoiceNo}</span>
-                        )}
-                      </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-gray-500 w-16 uppercase text-[9px]">Mobile:</span>
+                            {invoicePdfMode === 'EDIT' ? (
+                              <input
+                                type="text"
+                                value={invoiceCustomerPhone}
+                                onChange={(e) => setInvoiceCustomerPhone(e.target.value)}
+                                className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden font-mono"
+                              />
+                            ) : (
+                              <span className="font-mono text-gray-800 font-semibold">{invoiceCustomerPhone || ''}</span>
+                            )}
+                          </div>
 
-                      <div className="flex md:justify-end items-center gap-1">
-                        <span>Date:</span>
-                        {invoicePdfMode === 'EDIT' ? (
-                          <input
-                            type="date"
-                            value={invoiceDate}
-                            onChange={(e) => setInvoiceDate(e.target.value)}
-                            className="font-mono text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-28 text-right"
-                          />
-                        ) : (
-                          <span className="font-mono text-gray-800">{invoiceDate}</span>
-                        )}
-                      </div>
+                          <div className="flex items-start gap-1.5 md:col-span-1">
+                            <span className="font-bold text-gray-500 w-16 uppercase text-[9px] pt-0.5">Address:</span>
+                            {invoicePdfMode === 'EDIT' ? (
+                              <input
+                                type="text"
+                                value={invoiceCustomerAddress}
+                                onChange={(e) => setInvoiceCustomerAddress(e.target.value)}
+                                className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden text-gray-700 font-semibold"
+                              />
+                            ) : (
+                              <span className="text-gray-700 font-bold">{invoiceCustomerAddress}</span>
+                            )}
+                          </div>
 
-                      <div className="flex md:justify-end items-center gap-1">
-                        <span>Terms:</span>
-                        {invoicePdfMode === 'EDIT' ? (
-                          <input
-                            type="text"
-                            value={invoiceTerms}
-                            onChange={(e) => setInvoiceTerms(e.target.value)}
-                            className="text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-48 text-right"
-                          />
-                        ) : (
-                          <span className="text-gray-800 font-bold">{invoiceTerms}</span>
-                        )}
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-gray-500 w-16 uppercase text-[9px]">Email:</span>
+                            {invoicePdfMode === 'EDIT' ? (
+                              <input
+                                type="text"
+                                value={invoiceCustomerEmail}
+                                onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
+                                className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden text-gray-600"
+                              />
+                            ) : (
+                              <span className="text-gray-600 font-semibold">{invoiceCustomerEmail}</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Billing Addresses profiles */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 text-xs border-b border-gray-100">
-                  <div className="space-y-1 bg-gray-50/60 p-4 rounded-xl border border-gray-100">
-                    <span className="font-bold text-wood-950 uppercase tracking-wider block mb-1.5">CLIENT DEPOSITOR:</span>
-                    {invoicePdfMode === 'EDIT' ? (
-                      <div className="space-y-1">
-                        <input
-                          type="text"
-                          value={invoiceCustomerName}
-                          onChange={(e) => setInvoiceCustomerName(e.target.value)}
-                          className="text-xs font-black text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                          placeholder="Client Name"
-                        />
-                        <input
-                          type="text"
-                          value={invoiceCustomerCompany}
-                          onChange={(e) => setInvoiceCustomerCompany(e.target.value)}
-                          className="text-xs font-bold text-wood-700 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                          placeholder="Client Company"
-                        />
-                        <input
-                          type="text"
-                          value={invoiceCustomerPhone}
-                          onChange={(e) => setInvoiceCustomerPhone(e.target.value)}
-                          className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                          placeholder="Phone Number"
-                        />
-                        <input
-                          type="text"
-                          value={invoiceCustomerEmail}
-                          onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
-                          className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                          placeholder="Email address"
-                        />
-                        <input
-                          type="text"
-                          value={invoiceCustomerAddress}
-                          onChange={(e) => setInvoiceCustomerAddress(e.target.value)}
-                          className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                          placeholder="Delivery Address"
-                        />
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-sm font-black text-gray-800">{invoiceCustomerName}</p>
-                        {invoiceCustomerCompany && (
-                          <p className="font-bold text-wood-800">{invoiceCustomerCompany}</p>
-                        )}
-                        <p className="text-gray-500 font-semibold mt-1">Phone: {invoiceCustomerPhone || 'N/A'}</p>
-                        <p className="text-gray-500 font-semibold">Email: {invoiceCustomerEmail || 'N/A'}</p>
-                        <p className="text-gray-500 leading-tight font-semibold mt-1">Delivery: {invoiceCustomerAddress || 'N/A'}</p>
-                      </>
+                    {/* Ledger Style Items Table */}
+                    <div className="overflow-hidden border border-gray-400 bg-white rounded-xs">
+                      <table className="w-full border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-[#38bdf8] border-b border-gray-400 text-white font-black uppercase text-[10px] tracking-wider">
+                            <th className="py-2 px-3 border-r border-gray-400 text-left w-7/12">Description</th>
+                            <th className="py-2 px-3 border-r border-gray-400 text-center w-1/12">Qty</th>
+                            <th className="py-2 px-3 border-r border-gray-400 text-right w-2/12">Price</th>
+                            <th className="py-2 px-3 text-right w-2/12">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {/* Main Flat Commission (if > 0) */}
+                          {Number(invoiceCommissionAmount) > 0 && (
+                            <tr className="min-h-[36px]">
+                              <td className="py-2 px-3 border-r border-gray-400 font-semibold text-gray-800">
+                                <p className="font-bold text-gray-800">{invoiceProjectTitle}</p>
+                                <span className="block text-[10px] text-gray-400 font-normal italic">{invoiceProjectDescription}</span>
+                              </td>
+                              <td className="py-2 px-3 border-r border-gray-400 text-center font-mono">1</td>
+                              <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
+                                SLL {invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
+                                SLL {invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          )}
+
+                          {/* Custom Invoice Items */}
+                          {customInvoiceItems.map((item, idx) => (
+                            <tr key={item.id} className="min-h-[36px]">
+                              <td className="py-2 px-3 border-r border-gray-400 font-semibold text-gray-800 flex items-center justify-between">
+                                <span>{item.description}</span>
+                                {invoicePdfMode === 'EDIT' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCustomItem(item.id)}
+                                    className="text-red-500 hover:text-red-700 ml-2 no-print"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 border-r border-gray-400 text-center font-mono">{item.unitRate || '1'}</td>
+                              <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
+                                SLL {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
+                                SLL {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          ))}
+
+                          {/* Empty Ledger Padding Rows to replicate the paper pad style perfectly! */}
+                          {Array.from({ length: Math.max(1, 10 - (Number(invoiceCommissionAmount) > 0 ? 1 : 0) - customInvoiceItems.length) }).map((_, idx) => (
+                            <tr key={`empty-${idx}`} className="h-8">
+                              <td className="border-r border-gray-400"></td>
+                              <td className="border-r border-gray-400"></td>
+                              <td className="border-r border-gray-400"></td>
+                              <td></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Inline interface to add custom items in paper style inside EDIT mode */}
+                    {invoicePdfMode === 'EDIT' && (
+                      <form onSubmit={handleAddCustomItem} className="mt-4 p-3.5 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex flex-wrap items-end gap-3 no-print">
+                        <div className="flex-1 min-w-[200px] space-y-1">
+                          <label className="text-[9px] text-gray-400 font-bold uppercase block">New Item Description</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Premium Brass Hinges & Hardware upgrades"
+                            value={newCustomItemDesc}
+                            onChange={(e) => setNewCustomItemDesc(e.target.value)}
+                            className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-medium"
+                          />
+                        </div>
+
+                        <div className="w-28 space-y-1">
+                          <label className="text-[9px] text-gray-400 font-bold uppercase block">Billing Type</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 2 Units, Flat fee"
+                            value={newCustomItemRate}
+                            onChange={(e) => setNewCustomItemRate(e.target.value)}
+                            className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-medium"
+                          />
+                        </div>
+
+                        <div className="w-28 space-y-1">
+                          <label className="text-[9px] text-gray-400 font-bold uppercase block">Rate Amount (SLL)</label>
+                          <input
+                            type="number"
+                            value={newCustomItemAmount}
+                            onChange={(e) => setNewCustomItemAmount(Number(e.target.value))}
+                            className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="px-3.5 py-1.5 bg-[#0f52ba] hover:bg-blue-800 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Item</span>
+                        </button>
+                      </form>
                     )}
-                  </div>
 
-                  <div className="space-y-1 bg-gray-50/60 p-4 rounded-xl border border-gray-100">
-                    <span className="font-bold text-wood-950 uppercase tracking-wider block mb-1.5">PROJECT / DESIGN FOCUS:</span>
-                    {invoicePdfMode === 'EDIT' ? (
-                      <div className="space-y-1">
-                        <input
-                          type="text"
-                          value={invoiceProjectTitle}
-                          onChange={(e) => setInvoiceProjectTitle(e.target.value)}
-                          className="text-xs font-black text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                        />
-                        <textarea
-                          rows={2}
-                          value={invoiceProjectDescription}
-                          onChange={(e) => setInvoiceProjectDescription(e.target.value)}
-                          className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded p-1.5 w-full"
-                        />
-                        <input
-                          type="text"
-                          value={invoiceTimeline}
-                          onChange={(e) => setInvoiceTimeline(e.target.value)}
-                          className="text-xs font-semibold text-gray-700 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                          placeholder="Timeline"
-                        />
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-sm font-black text-gray-800">{invoiceProjectTitle}</p>
-                        <p className="text-gray-500 leading-relaxed font-semibold">{invoiceProjectDescription}</p>
-                        <p className="text-gray-500 font-semibold mt-2">Workshop Timeline: <strong className="text-gray-800">{invoiceTimeline}</strong></p>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Interactive/Editable Table Line Items */}
-                <div className="py-2">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-300 text-wood-950 font-bold uppercase bg-gray-50 text-[10px] tracking-wider">
-                        <th className="py-2.5 px-3">Itemized Production Scope & Timber Milling</th>
-                        <th className="py-2.5 px-3 text-right">Unit Rate / Unit Size</th>
-                        <th className="py-2.5 px-3 text-right">Cleared Value</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      <tr>
-                        <td className="py-3 px-3">
-                          <p className="font-bold text-gray-800">Bespoke Workshop Commission Fee</p>
-                          <span className="text-[10px] text-gray-400 font-semibold">Fine assembly, wood joinery, sanding, and hand polished finish.</span>
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono text-gray-600">Flat commission</td>
-                        <td className="py-3 px-3 text-right font-mono font-bold text-gray-800">
+                    {/* Footer Summary Blocks */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
+                      {/* Customer Message on the left */}
+                      <div className="md:col-span-7 flex flex-col justify-stretch">
+                        <span className="text-[10px] uppercase font-black text-gray-400 block mb-1">Customer Message</span>
+                        <div className="border border-gray-400 bg-white rounded-xs p-3 min-h-[64px] flex-1 text-xs">
                           {invoicePdfMode === 'EDIT' ? (
-                            <input
-                              type="number"
-                              value={invoiceCommissionAmount}
-                              onChange={(e) => setInvoiceCommissionAmount(Number(e.target.value))}
-                              className="w-28 text-right bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 font-bold outline-hidden font-mono text-xs"
+                            <textarea
+                              rows={2}
+                              value={invoiceCustomerMessage}
+                              onChange={(e) => setInvoiceCustomerMessage(e.target.value)}
+                              placeholder="e.g. Thank you for your woodwork order!"
+                              className="w-full text-xs text-gray-700 bg-amber-50 border border-amber-200 rounded p-1.5 outline-hidden"
                             />
                           ) : (
-                            formatCurrency(invoiceCommissionAmount, 0)
+                            <p className="text-gray-700 italic leading-normal whitespace-pre-line font-medium">
+                              {invoiceCustomerMessage || "Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!"}
+                            </p>
                           )}
-                        </td>
-                      </tr>
+                        </div>
+                      </div>
 
-                      {/* Consumed standard materials */}
-                      {activeInvoice.materialsUsed.map((m, idx) => (
-                        <tr key={idx} className="bg-gray-50/30">
-                          <td className="py-2.5 px-3">
-                            <span className="font-bold">Allocated Lumber: {m.name}</span>
-                            <span className="block text-[9px] text-gray-400 font-semibold">Consumed in construction logs.</span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono text-gray-500">{m.quantity} Units</td>
-                          <td className="py-2.5 px-3 text-right font-mono text-gray-400">Included in Quote</td>
-                        </tr>
-                      ))}
+                      {/* Subtotal block on the right */}
+                      <div className="md:col-span-5 flex flex-col justify-end">
+                        <div className="border border-gray-400 bg-white rounded-xs overflow-hidden shadow-xs">
+                          <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-3 border-b border-gray-400">
+                            <span className="font-sans font-black text-xs uppercase tracking-wider">Subtotal</span>
+                            <span className="font-mono font-black text-sm">
+                              SLL {((Number(invoiceCommissionAmount) || 0) + customInvoiceItems.reduce((sum, item) => sum + item.amount, 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          {totals.totalPaid > 0 && (
+                            <div className="p-2.5 space-y-1.5 text-[11px] font-semibold text-[#1e3a8a] bg-[#e0f2fe]/40">
+                              <div className="flex justify-between text-gray-500">
+                                <span>Total Amount:</span>
+                                <span className="font-mono">SLL {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="flex justify-between text-emerald-800 font-bold">
+                                <span>Less Paid Deposits:</span>
+                                <span className="font-mono">-SLL {totals.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="border-t border-dashed border-gray-300 pt-1 flex justify-between text-red-700 font-black">
+                                <span>Balance Due:</span>
+                                <span className="font-mono">SLL {totals.outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-                      {/* Render extra custom added line items */}
-                      {customInvoiceItems.map((item) => (
-                        <tr key={item.id} className="bg-amber-50/10">
-                          <td className="py-2.5 px-3 font-semibold text-gray-800 flex items-center justify-between">
-                            <span>{item.description}</span>
-                            {invoicePdfMode === 'EDIT' && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveCustomItem(item.id)}
-                                className="text-red-500 hover:text-red-700 ml-2 no-print"
-                                title="Remove item"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                    {/* Signatures and Official Stamp */}
+                    <div className="mt-8 pt-6 border-t border-gray-200 grid grid-cols-2 gap-8 text-center text-[10px] font-bold text-[#1e3a8a] uppercase">
+                      <div className="space-y-4">
+                        <p>PREPARED BY (SWEDS WOOD REPRESENTATIVE):</p>
+                        <div className="h-10 flex items-center justify-center">
+                          {invoicePdfMode === 'EDIT' ? (
+                            <input
+                              type="text"
+                              value={invoicePreparedBy}
+                              onChange={(e) => setInvoicePreparedBy(e.target.value)}
+                              className="font-serif italic text-gray-800 border-b border-gray-300 bg-amber-50 rounded px-2 py-0.5 text-center text-xs w-48 mx-auto"
+                            />
+                          ) : (
+                            <span className="font-serif italic text-gray-800 border-b border-gray-300 px-8 py-1 text-xs">
+                              {invoicePreparedBy}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[8px] text-gray-400 font-normal font-sans">Sweds Wood Enterprise Authorized Signatory</p>
+                      </div>
+
+                      <div className="space-y-4">
+                        <p>CLIENT ACCEPTANCE & SIGNATURE:</p>
+                        <div className="h-10 flex items-center justify-center">
+                          <div className="w-36 border-b border-gray-300" />
+                        </div>
+                        <p className="text-[8px] text-gray-400 font-normal font-sans">Approved & Received in Perfect Condition</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* ==========================================
+                     MODERN DIGITAL TEMPLATE PATTERN
+                     ========================================== */
+                  <>
+                    {/* Letterhead Header */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b-2 border-wood-950">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 bg-wood-950 text-white rounded-lg">
+                            <Wrench className="w-4 h-4" />
+                          </span>
+                          {invoicePdfMode === 'EDIT' ? (
+                            <input
+                              type="text"
+                              value={invoiceCompany}
+                              onChange={(e) => setInvoiceCompany(e.target.value)}
+                              className="font-display font-black text-lg uppercase tracking-wider text-wood-900 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 outline-hidden"
+                            />
+                          ) : (
+                            <span className="font-display font-black text-lg uppercase tracking-wider text-wood-900">
+                              {invoiceCompany}
+                            </span>
+                          )}
+                        </div>
+
+                        {invoicePdfMode === 'EDIT' ? (
+                          <textarea
+                            rows={4}
+                            value={invoiceCompanyContact}
+                            onChange={(e) => setInvoiceCompanyContact(e.target.value)}
+                            className="text-xs text-gray-600 leading-relaxed font-semibold bg-amber-50/50 border border-amber-200 rounded p-1.5 outline-hidden w-full"
+                          />
+                        ) : (
+                          <p className="text-xs text-gray-500 leading-relaxed font-semibold whitespace-pre-line">
+                            {invoiceCompanyContact}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="md:text-right space-y-2">
+                        <h2 className="text-xl font-black uppercase text-wood-950 tracking-wider font-display">COMMERCIAL INVOICE</h2>
+                        <div className="text-xs text-gray-500 font-semibold space-y-1 md:inline-block md:text-right">
+                          <div className="flex md:justify-end items-center gap-1">
+                            <span>Invoice No:</span>
+                            {invoicePdfMode === 'EDIT' ? (
+                              <input
+                                type="text"
+                                value={invoiceNo}
+                                onChange={(e) => setInvoiceNo(e.target.value)}
+                                className="font-mono text-gray-800 font-bold bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-28 text-right"
+                              />
+                            ) : (
+                              <span className="font-mono text-gray-800 font-bold">{invoiceNo}</span>
                             )}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono text-gray-500">{item.unitRate}</td>
-                          <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-800">
-                            {formatCurrency(item.amount, 0)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
 
-                  {/* Inline interface to add a new custom invoice line item (only visible in EDIT mode) */}
-                  {invoicePdfMode === 'EDIT' && (
-                    <form onSubmit={handleAddCustomItem} className="mt-4 p-3.5 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex flex-wrap items-end gap-3 no-print">
-                      <div className="flex-1 min-w-[200px] space-y-1">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block">New Item Description</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Premium Brass Hinges & Hardware upgrades"
-                          value={newCustomItemDesc}
-                          onChange={(e) => setNewCustomItemDesc(e.target.value)}
-                          className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-medium"
-                        />
+                          <div className="flex md:justify-end items-center gap-1">
+                            <span>Date:</span>
+                            {invoicePdfMode === 'EDIT' ? (
+                              <input
+                                type="date"
+                                value={invoiceDate}
+                                onChange={(e) => setInvoiceDate(e.target.value)}
+                                className="font-mono text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-28 text-right"
+                              />
+                            ) : (
+                              <span className="font-mono text-gray-800">{invoiceDate}</span>
+                            )}
+                          </div>
+
+                          <div className="flex md:justify-end items-center gap-1">
+                            <span>Terms:</span>
+                            {invoicePdfMode === 'EDIT' ? (
+                              <input
+                                type="text"
+                                value={invoiceTerms}
+                                onChange={(e) => setInvoiceTerms(e.target.value)}
+                                className="text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-48 text-right"
+                              />
+                            ) : (
+                              <span className="text-gray-800 font-bold">{invoiceTerms}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Billing Addresses profiles */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 text-xs border-b border-gray-100">
+                      <div className="space-y-1 bg-gray-50/60 p-4 rounded-xl border border-gray-100">
+                        <span className="font-bold text-wood-950 uppercase tracking-wider block mb-1.5">CLIENT DEPOSITOR:</span>
+                        {invoicePdfMode === 'EDIT' ? (
+                          <div className="space-y-1">
+                            <input
+                              type="text"
+                              value={invoiceCustomerName}
+                              onChange={(e) => setInvoiceCustomerName(e.target.value)}
+                              className="text-xs font-black text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                              placeholder="Client Name"
+                            />
+                            <input
+                              type="text"
+                              value={invoiceCustomerCompany}
+                              onChange={(e) => setInvoiceCustomerCompany(e.target.value)}
+                              className="text-xs font-bold text-wood-700 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                              placeholder="Client Company"
+                            />
+                            <input
+                              type="text"
+                              value={invoiceCustomerPhone}
+                              onChange={(e) => setInvoiceCustomerPhone(e.target.value)}
+                              className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                              placeholder="Phone Number"
+                            />
+                            <input
+                              type="text"
+                              value={invoiceCustomerEmail}
+                              onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
+                              className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                              placeholder="Email address"
+                            />
+                            <input
+                              type="text"
+                              value={invoiceCustomerAddress}
+                              onChange={(e) => setInvoiceCustomerAddress(e.target.value)}
+                              className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                              placeholder="Delivery Address"
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm font-black text-gray-800">{invoiceCustomerName}</p>
+                            {invoiceCustomerCompany && (
+                              <p className="font-bold text-wood-800">{invoiceCustomerCompany}</p>
+                            )}
+                            <p className="text-gray-500 font-semibold mt-1">Phone: {invoiceCustomerPhone || 'N/A'}</p>
+                            <p className="text-gray-500 font-semibold">Email: {invoiceCustomerEmail || 'N/A'}</p>
+                            <p className="text-gray-500 leading-tight font-semibold mt-1">Delivery: {invoiceCustomerAddress || 'N/A'}</p>
+                          </>
+                        )}
                       </div>
 
-                      <div className="w-28 space-y-1">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block">Billing Type</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 2 Units, Flat fee"
-                          value={newCustomItemRate}
-                          onChange={(e) => setNewCustomItemRate(e.target.value)}
-                          className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-medium"
-                        />
+                      <div className="space-y-1 bg-gray-50/60 p-4 rounded-xl border border-gray-100">
+                        <span className="font-bold text-wood-950 uppercase tracking-wider block mb-1.5">PROJECT / DESIGN FOCUS:</span>
+                        {invoicePdfMode === 'EDIT' ? (
+                          <div className="space-y-1">
+                            <input
+                              type="text"
+                              value={invoiceProjectTitle}
+                              onChange={(e) => setInvoiceProjectTitle(e.target.value)}
+                              className="text-xs font-black text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                            />
+                            <textarea
+                              rows={2}
+                              value={invoiceProjectDescription}
+                              onChange={(e) => setInvoiceProjectDescription(e.target.value)}
+                              className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded p-1.5 w-full"
+                            />
+                            <input
+                              type="text"
+                              value={invoiceTimeline}
+                              onChange={(e) => setInvoiceTimeline(e.target.value)}
+                              className="text-xs font-semibold text-gray-700 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                              placeholder="Timeline"
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm font-black text-gray-800">{invoiceProjectTitle}</p>
+                            <p className="text-gray-500 leading-relaxed font-semibold">{invoiceProjectDescription}</p>
+                            <p className="text-gray-500 font-semibold mt-2">Workshop Timeline: <strong className="text-gray-800">{invoiceTimeline}</strong></p>
+                          </>
+                        )}
                       </div>
-
-                      <div className="w-28 space-y-1">
-                        <label className="text-[9px] text-gray-400 font-bold uppercase block">Rate Amount (Le)</label>
-                        <input
-                          type="number"
-                          value={newCustomItemAmount}
-                          onChange={(e) => setNewCustomItemAmount(Number(e.target.value))}
-                          className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="px-3.5 py-1.5 bg-wood-700 hover:bg-wood-800 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Item</span>
-                      </button>
-                    </form>
-                  )}
-                </div>
-
-                {/* Calculations Summary block */}
-                <div className="pt-6 border-t border-gray-100 flex flex-col md:flex-row justify-between items-start gap-6 text-xs">
-                  <div className="max-w-md text-gray-400 font-semibold leading-relaxed whitespace-pre-line">
-                    <h5 className="font-extrabold text-wood-950 uppercase tracking-widest text-[9px] mb-1.5">SWED WOOD WORK CLEARANCE INSTRUCTIONS:</h5>
-                    {invoicePdfMode === 'EDIT' ? (
-                      <textarea
-                        rows={3}
-                        value={invoiceBankInstructions}
-                        onChange={(e) => setInvoiceBankInstructions(e.target.value)}
-                        className="w-full p-2 text-xs bg-amber-50/50 border border-amber-200 rounded outline-hidden text-gray-700"
-                      />
-                    ) : (
-                      <p>{invoiceBankInstructions}</p>
-                    )}
-                  </div>
-
-                  <div className="w-full md:w-64 space-y-2 text-xs font-semibold text-gray-500">
-                    <div className="flex justify-between">
-                      <span>Invoice Subtotal:</span>
-                      <span className="font-mono text-gray-800 font-bold">{formatCurrency(totals.subtotal)}</span>
                     </div>
 
-                    <div className="flex justify-between items-center text-amber-800 bg-amber-50/40 px-2 py-1 rounded-lg">
-                      <span className="flex items-center gap-0.5 text-[10px] uppercase font-bold">Discount ({discountPercent}%):</span>
-                      <span className="font-mono font-bold">-{formatCurrency(totals.discountAmount)}</span>
-                    </div>
+                    {/* Interactive/Editable Table Line Items */}
+                    <div className="py-2">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-300 text-wood-950 font-bold uppercase bg-gray-50 text-[10px] tracking-wider">
+                            <th className="py-2.5 px-3">Itemized Production Scope & Timber Milling</th>
+                            <th className="py-2.5 px-3 text-right">Unit Rate / Unit Size</th>
+                            <th className="py-2.5 px-3 text-right">Cleared Value</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          <tr>
+                            <td className="py-3 px-3">
+                              <p className="font-bold text-gray-800">Bespoke Workshop Commission Fee</p>
+                              <span className="text-[10px] text-gray-400 font-semibold">Fine assembly, wood joinery, sanding, and hand polished finish.</span>
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono text-gray-600">Flat commission</td>
+                            <td className="py-3 px-3 text-right font-mono font-bold text-gray-800">
+                              {invoicePdfMode === 'EDIT' ? (
+                                <input
+                                  type="number"
+                                  value={invoiceCommissionAmount}
+                                  onChange={(e) => setInvoiceCommissionAmount(Number(e.target.value))}
+                                  className="w-28 text-right bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 font-bold outline-hidden font-mono text-xs"
+                                />
+                              ) : (
+                                formatCurrency(invoiceCommissionAmount, 0)
+                              )}
+                            </td>
+                          </tr>
 
-                    <div className="flex justify-between">
-                      <span>Taxable Value (Net):</span>
-                      <span className="font-mono text-gray-800 font-semibold">{formatCurrency(totals.taxableAmount)}</span>
-                    </div>
+                          {/* Consumed standard materials */}
+                          {activeInvoice.materialsUsed.map((m, idx) => (
+                            <tr key={idx} className="bg-gray-50/30">
+                              <td className="py-2.5 px-3">
+                                <span className="font-bold">Allocated Lumber: {m.name}</span>
+                                <span className="block text-[9px] text-gray-400 font-semibold">Consumed in construction logs.</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono text-gray-500">{m.quantity} Units</td>
+                              <td className="py-2.5 px-3 text-right font-mono text-gray-400">Included in Quote</td>
+                            </tr>
+                          ))}
 
-                    <div className="flex justify-between text-gray-700">
-                      <span className="text-[10px] uppercase font-bold">GST Sales Tax ({taxPercent}%):</span>
-                      <span className="font-mono font-bold">+{formatCurrency(totals.taxAmount)}</span>
-                    </div>
+                          {/* Render extra custom added line items */}
+                          {customInvoiceItems.map((item) => (
+                            <tr key={item.id} className="bg-amber-50/10">
+                              <td className="py-2.5 px-3 font-semibold text-gray-800 flex items-center justify-between">
+                                <span>{item.description}</span>
+                                {invoicePdfMode === 'EDIT' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCustomItem(item.id)}
+                                    className="text-red-500 hover:text-red-700 ml-2 no-print"
+                                    title="Remove item"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono text-gray-500">{item.unitRate}</td>
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-800">
+                                {formatCurrency(item.amount, 0)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
 
-                    <div className="border-t border-gray-200 pt-2 flex justify-between text-gray-800">
-                      <span className="font-black text-sm uppercase tracking-wider text-wood-950">Grand Total Invoice:</span>
-                      <span className="font-mono font-black text-sm text-wood-950">{formatCurrency(totals.finalTotal)}</span>
-                    </div>
+                      {/* Inline interface to add a new custom invoice line item (only visible in EDIT mode) */}
+                      {invoicePdfMode === 'EDIT' && (
+                        <form onSubmit={handleAddCustomItem} className="mt-4 p-3.5 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex flex-wrap items-end gap-3 no-print">
+                          <div className="flex-1 min-w-[200px] space-y-1">
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block">New Item Description</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Premium Brass Hinges & Hardware upgrades"
+                              value={newCustomItemDesc}
+                              onChange={(e) => setNewCustomItemDesc(e.target.value)}
+                              className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-medium"
+                            />
+                          </div>
 
-                    <div className="flex justify-between text-emerald-800 bg-emerald-50/30 px-2 py-1 rounded-lg">
-                      <span className="text-[9px] uppercase font-bold">Less Paid Deposits:</span>
-                      <span className="font-mono font-bold">-{formatCurrency(totals.totalPaid)}</span>
-                    </div>
+                          <div className="w-28 space-y-1">
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block">Billing Type</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 2 Units, Flat fee"
+                              value={newCustomItemRate}
+                              onChange={(e) => setNewCustomItemRate(e.target.value)}
+                              className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-medium"
+                            />
+                          </div>
 
-                    <div className="border-t-2 border-dashed border-gray-300 pt-2 flex justify-between text-red-700">
-                      <span className="font-bold text-xs uppercase">Net Balance Due:</span>
-                      <span className="font-mono font-bold text-xs">{formatCurrency(totals.outstanding)}</span>
-                    </div>
-                  </div>
-                </div>
+                          <div className="w-28 space-y-1">
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block">Rate Amount (Le)</label>
+                            <input
+                              type="number"
+                              value={newCustomItemAmount}
+                              onChange={(e) => setNewCustomItemAmount(Number(e.target.value))}
+                              className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold"
+                            />
+                          </div>
 
-                {/* Bottom official Signatures line */}
-                <div className="mt-12 pt-8 border-t border-gray-100 grid grid-cols-2 gap-8 text-center text-[10px] font-bold text-gray-400 uppercase">
-                  <div className="space-y-4">
-                    <p>PREPARED BY (SWED WOOD WORK REPRESENTATIVE):</p>
-                    <div className="h-10 flex items-center justify-center">
-                      {invoicePdfMode === 'EDIT' ? (
-                        <input
-                          type="text"
-                          value={invoicePreparedBy}
-                          onChange={(e) => setInvoicePreparedBy(e.target.value)}
-                          className="font-serif italic text-gray-700 border-b border-gray-300 bg-amber-50/50 rounded px-2 py-0.5 text-center text-xs"
-                        />
-                      ) : (
-                        <span className="font-serif italic text-gray-600 border-b border-gray-300 px-8 py-1 text-xs">
-                          {invoicePreparedBy}
-                        </span>
+                          <button
+                            type="submit"
+                            className="px-3.5 py-1.5 bg-wood-700 hover:bg-wood-800 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Item</span>
+                          </button>
+                        </form>
                       )}
                     </div>
-                    <p className="text-[8px] text-gray-400 font-normal">Workshop Authorization Stamp</p>
-                  </div>
 
-                  <div className="space-y-4">
-                    <p>CLIENT ACCEPTANCE STAMP & SIGNATURE:</p>
-                    <div className="h-10 flex items-center justify-center">
-                      <div className="w-36 border-b border-gray-300" />
+                    {/* Calculations Summary block */}
+                    <div className="pt-6 border-t border-gray-100 flex flex-col md:flex-row justify-between items-start gap-6 text-xs">
+                      <div className="max-w-md text-gray-400 font-semibold leading-relaxed whitespace-pre-line">
+                        <h5 className="font-extrabold text-wood-950 uppercase tracking-widest text-[9px] mb-1.5">SWED WOOD WORK CLEARANCE INSTRUCTIONS:</h5>
+                        {invoicePdfMode === 'EDIT' ? (
+                          <textarea
+                            rows={3}
+                            value={invoiceBankInstructions}
+                            onChange={(e) => setInvoiceBankInstructions(e.target.value)}
+                            className="w-full p-2 text-xs bg-amber-50/50 border border-amber-200 rounded outline-hidden text-gray-700"
+                          />
+                        ) : (
+                          <p>{invoiceBankInstructions}</p>
+                        )}
+                      </div>
+
+                      <div className="w-full md:w-64 space-y-2 text-xs font-semibold text-gray-500">
+                        <div className="flex justify-between">
+                          <span>Invoice Subtotal:</span>
+                          <span className="font-mono text-gray-800 font-bold">{formatCurrency(totals.subtotal)}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-amber-800 bg-amber-50/40 px-2 py-1 rounded-lg">
+                          <span className="flex items-center gap-0.5 text-[10px] uppercase font-bold">Discount ({discountPercent}%):</span>
+                          <span className="font-mono font-bold">-{formatCurrency(totals.discountAmount)}</span>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <span>Taxable Value (Net):</span>
+                          <span className="font-mono text-gray-800 font-semibold">{formatCurrency(totals.taxableAmount)}</span>
+                        </div>
+
+                        <div className="flex justify-between text-gray-700">
+                          <span className="text-[10px] uppercase font-bold">GST Sales Tax ({taxPercent}%):</span>
+                          <span className="font-mono font-bold">+{formatCurrency(totals.taxAmount)}</span>
+                        </div>
+
+                        <div className="border-t border-gray-200 pt-2 flex justify-between text-gray-800">
+                          <span className="font-black text-sm uppercase tracking-wider text-wood-950">Grand Total Invoice:</span>
+                          <span className="font-mono font-black text-sm text-wood-950">{formatCurrency(totals.finalTotal)}</span>
+                        </div>
+
+                        <div className="flex justify-between text-emerald-800 bg-emerald-50/30 px-2 py-1 rounded-lg">
+                          <span className="text-[9px] uppercase font-bold">Less Paid Deposits:</span>
+                          <span className="font-mono font-bold">-{formatCurrency(totals.totalPaid)}</span>
+                        </div>
+
+                        <div className="border-t-2 border-dashed border-gray-300 pt-2 flex justify-between text-red-700">
+                          <span className="font-bold text-xs uppercase">Net Balance Due:</span>
+                          <span className="font-mono font-bold text-xs">{formatCurrency(totals.outstanding)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-[8px] text-gray-400 font-normal">Approved & Agreed Delivery Terms</p>
-                  </div>
-                </div>
+
+                    {/* Bottom official Signatures line */}
+                    <div className="mt-12 pt-8 border-t border-gray-100 grid grid-cols-2 gap-8 text-center text-[10px] font-bold text-gray-400 uppercase">
+                      <div className="space-y-4">
+                        <p>PREPARED BY (SWED WOOD WORK REPRESENTATIVE):</p>
+                        <div className="h-10 flex items-center justify-center">
+                          {invoicePdfMode === 'EDIT' ? (
+                            <input
+                              type="text"
+                              value={invoicePreparedBy}
+                              onChange={(e) => setInvoicePreparedBy(e.target.value)}
+                              className="font-serif italic text-gray-700 border-b border-gray-300 bg-amber-50/50 rounded px-2 py-0.5 text-center text-xs"
+                            />
+                          ) : (
+                            <span className="font-serif italic text-gray-600 border-b border-gray-300 px-8 py-1 text-xs">
+                              {invoicePreparedBy}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[8px] text-gray-400 font-normal">Workshop Authorization Stamp</p>
+                      </div>
+
+                      <div className="space-y-4">
+                        <p>CLIENT ACCEPTANCE STAMP & SIGNATURE:</p>
+                        <div className="h-10 flex items-center justify-center">
+                          <div className="w-36 border-b border-gray-300" />
+                        </div>
+                        <p className="text-[8px] text-gray-400 font-normal">Approved & Agreed Delivery Terms</p>
+                      </div>
+                    </div>
+                  </>
+                )}
 
               </div>
 
@@ -1218,6 +1750,696 @@ export default function InvoiceReceiptManager({
         )}
       </AnimatePresence>
 
+      {/* ==========================================
+         BULK PDF EXPORT HUB MODAL
+         ========================================== */}
+      <AnimatePresence>
+        {isBulkModalOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto no-print">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white text-slate-800 rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+            >
+              
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
+                    <FolderArchive className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <h3 className="font-display font-black text-sm text-gray-900 uppercase tracking-wider">Bulk PDF Export Hub</h3>
+                    <p className="text-[10px] text-gray-500 font-bold">Download multiple commission invoices as a single zipped archive.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition"
+                >
+                  <Plus className="w-5 h-5 rotate-45" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+                
+                {/* Search & Style Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Search bar inside modal */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-gray-400 font-black uppercase tracking-wider block">Search Orders/Clients</label>
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="Search standard orders..."
+                        value={bulkSearchTerm}
+                        onChange={(e) => setBulkSearchTerm(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-medium text-gray-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Template selector */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-gray-400 font-black uppercase tracking-wider block">PDF Template Style</label>
+                    <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => setBulkTemplate('SWEDS_WOOD')}
+                        className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${
+                          bulkTemplate === 'SWEDS_WOOD'
+                            ? 'bg-white text-wood-950 shadow-2xs border border-wood-200'
+                            : 'text-gray-500 hover:text-gray-800'
+                        }`}
+                      >
+                        Sweds Wood Style
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBulkTemplate('MODERN')}
+                        className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${
+                          bulkTemplate === 'MODERN'
+                            ? 'bg-wood-950 text-white shadow-2xs'
+                            : 'text-gray-500 hover:text-gray-800'
+                        }`}
+                      >
+                        Modern Digital
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bulk Select Options Row */}
+                <div className="flex items-center justify-between text-xs bg-wood-50/50 p-3 rounded-xl border border-wood-100">
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-wood-900 font-mono">{selectedBulkJobIds.length}</span>
+                    <span className="text-gray-500 font-semibold">of {jobs.length} invoices selected</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBulkJobIds(jobs.map(j => j.id))}
+                      className="px-2 py-1 bg-white hover:bg-gray-50 text-[10px] text-wood-900 border border-gray-200 rounded-lg font-bold transition uppercase"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBulkJobIds([])}
+                      className="px-2 py-1 bg-white hover:bg-gray-50 text-[10px] text-red-700 border border-gray-200 rounded-lg font-bold transition uppercase"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+
+                {/* Checklist Container */}
+                <div className="border border-gray-150 rounded-2xl overflow-hidden max-h-[250px] overflow-y-auto divide-y divide-gray-100 bg-slate-50/35">
+                  {jobs.filter(j => {
+                    const searchStr = `${j.title} ${j.customerName} ${j.id}`.toLowerCase();
+                    return searchStr.includes(bulkSearchTerm.toLowerCase());
+                  }).length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-xs font-bold">
+                      No matching commission orders.
+                    </div>
+                  ) : (
+                    jobs
+                      .filter(j => {
+                        const searchStr = `${j.title} ${j.customerName} ${j.id}`.toLowerCase();
+                        return searchStr.includes(bulkSearchTerm.toLowerCase());
+                      })
+                      .map(job => {
+                        const isChecked = selectedBulkJobIds.includes(job.id);
+                        return (
+                          <div 
+                            key={job.id} 
+                            onClick={() => {
+                              if (isChecked) {
+                                setSelectedBulkJobIds(selectedBulkJobIds.filter(id => id !== job.id));
+                              } else {
+                                setSelectedBulkJobIds([...selectedBulkJobIds, job.id]);
+                              }
+                            }}
+                            className="p-3 hover:bg-wood-50/10 transition flex items-center justify-between cursor-pointer text-xs"
+                          >
+                            <div className="flex items-center gap-3">
+                              <button type="button" className="text-wood-800 transition">
+                                {isChecked ? (
+                                  <CheckSquare className="w-5 h-5 text-wood-900 fill-wood-50" />
+                                ) : (
+                                  <Square className="w-5 h-5 text-gray-300" />
+                                )}
+                              </button>
+                              <div>
+                                <h5 className="font-bold text-gray-800 leading-tight">{job.title}</h5>
+                                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
+                                  Client: {job.customerName} &bull; <span className="font-mono">{job.startDate}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="text-right font-mono font-bold text-gray-700">
+                              {formatCurrency(job.quoteAmount, 0)}
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+
+              </div>
+
+              {/* Progress/Spinner overlay for compiling/generating ZIP */}
+              {isExporting && (
+                <div className="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center p-6 z-10 space-y-4">
+                  <div className="w-12 h-12 border-4 border-wood-950 border-t-amber-500 rounded-full animate-spin" />
+                  <div className="text-center">
+                    <h4 className="text-xs font-black text-gray-800 uppercase tracking-wider">Generating PDF Dossiers...</h4>
+                    <p className="text-[10px] text-gray-500 font-bold mt-1">Compressing documents & packing ZIP archive.</p>
+                  </div>
+                  <div className="w-full max-w-xs bg-gray-100 rounded-full h-2 overflow-hidden border border-gray-200">
+                    <div 
+                      className="bg-wood-950 h-full transition-all duration-150" 
+                      style={{ width: `${exportProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono font-black text-wood-950">{exportProgress}% Completed</span>
+                </div>
+              )}
+
+              {/* Modal Footer */}
+              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-600 bg-white rounded-xl text-xs font-bold hover:bg-gray-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkPdfExport}
+                  disabled={selectedBulkJobIds.length === 0 || isExporting}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition cursor-pointer shadow-md ${
+                    selectedBulkJobIds.length === 0
+                      ? 'bg-gray-150 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none'
+                      : 'bg-wood-950 hover:bg-wood-900 text-white'
+                  }`}
+                >
+                  <FileDown className="w-4 h-4 text-amber-500" />
+                  <span>Export Zipped Archive ({selectedBulkJobIds.length})</span>
+                </button>
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
+}
+
+// ==========================================
+// PROGRAMMATIC HIGH-FIDELITY PDF GENERATOR
+// ==========================================
+export function buildInvoicePdfContent(
+  doc: any, // Use jsPDF instance
+  job: Job,
+  customer: Customer | undefined,
+  template: 'SWEDS_WOOD' | 'MODERN',
+  currentUser: Employee | null
+) {
+  const isSwedsWood = template === 'SWEDS_WOOD';
+  
+  if (isSwedsWood) {
+    // SWEDS WOOD ENTERPRISE OFFICIAL PAPER STYLE
+    doc.setDrawColor(219, 234, 254);
+    doc.setLineWidth(0.3);
+    doc.rect(10, 10, 190, 277, 'S');
+
+    // Sun logo vector
+    const logoX = 25;
+    const logoY = 28;
+    
+    doc.setLineWidth(0.8);
+    doc.setDrawColor(217, 119, 6);
+    const rayLength = 8;
+    for (let angle = 0; angle < 360; angle += 45) {
+      const rad = (angle * Math.PI) / 180;
+      const startX = logoX + Math.cos(rad) * 4;
+      const startY = logoY + Math.sin(rad) * 4;
+      const endX = logoX + Math.cos(rad) * rayLength;
+      const endY = logoY + Math.sin(rad) * rayLength;
+      doc.line(startX, startY, endX, endY);
+    }
+    
+    doc.setFillColor(245, 158, 11);
+    doc.setDrawColor(217, 119, 6);
+    doc.circle(logoX, logoY, 4, 'FD');
+
+    // Company Name
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(15, 82, 186);
+    doc.text("SWEDS WOOD ENTERPRISE", 40, 27);
+    
+    doc.setFillColor(15, 82, 186);
+    doc.rect(40, 30, 75, 1.2, 'F');
+    
+    // Invoice Badge Box
+    doc.setFillColor(56, 189, 248);
+    doc.setDrawColor(15, 82, 186);
+    doc.setLineWidth(0.6);
+    doc.rect(135, 18, 60, 16, 'FD');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(255, 255, 255);
+    doc.text("INVOICE", 135 + 30, 18 + 10.5, { align: 'center' });
+
+    // Metadata Small Table
+    const tableX = 15;
+    const tableY = 44;
+    const col1Width = 30;
+    const col2Width = 65;
+    const rowHeight = 6.5;
+    
+    const metaData = [
+      { label: "Invoice No.", val: `INV-${job.id.slice(4).toUpperCase()}` },
+      { label: "Address", val: "2 Sweds free Avenue" },
+      { label: "Date", val: job.startDate },
+      { label: "Terms (days)", val: "COD / Standard" }
+    ];
+    
+    doc.setLineWidth(0.2);
+    doc.setDrawColor(156, 163, 175);
+    
+    for (let i = 0; i < 4; i++) {
+      const currentY = tableY + i * rowHeight;
+      doc.setFillColor(224, 242, 254);
+      doc.rect(tableX, currentY, col1Width, rowHeight, 'FD');
+      
+      doc.setFillColor(255, 255, 255);
+      doc.rect(tableX + col1Width, currentY, col2Width, rowHeight, 'FD');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(15, 82, 186);
+      doc.text(metaData[i].label, tableX + 3, currentY + 4.5);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(31, 41, 55);
+      doc.text(metaData[i].val, tableX + col1Width + 3, currentY + 4.5);
+    }
+
+    // Customer Information Box
+    const custY = 76;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(15, 82, 186);
+    doc.text("Invoice to:", 15, custY);
+    
+    const boxY = custY + 2;
+    const boxHeight = 22;
+    doc.setLineWidth(0.2);
+    doc.setDrawColor(156, 163, 175);
+    doc.setFillColor(255, 255, 255);
+    doc.rect(15, boxY, 180, boxHeight, 'FD');
+    
+    doc.setFillColor(224, 242, 254);
+    doc.rect(15, boxY, 180, 5, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 82, 186);
+    doc.text("CUSTOMER INFORMATION & DELIVERY DETAILS", 18, boxY + 3.5);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(75, 85, 99);
+    doc.text("NAME:", 18, boxY + 10);
+    doc.setTextColor(17, 24, 39);
+    doc.text(job.customerName, 32, boxY + 10);
+    
+    doc.setTextColor(75, 85, 99);
+    doc.text("MOBILE:", 115, boxY + 10);
+    doc.setTextColor(17, 24, 39);
+    doc.text(customer?.phone || "N/A", 130, boxY + 10);
+    
+    doc.setTextColor(75, 85, 99);
+    doc.text("ADDRESS:", 18, boxY + 16);
+    doc.setTextColor(17, 24, 39);
+    doc.text(customer?.address || "N/A", 32, boxY + 16);
+    
+    doc.setTextColor(75, 85, 99);
+    doc.text("EMAIL:", 115, boxY + 16);
+    doc.setTextColor(17, 24, 39);
+    doc.text(customer?.email || "N/A", 130, boxY + 16);
+
+    // Ledger Table
+    const ledY = 105;
+    const ledCol1 = 110;
+    const ledCol2 = 15;
+    const ledCol3 = 25;
+    const ledCol4 = 30;
+    
+    doc.setFillColor(56, 189, 248);
+    doc.rect(15, ledY, 180, 8, 'FD');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Description", 15 + 4, ledY + 5.5);
+    doc.text("Qty", 15 + ledCol1 + 4, ledY + 5.5, { align: 'center' });
+    doc.text("Price", 15 + ledCol1 + ledCol2 + ledCol3 - 4, ledY + 5.5, { align: 'right' });
+    doc.text("Total", 15 + ledCol1 + ledCol2 + ledCol3 + ledCol4 - 4, ledY + 5.5, { align: 'right' });
+    
+    const tableBottomY = 195;
+    const tableRowHeight = 8;
+    const totalRowsCount = 10;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(31, 41, 55);
+    doc.text(job.title, 19, ledY + 8 + 5.5);
+    
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(107, 114, 128);
+    const descText = job.description || 'Fine custom hand-crafted wood carpentry commission.';
+    const splitDesc = doc.splitTextToSize(descText, ledCol1 - 10);
+    doc.text(splitDesc, 19, ledY + 8 + 10.5);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(31, 41, 55);
+    doc.text("1", 15 + ledCol1 + (ledCol2 / 2), ledY + 8 + 5.5, { align: 'center' });
+    
+    doc.setFont('helvetica', 'bold');
+    const priceStr = `Le ${job.quoteAmount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
+    doc.text(priceStr, 15 + ledCol1 + ledCol2 + ledCol3 - 4, ledY + 8 + 5.5, { align: 'right' });
+    doc.text(priceStr, 15 + ledCol1 + ledCol2 + ledCol3 + ledCol4 - 4, ledY + 8 + 5.5, { align: 'right' });
+    
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.15);
+    for (let r = 0; r <= totalRowsCount; r++) {
+      const currentY = ledY + 8 + r * tableRowHeight;
+      doc.line(15, currentY, 195, currentY);
+    }
+    
+    doc.setDrawColor(156, 163, 175);
+    doc.setLineWidth(0.2);
+    doc.line(15, ledY, 15, tableBottomY);
+    doc.line(15 + ledCol1, ledY, 15 + ledCol1, tableBottomY);
+    doc.line(15 + ledCol1 + ledCol2, ledY, 15 + ledCol1 + ledCol2, tableBottomY);
+    doc.line(15 + ledCol1 + ledCol2 + ledCol3, ledY, 15 + ledCol1 + ledCol2 + ledCol3, tableBottomY);
+    doc.line(195, ledY, 195, tableBottomY);
+
+    // Footer Totals Section
+    const totY = 202;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(156, 163, 175);
+    doc.text("Customer Message", 15, totY);
+    
+    doc.setDrawColor(156, 163, 175);
+    doc.setFillColor(255, 255, 255);
+    doc.rect(15, totY + 2, 100, 20, 'FD');
+    
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(55, 65, 81);
+    const messageLines = doc.splitTextToSize("Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!", 94);
+    doc.text(messageLines, 18, totY + 7);
+    
+    const totalPaid = job.payments.reduce((sum, p) => sum + p.amount, 0);
+    const outstanding = job.quoteAmount - totalPaid;
+    
+    doc.setFillColor(17, 24, 39);
+    doc.rect(122, totY + 2, 73, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Subtotal", 125, totY + 6.5);
+    doc.text(priceStr, 191, totY + 6.5, { align: 'right' });
+    
+    doc.setDrawColor(156, 163, 175);
+    doc.setFillColor(248, 250, 252);
+    doc.rect(122, totY + 9, 73, 13, 'FD');
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(107, 114, 128);
+    doc.text("Total Quoted Amount:", 125, totY + 13.5);
+    doc.text(priceStr, 191, totY + 13.5, { align: 'right' });
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(5, 150, 105);
+    doc.text("Less Paid Deposits:", 125, totY + 17);
+    const paidStr = `- Le ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
+    doc.text(paidStr, 191, totY + 17, { align: 'right' });
+    
+    doc.setDrawColor(209, 213, 219);
+    doc.line(122, totY + 18.5, 195, totY + 18.5);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(185, 28, 28);
+    doc.text("Balance Due:", 125, totY + 21);
+    const balanceStr = `Le ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
+    doc.text(balanceStr, 191, totY + 21, { align: 'right' });
+
+    // Signatures
+    const sigY = 245;
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(156, 163, 175);
+    
+    doc.line(20, sigY + 15, 90, sigY + 15);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 82, 186);
+    doc.text("PREPARED BY (SWEDS WOOD REPRESENTATIVE):", 20, sigY + 3);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(107, 114, 128);
+    doc.text(currentUser?.name || "Managing Director", 20, sigY + 19);
+    
+    doc.line(115, sigY + 15, 185, sigY + 15);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 82, 186);
+    doc.text("CLIENT ACCEPTANCE & SIGNATURE:", 115, sigY + 3);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(6.5);
+    doc.setTextColor(107, 114, 128);
+    doc.text("Approved & Received in Perfect Condition", 115, sigY + 19);
+    
+  } else {
+    // MODERN DIGITAL PROFESSIONAL TEMPLATE
+    doc.setDrawColor(245, 245, 244);
+    doc.setLineWidth(0.3);
+    doc.rect(10, 10, 190, 277, 'S');
+
+    // Header
+    doc.setFillColor(69, 26, 3);
+    doc.rect(15, 15, 10, 10, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(255, 255, 255);
+    doc.text("W", 18.5, 21.5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(69, 26, 3);
+    doc.text("SWED WOOD WORK", 28, 20);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(107, 114, 128);
+    doc.text("Corporate Carpentry, Woodwork, Timber Logistics & Design.", 28, 24);
+
+    doc.setFontSize(6.5);
+    const contactText = "Freetown Workshop & Site Installations.\nSierra Leone Office: Wilkinson Road, Freetown.\nContact: info@swedwoodwork.com | +232 76 112 3344";
+    doc.text(contactText, 15, 30);
+
+    // Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(69, 26, 3);
+    doc.text("COMMERCIAL INVOICE", 195, 20, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(55, 65, 81);
+    
+    doc.text(`Invoice No: INV-${job.id.slice(4).toUpperCase()}`, 195, 26, { align: 'right' });
+    doc.text(`Date: ${job.startDate}`, 195, 31, { align: 'right' });
+    doc.text(`Terms: Payment Clear / Standard Log`, 195, 36, { align: 'right' });
+
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.4);
+    doc.line(15, 46, 195, 46);
+
+    // Side-by-side containers
+    const blockWidth = 87;
+    const blockHeight = 28;
+    
+    // Client
+    doc.setFillColor(245, 245, 244);
+    doc.rect(15, 51, blockWidth, blockHeight, 'F');
+    doc.setDrawColor(229, 231, 235);
+    doc.rect(15, 51, blockWidth, blockHeight, 'S');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(69, 26, 3);
+    doc.text("CLIENT DEPOSITOR:", 18, 56);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(17, 24, 39);
+    doc.text(job.customerName, 18, 62);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`Phone: ${customer?.phone || "N/A"}`, 18, 67);
+    doc.text(`Email: ${customer?.email || "N/A"}`, 18, 71);
+    doc.text(`Delivery: ${customer?.address || "N/A"}`, 18, 75);
+
+    // Project Details
+    doc.setFillColor(245, 245, 244);
+    doc.rect(108, 51, blockWidth, blockHeight, 'F');
+    doc.setDrawColor(229, 231, 235);
+    doc.rect(108, 51, blockWidth, blockHeight, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(69, 26, 3);
+    doc.text("PROJECT / DESIGN FOCUS:", 111, 56);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(17, 24, 39);
+    doc.text(job.title, 111, 62);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(75, 85, 99);
+    const splitProjDesc = doc.splitTextToSize(job.description || "Custom hand-crafted carpentry order.", blockWidth - 8);
+    doc.text(splitProjDesc, 111, 67);
+    doc.text(`Workshop Timeline: ${job.startDate} to ${job.dueDate}`, 111, 75);
+
+    // Items Table
+    const tableY = 86;
+    doc.setFillColor(69, 26, 3);
+    doc.rect(15, tableY, 180, 8, 'F');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Itemized Production Scope & Timber Milling", 19, tableY + 5.5);
+    doc.text("Unit Rate / Size", 130, tableY + 5.5);
+    doc.text("Cleared Value", 191, tableY + 5.5, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(31, 41, 55);
+    doc.text("Bespoke Workshop Commission Fee", 19, tableY + 14);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(107, 114, 128);
+    doc.text("Fine assembly, wood joinery, sanding, and hand polished finish.", 19, tableY + 18);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(75, 85, 99);
+    doc.text("Flat commission", 130, tableY + 14);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(31, 41, 55);
+    const quotePriceStr = `Le ${job.quoteAmount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
+    doc.text(quotePriceStr, 191, tableY + 14, { align: 'right' });
+
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.3);
+    doc.line(15, tableY + 8, 195, tableY + 8);
+    doc.line(15, tableY + 23, 195, tableY + 23);
+    doc.line(15, tableY, 15, tableY + 105);
+    doc.line(195, tableY, 195, tableY + 105);
+    doc.line(15, tableY + 105, 195, tableY + 105);
+
+    // Totals Section
+    const botY = 198;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(69, 26, 3);
+    doc.text("Payment Instructions & Bank Log:", 15, botY);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(75, 85, 99);
+    const bankInstructionsText = `Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${job.id.slice(4).toUpperCase()}`;
+    doc.text(bankInstructionsText, 15, botY + 4.5);
+
+    const totalPaid = job.payments.reduce((sum, p) => sum + p.amount, 0);
+    const outstanding = job.quoteAmount - totalPaid;
+
+    const calcX = 125;
+    const calcWidth = 70;
+    
+    doc.setDrawColor(229, 231, 235);
+    doc.setFillColor(245, 245, 244);
+    doc.rect(calcX, botY, calcWidth, 24, 'FD');
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(75, 85, 99);
+    doc.text("Total Value:", calcX + 3, botY + 5.5);
+    doc.text(quotePriceStr, calcX + calcWidth - 3, botY + 5.5, { align: 'right' });
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(5, 150, 105);
+    doc.text("Paid Deposits:", calcX + 3, botY + 11.5);
+    const paidStrVal = `- Le ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
+    doc.text(paidStrVal, calcX + calcWidth - 3, botY + 11.5, { align: 'right' });
+    
+    doc.line(calcX, botY + 14.5, calcX + calcWidth, botY + 14.5);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(185, 28, 28);
+    doc.text("Outstanding:", calcX + 3, botY + 20);
+    const outStrVal = `Le ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
+    doc.text(outStrVal, calcX + calcWidth - 3, botY + 20, { align: 'right' });
+
+    // Signatures
+    const sigY = 245;
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(156, 163, 175);
+    
+    doc.line(20, sigY + 15, 90, sigY + 15);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(69, 26, 3);
+    doc.text("PREPARED BY (AUTHORISING OFFICER):", 20, sigY + 3);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(107, 114, 128);
+    doc.text(currentUser?.name || "Managing Director", 20, sigY + 19);
+    
+    doc.line(115, sigY + 15, 185, sigY + 15);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(69, 26, 3);
+    doc.text("CLIENT ACCEPTANCE SIGNATURE:", 115, sigY + 3);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(107, 114, 128);
+    doc.text("Authorized Design Specifications Sign-Off", 115, sigY + 19);
+  }
 }
