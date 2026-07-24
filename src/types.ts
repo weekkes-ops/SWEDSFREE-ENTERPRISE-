@@ -146,6 +146,34 @@ export interface WarningLetter {
   issuedBy: string;
 }
 
+export interface SavedInvoiceItem {
+  id: string;
+  description: string;
+  unitRate: string;
+  amount: number;
+}
+
+export interface SavedInvoice {
+  id: string;
+  jobId: string;
+  invoiceNo: string;
+  date: string;
+  terms: string;
+  customerName: string;
+  customerAddress: string;
+  customerPhone: string;
+  customerEmail: string;
+  customerMessage: string;
+  preparedBy: string;
+  template: 'SWEDS_WOOD' | 'MODERN';
+  status: 'Draft' | 'Issued' | 'Paid' | 'Overdue' | 'Cancelled';
+  logoUrl?: string;
+  items: SavedInvoiceItem[];
+  subtotal: number;
+  createdAt: string;
+  lastUpdated: string;
+}
+
 export function formatCurrency(amount: number, decimals: number = 2): string {
   return `Le ${amount.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 }

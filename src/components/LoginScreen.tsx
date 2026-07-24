@@ -238,14 +238,14 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
       >
         {/* Logo / Brand Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex p-3.5 bg-white/5 rounded-2xl border border-white/10 text-white shadow-xl mb-3.5 backdrop-blur-md">
-            <Hammer className="w-8 h-8 text-amber-500" />
+          <div className="inline-flex p-2 bg-white/10 rounded-2xl border border-amber-500/30 text-white shadow-xl mb-3.5 backdrop-blur-md">
+            <img src="/logo.svg" alt="Swedswood Enterprise Logo" className="w-16 h-16 object-contain" />
           </div>
           <h1 className="font-display font-black text-2xl uppercase tracking-widest text-amber-500">
-            SWEDSFREE<span className="text-white ml-1">ENTERPRISE</span>
+            SWEDSWOOD<span className="text-white ml-1">ENTERPRISE</span>
           </h1>
           <p className="text-xs text-slate-400 tracking-wider font-semibold uppercase mt-1 flex items-center justify-center gap-1.5">
-            <span className="text-sm">🇸🇱</span> Bespoke Woodwork Tracking & Management
+            <span className="text-sm">🇸🇱</span> Bespoke Woodwork & Invoice Management System
           </p>
         </div>
 

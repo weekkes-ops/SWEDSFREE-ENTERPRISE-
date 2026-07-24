@@ -1,5 +1,5 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { Job, Customer, Employee, formatCurrency, JobPayment, FinancialCategory } from '../types';
+import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { Job, Customer, Employee, formatCurrency, JobPayment, FinancialCategory, SavedInvoice, SavedInvoiceItem } from '../types';
 import { 
   FileText, 
   Receipt, 
@@ -25,11 +25,27 @@ import {
   Download,
   CheckSquare,
   Square,
-  FileDown
+  FileDown,
+  Save,
+  FolderOpen,
+  Filter,
+  Tag,
+  Clock,
+  X,
+  Check,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
+
+export interface CustomInvoiceItem {
+  id: string;
+  description: string;
+  unitRate: string;
+  amount: number;
+}
 
 interface InvoiceReceiptManagerProps {
   jobs: Job[];
@@ -50,8 +66,35 @@ export default function InvoiceReceiptManager({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(jobs[0]?.id || null);
   
-  // Top level tabs: Invoice Workspace vs Receipt Workspace
-  const [subTab, setSubTab] = useState<'INVOICE' | 'RECEIPT'>('INVOICE');
+  // Top level tabs: Invoice Workspace vs Saved Invoices Directory vs Receipt Workspace
+  const [subTab, setSubTab] = useState<'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT'>('INVOICE');
+
+  // Saved Invoices Persistent State
+  const [savedInvoices, setSavedInvoices] = useState<SavedInvoice[]>(() => {
+    const local = localStorage.getItem('swedswood_saved_invoices');
+    if (local) {
+      try {
+        return JSON.parse(local);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const [editingSavedInvoiceId, setEditingSavedInvoiceId] = useState<string | null>(null);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [invoiceStatus, setInvoiceStatus] = useState<SavedInvoice['status']>('Issued');
+
+  // Directory filter & search
+  const [savedInvoiceSearch, setSavedInvoiceSearch] = useState('');
+  const [savedInvoiceStatusFilter, setSavedInvoiceStatusFilter] = useState<'ALL' | SavedInvoice['status']>('ALL');
+  const [deleteConfirmInvoiceId, setDeleteConfirmInvoiceId] = useState<string | null>(null);
+
+  // Sync savedInvoices to localStorage
+  useEffect(() => {
+    localStorage.setItem('swedswood_saved_invoices', JSON.stringify(savedInvoices));
+  }, [savedInvoices]);
 
   // Template format selection: 'SWEDS_WOOD' (scanned paper style) or 'MODERN' (original template)
   const [invoiceTemplate, setInvoiceTemplate] = useState<'SWEDS_WOOD' | 'MODERN'>('SWEDS_WOOD');
@@ -80,6 +123,8 @@ export default function InvoiceReceiptManager({
   // ==========================================
   // INLINE EDITABLE STATES - INVOICE PDF
   // ==========================================
+  const [invoiceLogoUrl, setInvoiceLogoUrl] = useState<string>('/logo.svg');
+  const [invoiceLogoSize, setInvoiceLogoSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [invoiceCompany, setInvoiceCompany] = useState("SWED WOOD WORK");
   const [invoiceCompanyContact, setInvoiceCompanyContact] = useState("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: Wilkinson Road, Freetown.\nContact: info@swedwoodwork.com | +232 76 112 3344");
   const [invoiceNo, setInvoiceNo] = useState("");
@@ -98,12 +143,6 @@ export default function InvoiceReceiptManager({
   const [invoicePreparedBy, setInvoicePreparedBy] = useState("");
 
   // Custom line items in the invoice besides the main flat commission
-  interface CustomInvoiceItem {
-    id: string;
-    description: string;
-    unitRate: string;
-    amount: number;
-  }
   const [customInvoiceItems, setCustomInvoiceItems] = useState<CustomInvoiceItem[]>([]);
   const [newCustomItemDesc, setNewCustomItemDesc] = useState("");
   const [newCustomItemRate, setNewCustomItemRate] = useState("Flat fee");
@@ -276,6 +315,201 @@ export default function InvoiceReceiptManager({
     window.print();
   };
 
+  // ==========================================
+  // INVOICE RECORD CRUD HANDLERS
+  // ==========================================
+  const handleSaveInvoiceRecord = (statusOverride?: SavedInvoice['status']) => {
+    const currentStatus = statusOverride || invoiceStatus || 'Issued';
+
+    const itemsToSave: SavedInvoiceItem[] = customInvoiceItems.length > 0 
+      ? customInvoiceItems 
+      : [{
+          id: '1',
+          description: invoiceProjectTitle || (activeInvoice ? activeInvoice.title : 'Custom Woodwork Order'),
+          unitRate: 'Flat fee',
+          amount: invoiceCommissionAmount || (activeInvoice ? activeInvoice.quoteAmount : 0)
+        }];
+
+    const subtotal = itemsToSave.reduce((sum, item) => sum + item.amount, 0);
+    const recordId = editingSavedInvoiceId || `inv-${Date.now()}`;
+    const targetJobId = activeInvoice ? activeInvoice.id : 'job-custom';
+
+    const newRecord: SavedInvoice = {
+      id: recordId,
+      jobId: targetJobId,
+      invoiceNo: invoiceNo || `INV-${Date.now().toString().slice(-4)}`,
+      date: invoiceDate || new Date().toISOString().split('T')[0],
+      terms: invoiceTerms || 'COD / Standard',
+      customerName: invoiceCustomerName || (activeInvoice ? activeInvoice.customerName : 'Custom Customer'),
+      customerAddress: invoiceCustomerAddress || '',
+      customerPhone: invoiceCustomerPhone || '',
+      customerEmail: invoiceCustomerEmail || '',
+      customerMessage: invoiceCustomerMessage || 'Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!',
+      preparedBy: invoicePreparedBy || currentUser?.name || 'Managing Director',
+      template: invoiceTemplate,
+      status: currentStatus,
+      logoUrl: invoiceLogoUrl,
+      items: itemsToSave,
+      subtotal: subtotal,
+      createdAt: editingSavedInvoiceId 
+        ? (savedInvoices.find(s => s.id === editingSavedInvoiceId)?.createdAt || new Date().toISOString()) 
+        : new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    };
+
+    setSavedInvoices(prev => {
+      const idx = prev.findIndex(s => s.id === recordId);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = newRecord;
+        return copy;
+      }
+      return [newRecord, ...prev];
+    });
+
+    setEditingSavedInvoiceId(recordId);
+    setSaveToast(`Invoice #${newRecord.invoiceNo} saved & updated successfully!`);
+    setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  const handleCreateNewBlankInvoice = () => {
+    const blankJob: Job = {
+      id: `job-custom-${Date.now()}`,
+      customerId: 'c-custom',
+      customerName: 'New Client',
+      title: 'Bespoke Carpentry & Furniture Commission',
+      description: 'Custom woodwork order and installation',
+      assignedEmployees: [],
+      status: 'In Progress',
+      startDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date().toISOString().split('T')[0],
+      quoteAmount: 0,
+      materialsUsed: [],
+      laborCost: 0,
+      otherCosts: 0,
+      payments: []
+    };
+    
+    setActiveInvoice(blankJob);
+    setInvoiceNo(`INV-${Math.floor(1000 + Math.random() * 9000)}`);
+    setInvoiceDate(new Date().toISOString().split('T')[0]);
+    setInvoiceTerms("COD / Payment Clear");
+    setInvoiceCustomerName("");
+    setInvoiceCustomerAddress("");
+    setInvoiceCustomerPhone("");
+    setInvoiceCustomerEmail("");
+    setInvoiceCustomerMessage("Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!");
+    setInvoicePreparedBy(currentUser?.name || 'Managing Director');
+    setInvoiceCommissionAmount(0);
+    setCustomInvoiceItems([
+      { id: '1', description: 'Handcrafted Mahogany Dining Table with Carved Finish', unitRate: '1 Set', amount: 15000 },
+      { id: '2', description: 'Delivery & Site Installation Fee (Freetown Workshop)', unitRate: 'Flat', amount: 1200 }
+    ]);
+    setEditingSavedInvoiceId(null);
+    setInvoiceStatus('Draft');
+    setInvoiceLogoUrl('/logo.svg');
+    setSubTab('INVOICE');
+    setInvoicePdfMode('EDIT');
+  };
+
+  const handleInvoiceLogoFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setInvoiceLogoUrl(event.target.result as string);
+          setSaveToast('Invoice logo updated from image upload!');
+          setTimeout(() => setSaveToast(null), 2500);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLoadSavedInvoice = (saved: SavedInvoice) => {
+    const job: Job = jobs.find(j => j.id === saved.jobId) || {
+      id: saved.jobId,
+      customerId: 'c-custom',
+      customerName: saved.customerName,
+      title: saved.items[0]?.description || 'Custom Woodwork Order',
+      description: saved.customerMessage,
+      assignedEmployees: [],
+      status: 'In Progress',
+      startDate: saved.date,
+      dueDate: saved.date,
+      quoteAmount: saved.subtotal,
+      materialsUsed: [],
+      laborCost: 0,
+      otherCosts: 0,
+      payments: []
+    };
+
+    setActiveInvoice(job);
+    setInvoiceNo(saved.invoiceNo);
+    setInvoiceDate(saved.date);
+    setInvoiceTerms(saved.terms);
+    setInvoiceCustomerName(saved.customerName);
+    setInvoiceCustomerAddress(saved.customerAddress);
+    setInvoiceCustomerPhone(saved.customerPhone);
+    setInvoiceCustomerEmail(saved.customerEmail);
+    setInvoiceCustomerMessage(saved.customerMessage);
+    setInvoicePreparedBy(saved.preparedBy);
+    setInvoiceTemplate(saved.template);
+    setInvoiceLogoUrl(saved.logoUrl || '/logo.svg');
+    setCustomInvoiceItems(saved.items);
+    setEditingSavedInvoiceId(saved.id);
+    setInvoiceStatus(saved.status);
+    setSubTab('INVOICE');
+    setInvoicePdfMode('VIEW');
+  };
+
+  const handleDeleteSavedInvoice = (id: string) => {
+    setSavedInvoices(prev => prev.filter(inv => inv.id !== id));
+    if (editingSavedInvoiceId === id) {
+      setEditingSavedInvoiceId(null);
+    }
+    setDeleteConfirmInvoiceId(null);
+    setSaveToast('Invoice deleted from database.');
+    setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  const handleUpdateInvoiceStatus = (id: string, newStatus: SavedInvoice['status']) => {
+    setSavedInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: newStatus, lastUpdated: new Date().toISOString() } : inv));
+    if (editingSavedInvoiceId === id) {
+      setInvoiceStatus(newStatus);
+    }
+    setSaveToast(`Invoice status updated to ${newStatus}`);
+    setTimeout(() => setSaveToast(null), 2500);
+  };
+
+  const handleDownloadSinglePdf = () => {
+    if (!activeInvoice) return;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+    const customer = customers.find(c => c.id === activeInvoice.customerId);
+    buildInvoicePdfContent(
+      doc,
+      activeInvoice,
+      customer,
+      invoiceTemplate,
+      currentUser,
+      customInvoiceItems,
+      invoiceNo,
+      invoiceDate,
+      invoiceCustomerName,
+      invoiceCustomerAddress,
+      invoiceCustomerPhone,
+      invoiceCustomerEmail,
+      invoiceCustomerMessage
+    );
+    const cleanName = (invoiceCustomerName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
+    doc.save(`Invoice_${invoiceNo || '042'}_${cleanName}.pdf`);
+  };
+
   const handleBulkPdfExport = async () => {
     if (selectedBulkJobIds.length === 0) return;
     setIsExporting(true);
@@ -363,39 +597,74 @@ export default function InvoiceReceiptManager({
 
       {/* Top Section Header with SubTab buttons */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-5 rounded-2xl border border-wood-100 shadow-xs no-print">
-        <div>
-          <h1 className="text-xl font-display font-black text-wood-900 tracking-tight flex items-center gap-2">
-            <FileText className="w-5 h-5 text-wood-600" />
-            SWED WOOD WORK Billing Desk
-          </h1>
-          <p className="text-xs text-gray-500 mt-1">
-            Generate, customize, edit, and print official invoices and clearance receipts in high-fidelity PDF layouts.
-          </p>
+        <div className="flex items-center gap-3">
+          <img src="/logo.svg" alt="Swedswood Enterprise Logo" className="w-12 h-12 object-contain" />
+          <div>
+            <h1 className="text-xl font-display font-black text-wood-900 tracking-tight flex items-center gap-2">
+              Swedswood Enterprise Billing Desk
+            </h1>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Manage, update, save, print and delete official invoices and clearance receipts in high-fidelity PDF layouts.
+            </p>
+          </div>
         </div>
 
-        {/* Sub-tab Switcher: Invoices vs Receipts & Bulk Export */}
+        {/* Floating Toast Notification */}
+        <AnimatePresence>
+          {saveToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-emerald-900 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 border border-emerald-700"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>{saveToast}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Sub-tab Switcher: Invoices vs Saved Invoices vs Receipts & Bulk Export */}
         <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
           <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
             <button
               onClick={() => setSubTab('INVOICE')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
                 subTab === 'INVOICE' 
                   ? 'bg-white text-wood-950 shadow-xs' 
                   : 'text-gray-500 hover:text-gray-800'
               }`}
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="w-4 h-4 text-amber-600" />
               <span>Invoice Workspace</span>
             </button>
+
+            <button
+              onClick={() => setSubTab('SAVED_INVOICES')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                subTab === 'SAVED_INVOICES' 
+                  ? 'bg-white text-wood-950 shadow-xs' 
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <FolderArchive className="w-4 h-4 text-blue-600" />
+              <span>Saved Invoices</span>
+              {savedInvoices.length > 0 && (
+                <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 text-[10px] font-black rounded-full ml-0.5">
+                  {savedInvoices.length}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => setSubTab('RECEIPT')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
                 subTab === 'RECEIPT' 
                   ? 'bg-white text-emerald-950 shadow-xs' 
                   : 'text-gray-500 hover:text-gray-800'
               }`}
             >
-              <Receipt className="w-4 h-4" />
+              <Receipt className="w-4 h-4 text-emerald-600" />
               <span>Receipt Desk</span>
             </button>
           </div>
@@ -406,7 +675,7 @@ export default function InvoiceReceiptManager({
               setBulkTemplate(invoiceTemplate);
               setIsBulkModalOpen(true);
             }}
-            className="flex items-center gap-1.5 px-4 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-black uppercase transition shadow-xs cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-black uppercase transition shadow-xs cursor-pointer"
           >
             <FolderArchive className="w-4 h-4 text-amber-500" />
             <span>Bulk PDF Export</span>
@@ -414,7 +683,276 @@ export default function InvoiceReceiptManager({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 no-print">
+      {/* ==========================================
+         SAVED INVOICES DIRECTORY & MANAGER TAB
+         ========================================== */}
+      {subTab === 'SAVED_INVOICES' && (
+        <div className="space-y-6 no-print">
+          {/* Metric Cards Header */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Total Saved Invoices</span>
+                <p className="text-2xl font-black text-wood-950 mt-1 font-mono">{savedInvoices.length}</p>
+              </div>
+              <div className="p-3 bg-wood-50 text-wood-700 rounded-xl">
+                <FolderArchive className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Outstanding Unpaid</span>
+                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">
+                  Le {savedInvoices.filter(i => i.status === 'Issued' || i.status === 'Overdue' || i.status === 'Draft').reduce((s, i) => s + i.subtotal, 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                <Clock className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Total Cleared Revenue</span>
+                <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
+                  Le {savedInvoices.filter(i => i.status === 'Paid').reduce((s, i) => s + i.subtotal, 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Active Draft Invoices</span>
+                <p className="text-2xl font-black text-blue-600 mt-1 font-mono">
+                  {savedInvoices.filter(i => i.status === 'Draft').length}
+                </p>
+              </div>
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                <Tag className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          {/* Directory Filter & Search Control Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-1 flex-col sm:flex-row items-center gap-3">
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search invoice #, customer, line item..."
+                  value={savedInvoiceSearch}
+                  onChange={(e) => setSavedInvoiceSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-hidden focus:bg-white font-medium"
+                />
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
+                {(['ALL', 'Draft', 'Issued', 'Paid', 'Overdue', 'Cancelled'] as const).map(st => (
+                  <button
+                    key={st}
+                    onClick={() => setSavedInvoiceStatusFilter(st)}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+                      savedInvoiceStatusFilter === st
+                        ? 'bg-white text-wood-950 shadow-2xs'
+                        : 'text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleCreateNewBlankInvoice}
+              className="px-4 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4 text-amber-400" />
+              <span>+ Create Blank Custom Invoice</span>
+            </button>
+          </div>
+
+          {/* Directory Table */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+            {savedInvoices.filter(inv => {
+              const query = savedInvoiceSearch.toLowerCase();
+              const matchesSearch = !query || 
+                inv.invoiceNo.toLowerCase().includes(query) ||
+                inv.customerName.toLowerCase().includes(query) ||
+                inv.customerPhone.toLowerCase().includes(query) ||
+                inv.items.some(it => it.description.toLowerCase().includes(query));
+              const matchesStatus = savedInvoiceStatusFilter === 'ALL' || inv.status === savedInvoiceStatusFilter;
+              return matchesSearch && matchesStatus;
+            }).length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <FolderArchive className="w-12 h-12 text-gray-300 mx-auto" />
+                <h3 className="text-sm font-bold text-gray-800">No Saved Invoices Found</h3>
+                <p className="text-xs text-gray-400 max-w-md mx-auto">
+                  Save invoices from the Invoice Workspace or click below to draft a brand new invoice from scratch.
+                </p>
+                <button
+                  onClick={handleCreateNewBlankInvoice}
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-wood-950 text-white rounded-xl text-xs font-bold hover:bg-wood-900 transition"
+                >
+                  <Plus className="w-4 h-4 text-amber-400" />
+                  <span>Create New Invoice Now</span>
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase font-black tracking-wider text-gray-400">
+                    <tr>
+                      <th className="py-3.5 px-4">Invoice # & Date</th>
+                      <th className="py-3.5 px-4">Customer Details</th>
+                      <th className="py-3.5 px-4">Line Items Summary</th>
+                      <th className="py-3.5 px-4 text-right">Subtotal Amount</th>
+                      <th className="py-3.5 px-4 text-center">Status</th>
+                      <th className="py-3.5 px-4 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {savedInvoices.filter(inv => {
+                      const query = savedInvoiceSearch.toLowerCase();
+                      const matchesSearch = !query || 
+                        inv.invoiceNo.toLowerCase().includes(query) ||
+                        inv.customerName.toLowerCase().includes(query) ||
+                        inv.customerPhone.toLowerCase().includes(query) ||
+                        inv.items.some(it => it.description.toLowerCase().includes(query));
+                      const matchesStatus = savedInvoiceStatusFilter === 'ALL' || inv.status === savedInvoiceStatusFilter;
+                      return matchesSearch && matchesStatus;
+                    }).map(inv => {
+                      const statusColors = {
+                        Draft: 'bg-blue-50 text-blue-700 border-blue-200',
+                        Issued: 'bg-amber-50 text-amber-700 border-amber-200',
+                        Paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                        Overdue: 'bg-red-50 text-red-700 border-red-200',
+                        Cancelled: 'bg-gray-100 text-gray-600 border-gray-200'
+                      };
+
+                      return (
+                        <tr key={inv.id} className="hover:bg-gray-50/80 transition">
+                          <td className="py-3.5 px-4">
+                            <div className="font-mono font-black text-gray-900 text-sm">{inv.invoiceNo}</div>
+                            <div className="text-[10px] text-gray-400 font-medium">{inv.date} • {inv.terms}</div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-gray-800">{inv.customerName}</div>
+                            {inv.customerPhone && <div className="text-[10px] text-gray-400">{inv.customerPhone}</div>}
+                          </td>
+                          <td className="py-3.5 px-4 max-w-xs">
+                            <div className="truncate font-medium text-gray-700">
+                              {inv.items.map(i => i.description).join(', ')}
+                            </div>
+                            <div className="text-[10px] text-gray-400">{inv.items.length} item(s) • Prepared by {inv.preparedBy}</div>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="font-mono font-black text-gray-900 text-sm">Le {inv.subtotal.toLocaleString()}</div>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <select
+                              value={inv.status}
+                              onChange={(e) => handleUpdateInvoiceStatus(inv.id, e.target.value as SavedInvoice['status'])}
+                              className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border cursor-pointer ${statusColors[inv.status] || statusColors.Draft}`}
+                            >
+                              <option value="Draft">Draft</option>
+                              <option value="Issued">Issued</option>
+                              <option value="Paid">Paid</option>
+                              <option value="Overdue">Overdue</option>
+                              <option value="Cancelled">Cancelled</option>
+                            </select>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => handleLoadSavedInvoice(inv)}
+                                className="p-1.5 bg-gray-100 hover:bg-wood-950 hover:text-white text-gray-700 rounded-lg transition cursor-pointer"
+                                title="View / Edit Invoice"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  handleLoadSavedInvoice(inv);
+                                  setTimeout(() => window.print(), 100);
+                                }}
+                                className="p-1.5 bg-gray-100 hover:bg-blue-600 hover:text-white text-gray-700 rounded-lg transition cursor-pointer"
+                                title="Print Invoice"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  handleLoadSavedInvoice(inv);
+                                  setTimeout(() => handleDownloadSinglePdf(), 100);
+                                }}
+                                className="p-1.5 bg-gray-100 hover:bg-emerald-600 hover:text-white text-gray-700 rounded-lg transition cursor-pointer"
+                                title="Download PDF"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmInvoiceId(inv.id)}
+                                className="p-1.5 bg-gray-100 hover:bg-red-600 hover:text-white text-gray-700 rounded-lg transition cursor-pointer"
+                                title="Delete Invoice"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Delete Confirmation Modal */}
+          {deleteConfirmInvoiceId && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+                <div className="p-3 bg-red-100 text-red-600 rounded-xl w-fit">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Confirm Invoice Deletion</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Are you sure you want to delete this saved invoice? This action will permanently remove it from your system database.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setDeleteConfirmInvoiceId(null)}
+                    className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDeleteSavedInvoice(deleteConfirmInvoiceId)}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black shadow-xs cursor-pointer"
+                  >
+                    Yes, Delete Record
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==========================================
+         INVOICE WORKSPACE & RECEIPT DESK
+         ========================================== */}
+      {(subTab === 'INVOICE' || subTab === 'RECEIPT') && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 no-print">
         
         {/* Left Column: Commission Orders Selector */}
         <div className="lg:col-span-1 bg-white rounded-2xl border border-wood-100 shadow-xs flex flex-col h-[650px] overflow-hidden">
@@ -576,6 +1114,49 @@ export default function InvoiceReceiptManager({
                     </div>
                   </div>
 
+                  {/* Invoice Header Logo Customizer */}
+                  <div className="p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-amber-900 tracking-wider flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
+                        Invoice Sunburst Logo (Editable)
+                      </span>
+                      {invoiceLogoUrl !== '/logo.svg' && (
+                        <button
+                          type="button"
+                          onClick={() => setInvoiceLogoUrl('/logo.svg')}
+                          className="text-[10px] text-amber-700 underline hover:text-amber-900 font-bold cursor-pointer"
+                        >
+                          Reset to Sun Logo
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-lg bg-white border border-amber-200 p-1 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                        <img src={invoiceLogoUrl || '/logo.svg'} alt="Invoice Logo Preview" className="w-full h-full object-contain" />
+                      </div>
+                      
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <label className="px-2.5 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition shadow-2xs shrink-0">
+                            <Upload className="w-3 h-3" />
+                            <span>Upload Image</span>
+                            <input type="file" accept="image/*" onChange={handleInvoiceLogoFileUpload} className="hidden" />
+                          </label>
+                          
+                          <input
+                            type="text"
+                            value={invoiceLogoUrl}
+                            onChange={(e) => setInvoiceLogoUrl(e.target.value)}
+                            placeholder="/logo.svg or data:image..."
+                            className="w-full px-2 py-1 text-xs bg-white border border-amber-200 rounded-lg outline-hidden font-mono text-gray-700"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="pt-2">
                     <button
                       onClick={() => {
@@ -644,6 +1225,7 @@ export default function InvoiceReceiptManager({
           )}
         </div>
       </div>
+      )}
 
       {/* ==========================================
          PDF WORKSPACE MODAL: FULL INVOICE VIEW/EDIT
@@ -726,17 +1308,55 @@ export default function InvoiceReceiptManager({
                     </button>
                   </div>
 
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase">Status:</span>
+                    <select
+                      value={invoiceStatus}
+                      onChange={(e) => {
+                        const val = e.target.value as SavedInvoice['status'];
+                        setInvoiceStatus(val);
+                        if (editingSavedInvoiceId) {
+                          handleUpdateInvoiceStatus(editingSavedInvoiceId, val);
+                        }
+                      }}
+                      className="px-2.5 py-1 text-xs font-black rounded-lg border border-gray-300 bg-white text-gray-800 outline-hidden cursor-pointer"
+                    >
+                      <option value="Draft">Draft</option>
+                      <option value="Issued">Issued</option>
+                      <option value="Paid">Paid</option>
+                      <option value="Overdue">Overdue</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={() => handleSaveInvoiceRecord()}
+                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                    title="Save or update this invoice in the local database"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{editingSavedInvoiceId ? 'Update Saved Invoice' : 'Save Invoice Record'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleDownloadSinglePdf}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download PDF File</span>
+                  </button>
+
                   <button
                     onClick={handlePrint}
-                    className="px-4 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
+                    className="px-3.5 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <Printer className="w-4 h-4" />
-                    <span>Print/Save PDF</span>
+                    <span>Print Page</span>
                   </button>
 
                   <button
                     onClick={() => setActiveInvoice(null)}
-                    className="px-4 py-2 border border-gray-300 text-gray-600 bg-white rounded-xl text-xs font-bold hover:bg-gray-50 transition"
+                    className="px-3.5 py-2 border border-gray-300 text-gray-600 bg-white rounded-xl text-xs font-bold hover:bg-gray-50 transition cursor-pointer"
                   >
                     Close Workspace
                   </button>
@@ -744,7 +1364,7 @@ export default function InvoiceReceiptManager({
               </div>
 
               {/* THE FLOATING PAPER (styled to look like an A4 page with high-contrast) */}
-              <div className="bg-white p-8 sm:p-12 border border-gray-200 rounded-xl shadow-xl space-y-6 print:p-0 print:border-none print:shadow-none print:rounded-none">
+              <div className={`p-8 sm:p-12 border border-gray-200 rounded-xl shadow-xl space-y-6 print:p-0 print:border-none print:shadow-none print:rounded-none ${invoiceTemplate === 'SWEDS_WOOD' ? 'sweds-paper-invoice bg-white' : 'bg-white'}`}>
                 
                 {invoiceTemplate === 'SWEDS_WOOD' ? (
                   /* ==========================================
@@ -756,19 +1376,14 @@ export default function InvoiceReceiptManager({
                       <div className="flex flex-col justify-between">
                         {/* Company Logo and Name */}
                         <div className="flex items-center gap-3">
-                          {/* Custom Yellow Sun SVG Logo */}
-                          <div className="relative w-12 h-12 flex items-center justify-center bg-transparent">
-                            <svg viewBox="0 0 100 100" className="w-12 h-12 text-amber-500 fill-amber-400">
-                              <circle cx="50" cy="50" r="18" className="fill-amber-400 stroke-amber-500 stroke-2" />
-                              <line x1="50" y1="12" x2="50" y2="24" className="stroke-amber-500 stroke-[5px] stroke-round" />
-                              <line x1="50" y1="76" x2="50" y2="88" className="stroke-amber-500 stroke-[5px] stroke-round" />
-                              <line x1="12" y1="50" x2="24" y2="50" className="stroke-amber-500 stroke-[5px] stroke-round" />
-                              <line x1="76" y1="50" x2="88" y2="50" className="stroke-amber-500 stroke-[5px] stroke-round" />
-                              <line x1="23" y1="23" x2="32" y2="32" className="stroke-amber-500 stroke-[5px] stroke-round" />
-                              <line x1="68" y1="68" x2="77" y2="77" className="stroke-amber-500 stroke-[5px] stroke-round" />
-                              <line x1="77" y1="23" x2="68" y2="32" className="stroke-amber-500 stroke-[5px] stroke-round" />
-                              <line x1="32" y1="68" x2="23" y2="77" className="stroke-amber-500 stroke-[5px] stroke-round" />
-                            </svg>
+                          <div className="relative group shrink-0">
+                            <img src={invoiceLogoUrl || '/logo.svg'} alt="Swedswood Enterprise Official Logo" className="w-14 h-14 object-contain shrink-0" />
+                            {invoicePdfMode === 'EDIT' && (
+                              <label className="absolute -bottom-1 -right-1 bg-wood-950 text-white p-1 rounded-full text-[9px] cursor-pointer shadow-md hover:bg-amber-600 transition no-print" title="Click to replace logo image">
+                                <Upload className="w-3 h-3 text-amber-400" />
+                                <input type="file" accept="image/*" onChange={handleInvoiceLogoFileUpload} className="hidden" />
+                              </label>
+                            )}
                           </div>
                           <div className="flex flex-col">
                             <h1 className="font-sans font-black text-2xl tracking-tight text-[#0f52ba] flex items-center gap-1.5 uppercase">
@@ -1126,9 +1741,15 @@ export default function InvoiceReceiptManager({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b-2 border-wood-950">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="p-1.5 bg-wood-950 text-white rounded-lg">
-                            <Wrench className="w-4 h-4" />
-                          </span>
+                          <div className="relative group shrink-0">
+                            <img src={invoiceLogoUrl || '/logo.svg'} alt="Company Logo" className="w-10 h-10 object-contain shrink-0" />
+                            {invoicePdfMode === 'EDIT' && (
+                              <label className="absolute -bottom-1 -right-1 bg-wood-950 text-white p-1 rounded-full text-[9px] cursor-pointer shadow-md hover:bg-amber-600 transition no-print" title="Click to replace logo image">
+                                <Upload className="w-3 h-3 text-amber-400" />
+                                <input type="file" accept="image/*" onChange={handleInvoiceLogoFileUpload} className="hidden" />
+                              </label>
+                            )}
+                          </div>
                           {invoicePdfMode === 'EDIT' ? (
                             <input
                               type="text"
@@ -1972,7 +2593,15 @@ export function buildInvoicePdfContent(
   job: Job,
   customer: Customer | undefined,
   template: 'SWEDS_WOOD' | 'MODERN',
-  currentUser: Employee | null
+  currentUser: Employee | null,
+  customItems?: CustomInvoiceItem[],
+  invoiceNoOverride?: string,
+  dateOverride?: string,
+  customerNameOverride?: string,
+  addressOverride?: string,
+  phoneOverride?: string,
+  emailOverride?: string,
+  customerMessageOverride?: string
 ) {
   const isSwedsWood = template === 'SWEDS_WOOD';
   
@@ -1982,25 +2611,26 @@ export function buildInvoicePdfContent(
     doc.setLineWidth(0.3);
     doc.rect(10, 10, 190, 277, 'S');
 
-    // Sun logo vector
+    // Terracotta Sunburst Logo Disc vector
     const logoX = 25;
-    const logoY = 28;
-    
-    doc.setLineWidth(0.8);
-    doc.setDrawColor(217, 119, 6);
-    const rayLength = 8;
+    const logoY = 27;
+    doc.setFillColor(155, 55, 31);
+    doc.circle(logoX, logoY, 9, 'F');
+
+    // White sunburst rays inside disc
+    doc.setLineWidth(0.6);
+    doc.setDrawColor(255, 255, 255);
     for (let angle = 0; angle < 360; angle += 45) {
       const rad = (angle * Math.PI) / 180;
-      const startX = logoX + Math.cos(rad) * 4;
-      const startY = logoY + Math.sin(rad) * 4;
-      const endX = logoX + Math.cos(rad) * rayLength;
-      const endY = logoY + Math.sin(rad) * rayLength;
+      const startX = logoX + Math.cos(rad) * 3.5;
+      const startY = logoY + Math.sin(rad) * 3.5;
+      const endX = logoX + Math.cos(rad) * 7;
+      const endY = logoY + Math.sin(rad) * 7;
       doc.line(startX, startY, endX, endY);
     }
-    
-    doc.setFillColor(245, 158, 11);
-    doc.setDrawColor(217, 119, 6);
-    doc.circle(logoX, logoY, 4, 'FD');
+
+    doc.setFillColor(255, 255, 255);
+    doc.circle(logoX, logoY, 2.5, 'F');
 
     // Company Name
     doc.setFont('helvetica', 'bold');
@@ -2029,10 +2659,13 @@ export function buildInvoicePdfContent(
     const col2Width = 65;
     const rowHeight = 6.5;
     
+    const invNoStr = invoiceNoOverride || `042`;
+    const invDateStr = dateOverride || job.startDate;
+
     const metaData = [
-      { label: "Invoice No.", val: `INV-${job.id.slice(4).toUpperCase()}` },
+      { label: "Invoice No.", val: invNoStr },
       { label: "Address", val: "2 Sweds free Avenue" },
-      { label: "Date", val: job.startDate },
+      { label: "Date", val: invDateStr },
       { label: "Terms (days)", val: "COD / Standard" }
     ];
     
@@ -2076,29 +2709,34 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(15, 82, 186);
-    doc.text("CUSTOMER INFORMATION & DELIVERY DETAILS", 18, boxY + 3.5);
+    doc.text("CUSTOMER INFORMATION", 18, boxY + 3.5);
     
+    const cName = customerNameOverride || job.customerName;
+    const cPhone = phoneOverride !== undefined ? phoneOverride : (customer?.phone || "");
+    const cAddr = addressOverride || customer?.address || "";
+    const cEmail = emailOverride !== undefined ? emailOverride : (customer?.email || "");
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(75, 85, 99);
     doc.text("NAME:", 18, boxY + 10);
     doc.setTextColor(17, 24, 39);
-    doc.text(job.customerName, 32, boxY + 10);
+    doc.text(cName, 32, boxY + 10);
     
     doc.setTextColor(75, 85, 99);
     doc.text("MOBILE:", 115, boxY + 10);
     doc.setTextColor(17, 24, 39);
-    doc.text(customer?.phone || "N/A", 130, boxY + 10);
+    doc.text(cPhone, 130, boxY + 10);
     
     doc.setTextColor(75, 85, 99);
     doc.text("ADDRESS:", 18, boxY + 16);
     doc.setTextColor(17, 24, 39);
-    doc.text(customer?.address || "N/A", 32, boxY + 16);
+    doc.text(cAddr, 32, boxY + 16);
     
     doc.setTextColor(75, 85, 99);
     doc.text("EMAIL:", 115, boxY + 16);
     doc.setTextColor(17, 24, 39);
-    doc.text(customer?.email || "N/A", 130, boxY + 16);
+    doc.text(cEmail, 130, boxY + 16);
 
     // Ledger Table
     const ledY = 105;
@@ -2122,27 +2760,43 @@ export function buildInvoicePdfContent(
     const tableRowHeight = 8;
     const totalRowsCount = 10;
     
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(31, 41, 55);
-    doc.text(job.title, 19, ledY + 8 + 5.5);
-    
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7.5);
-    doc.setTextColor(107, 114, 128);
-    const descText = job.description || 'Fine custom hand-crafted wood carpentry commission.';
-    const splitDesc = doc.splitTextToSize(descText, ledCol1 - 10);
-    doc.text(splitDesc, 19, ledY + 8 + 10.5);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(31, 41, 55);
-    doc.text("1", 15 + ledCol1 + (ledCol2 / 2), ledY + 8 + 5.5, { align: 'center' });
-    
-    doc.setFont('helvetica', 'bold');
-    const priceStr = `Le ${job.quoteAmount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
-    doc.text(priceStr, 15 + ledCol1 + ledCol2 + ledCol3 - 4, ledY + 8 + 5.5, { align: 'right' });
-    doc.text(priceStr, 15 + ledCol1 + ledCol2 + ledCol3 + ledCol4 - 4, ledY + 8 + 5.5, { align: 'right' });
+    // Items rendering
+    let itemsToRender: { desc: string; qty: string; price: number; total: number }[] = [];
+    if (customItems && customItems.length > 0) {
+      itemsToRender = customItems.map(item => ({
+        desc: item.description,
+        qty: item.unitRate || '1',
+        price: item.amount,
+        total: item.amount
+      }));
+    } else {
+      itemsToRender = [{
+        desc: job.title,
+        qty: '1',
+        price: job.quoteAmount,
+        total: job.quoteAmount
+      }];
+    }
+
+    let subtotalVal = 0;
+    itemsToRender.forEach((it, idx) => {
+      subtotalVal += it.total;
+      const currentY = ledY + 8 + idx * tableRowHeight;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(31, 41, 55);
+      doc.text(it.desc, 19, currentY + 5.5);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(it.qty, 15 + ledCol1 + (ledCol2 / 2), currentY + 5.5, { align: 'center' });
+      
+      doc.setFont('helvetica', 'bold');
+      const pStr = `SLL ${it.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      const tStr = `SLL ${it.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      doc.text(pStr, 15 + ledCol1 + ledCol2 + ledCol3 - 4, currentY + 5.5, { align: 'right' });
+      doc.text(tStr, 15 + ledCol1 + ledCol2 + ledCol3 + ledCol4 - 4, currentY + 5.5, { align: 'right' });
+    });
     
     doc.setDrawColor(209, 213, 219);
     doc.setLineWidth(0.15);
@@ -2174,11 +2828,12 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
     doc.setTextColor(55, 65, 81);
-    const messageLines = doc.splitTextToSize("Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!", 94);
+    const msgText = customerMessageOverride !== undefined ? customerMessageOverride : "Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!";
+    const messageLines = doc.splitTextToSize(msgText, 94);
     doc.text(messageLines, 18, totY + 7);
     
     const totalPaid = job.payments.reduce((sum, p) => sum + p.amount, 0);
-    const outstanding = job.quoteAmount - totalPaid;
+    const outstanding = subtotalVal - totalPaid;
     
     doc.setFillColor(17, 24, 39);
     doc.rect(122, totY + 2, 73, 7, 'F');
@@ -2186,32 +2841,35 @@ export function buildInvoicePdfContent(
     doc.setFontSize(8.5);
     doc.setTextColor(255, 255, 255);
     doc.text("Subtotal", 125, totY + 6.5);
-    doc.text(priceStr, 191, totY + 6.5, { align: 'right' });
+    const subtotalStr = `SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    doc.text(subtotalStr, 191, totY + 6.5, { align: 'right' });
     
-    doc.setDrawColor(156, 163, 175);
-    doc.setFillColor(248, 250, 252);
-    doc.rect(122, totY + 9, 73, 13, 'FD');
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(107, 114, 128);
-    doc.text("Total Quoted Amount:", 125, totY + 13.5);
-    doc.text(priceStr, 191, totY + 13.5, { align: 'right' });
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(5, 150, 105);
-    doc.text("Less Paid Deposits:", 125, totY + 17);
-    const paidStr = `- Le ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
-    doc.text(paidStr, 191, totY + 17, { align: 'right' });
-    
-    doc.setDrawColor(209, 213, 219);
-    doc.line(122, totY + 18.5, 195, totY + 18.5);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(185, 28, 28);
-    doc.text("Balance Due:", 125, totY + 21);
-    const balanceStr = `Le ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
-    doc.text(balanceStr, 191, totY + 21, { align: 'right' });
+    if (totalPaid > 0) {
+      doc.setDrawColor(156, 163, 175);
+      doc.setFillColor(248, 250, 252);
+      doc.rect(122, totY + 9, 73, 13, 'FD');
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(107, 114, 128);
+      doc.text("Total Quoted Amount:", 125, totY + 13.5);
+      doc.text(subtotalStr, 191, totY + 13.5, { align: 'right' });
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(5, 150, 105);
+      doc.text("Less Paid Deposits:", 125, totY + 17);
+      const paidStr = `- SLL ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      doc.text(paidStr, 191, totY + 17, { align: 'right' });
+      
+      doc.setDrawColor(209, 213, 219);
+      doc.line(122, totY + 18.5, 195, totY + 18.5);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(185, 28, 28);
+      doc.text("Balance Due:", 125, totY + 21);
+      const balanceStr = `SLL ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      doc.text(balanceStr, 191, totY + 21, { align: 'right' });
+    }
 
     // Signatures
     const sigY = 245;

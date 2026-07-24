@@ -90,6 +90,9 @@ export default function App() {
 
   // Offline Database Export (JSON)
   const handleExportBackup = () => {
+    const localSavedInvoices = localStorage.getItem('swedswood_saved_invoices');
+    const savedInvoices = localSavedInvoices ? JSON.parse(localSavedInvoices) : [];
+
     const backupData = {
       appName: 'Sweds Wood Enterprise',
       exportDate: new Date().toISOString(),
@@ -101,7 +104,8 @@ export default function App() {
       financialTransactions,
       dailyWorkLogs,
       registrationRequests,
-      warningLetters
+      warningLetters,
+      savedInvoices
     };
     const jsonStr = JSON.stringify(backupData, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -133,6 +137,9 @@ export default function App() {
         if (data.dailyWorkLogs) setDailyWorkLogs(data.dailyWorkLogs);
         if (data.registrationRequests) setRegistrationRequests(data.registrationRequests);
         if (data.warningLetters) setWarningLetters(data.warningLetters);
+        if (data.savedInvoices) {
+          localStorage.setItem('swedswood_saved_invoices', JSON.stringify(data.savedInvoices));
+        }
         alert('Offline database backup imported successfully! All records updated.');
       } catch (err) {
         alert('Failed to parse backup file. Please upload a valid JSON backup file.');
@@ -828,10 +835,10 @@ export default function App() {
       </div>
 
       {/* Mobile Top Navigation Bar */}
-      <div className="md:hidden bg-slate-900/60 backdrop-blur-md text-white p-4 flex items-center justify-between border-b border-white/10 sticky top-0 z-40 print:hidden relative z-10">
+      <div className="md:hidden bg-slate-900/60 backdrop-blur-md text-white p-3 flex items-center justify-between border-b border-white/10 sticky top-0 z-40 print:hidden relative z-10">
         <div className="flex items-center gap-2">
-          <Hammer className="w-5 h-5 text-amber-500 animate-spin-slow" />
-          <span className="font-display font-black text-sm uppercase tracking-wider text-amber-500">SWED WOOD<span className="text-white ml-1">WORK</span></span>
+          <img src="/logo.svg" alt="Swedswood Enterprise Logo" className="w-7 h-7 object-contain" />
+          <span className="font-display font-black text-sm uppercase tracking-wider text-amber-500">SWEDSWOOD<span className="text-white ml-1">ENTERPRISE</span></span>
         </div>
         
         <button 
@@ -849,12 +856,12 @@ export default function App() {
           {/* Logo / Brand Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 px-1">
-              <div className="p-2 bg-white/5 rounded-xl border border-white/10 text-white shadow-md shadow-slate-950/50">
-                <Hammer className="w-5 h-5 text-amber-500 animate-spin-slow" />
+              <div className="p-1.5 bg-white/10 rounded-xl border border-amber-500/30 text-white shadow-md shadow-slate-950/50">
+                <img src="/logo.svg" alt="Swedswood Enterprise Logo" className="w-8 h-8 object-contain" />
               </div>
               <div>
-                <h2 className="font-display font-black text-base uppercase tracking-wider text-amber-500">SWED WOOD<span className="text-white ml-1">WORK</span></h2>
-                <p className="text-[10px] text-slate-400 font-semibold tracking-widest uppercase">Management System</p>
+                <h2 className="font-display font-black text-sm uppercase tracking-wider text-amber-500">SWEDSWOOD<span className="text-white ml-1">ENTERPRISE</span></h2>
+                <p className="text-[9px] text-slate-400 font-semibold tracking-widest uppercase">Invoice & Workshop System</p>
               </div>
             </div>
 
