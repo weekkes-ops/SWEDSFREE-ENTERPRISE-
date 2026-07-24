@@ -67,6 +67,7 @@ export interface JobPayment {
   amount: number;
   date: string;
   method: 'Cash' | 'Bank Transfer' | 'Check' | 'Mobile Money';
+  note?: string;
 }
 
 export interface Job {

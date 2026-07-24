@@ -219,30 +219,8 @@ export default function App() {
     if (localRequests) {
       setRegistrationRequests(JSON.parse(localRequests));
     } else {
-      const seedRequests: RegistrationRequest[] = [
-        {
-          id: 'req-01',
-          name: 'Sahr Mattia',
-          email: 'sahr.mattia@swedsfree.com',
-          phone: '+232 76 112 3344',
-          role: 'Carpenter',
-          password: '1234',
-          status: 'Pending',
-          requestDate: '2026-07-19',
-        },
-        {
-          id: 'req-02',
-          name: 'Aminata Tarawallie',
-          email: 'aminata.t@swedsfree.com',
-          phone: '+232 78 555 8888',
-          role: 'Designer',
-          password: '1234',
-          status: 'Pending',
-          requestDate: '2026-07-20',
-        }
-      ];
-      setRegistrationRequests(seedRequests);
-      localStorage.setItem('swedsfree_registration_requests', JSON.stringify(seedRequests));
+      setRegistrationRequests([]);
+      localStorage.setItem('swedsfree_registration_requests', JSON.stringify([]));
     }
 
     const localUser = localStorage.getItem('swedsfree_current_user');
@@ -271,37 +249,31 @@ export default function App() {
 
   // 2. Sync to localStorage
   useEffect(() => {
-    if (inventory.length > 0) localStorage.setItem('swedsfree_inventory', JSON.stringify(inventory));
+    localStorage.setItem('swedsfree_inventory', JSON.stringify(inventory));
   }, [inventory]);
 
   useEffect(() => {
-    if (customers.length > 0) localStorage.setItem('swedsfree_customers', JSON.stringify(customers));
+    localStorage.setItem('swedsfree_customers', JSON.stringify(customers));
   }, [customers]);
 
   useEffect(() => {
-    if (employees.length > 0) localStorage.setItem('swedsfree_employees', JSON.stringify(employees));
+    localStorage.setItem('swedsfree_employees', JSON.stringify(employees));
   }, [employees]);
 
   useEffect(() => {
-    if (jobs.length > 0) localStorage.setItem('swedsfree_jobs', JSON.stringify(jobs));
+    localStorage.setItem('swedsfree_jobs', JSON.stringify(jobs));
   }, [jobs]);
 
   useEffect(() => {
-    if (inventoryTransactions.length > 0) {
-      localStorage.setItem('swedsfree_inv_transactions', JSON.stringify(inventoryTransactions));
-    }
+    localStorage.setItem('swedsfree_inv_transactions', JSON.stringify(inventoryTransactions));
   }, [inventoryTransactions]);
 
   useEffect(() => {
-    if (financialTransactions.length > 0) {
-      localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(financialTransactions));
-    }
+    localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(financialTransactions));
   }, [financialTransactions]);
 
   useEffect(() => {
-    if (dailyWorkLogs.length > 0) {
-      localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify(dailyWorkLogs));
-    }
+    localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify(dailyWorkLogs));
   }, [dailyWorkLogs]);
 
   useEffect(() => {
@@ -314,7 +286,7 @@ export default function App() {
 
   // RESET DATABASE ACTION
   const handleResetDatabase = () => {
-    if (window.confirm('Are you sure you want to reset all records back to Swedsfree Enterprise standard seeds? This will delete custom transactions.')) {
+    if (window.confirm('Are you sure you want to clear all data and reset the database? All records will be wiped completely.')) {
       localStorage.removeItem('swedsfree_inventory');
       localStorage.removeItem('swedsfree_customers');
       localStorage.removeItem('swedsfree_employees');
@@ -324,37 +296,17 @@ export default function App() {
       localStorage.removeItem('swedsfree_daily_work_logs');
       localStorage.removeItem('swedsfree_registration_requests');
       localStorage.removeItem('swedsfree_warning_letters');
+      localStorage.removeItem('swedswood_saved_invoices');
 
-      setInventory(INITIAL_INVENTORY);
-      setCustomers(INITIAL_CUSTOMERS);
+      setInventory([]);
+      setCustomers([]);
       setEmployees(INITIAL_EMPLOYEES);
-      setJobs(INITIAL_JOBS);
-      setInventoryTransactions(INITIAL_INVENTORY_TRANSACTIONS);
-      setFinancialTransactions(INITIAL_FINANCIALS);
-      setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
+      setJobs([]);
+      setInventoryTransactions([]);
+      setFinancialTransactions([]);
+      setDailyWorkLogs([]);
       setWarningLetters([]);
-      setRegistrationRequests([
-        {
-          id: 'req-01',
-          name: 'Sahr Mattia',
-          email: 'sahr.mattia@swedsfree.com',
-          phone: '+232 76 112 3344',
-          role: 'Carpenter',
-          password: '1234',
-          status: 'Pending',
-          requestDate: '2026-07-19',
-        },
-        {
-          id: 'req-02',
-          name: 'Aminata Tarawallie',
-          email: 'aminata.t@swedsfree.com',
-          phone: '+232 78 555 8888',
-          role: 'Designer',
-          password: '1234',
-          status: 'Pending',
-          requestDate: '2026-07-20',
-        }
-      ]);
+      setRegistrationRequests([]);
       setActiveTab('dashboard');
     }
   };
@@ -1082,6 +1034,9 @@ export default function App() {
                 onAddCustomer={handleAddCustomer}
                 onUpdateCustomer={handleUpdateCustomer}
                 onDeleteCustomer={handleDeleteCustomer}
+                onRecordPayment={handleRecordJobPayment}
+                onAddJob={handleCreateJob}
+                onUpdateJob={handleUpdateJob}
                 showRegisterModalOnLoad={quickActionTrigger === 'register-customer'}
                 onCloseRegisterModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
