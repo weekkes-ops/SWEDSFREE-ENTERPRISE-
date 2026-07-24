@@ -193,23 +193,27 @@ export default function App() {
 
   // 1. Initial Load from localStorage or Seeds
   useEffect(() => {
-    const localInv = localStorage.getItem('swedsfree_inventory');
-    const localCust = localStorage.getItem('swedsfree_customers');
-    const localEmp = localStorage.getItem('swedsfree_employees');
-    const localJobs = localStorage.getItem('swedsfree_jobs');
-    const localInvTx = localStorage.getItem('swedsfree_inv_transactions');
-    const localFinTx = localStorage.getItem('swedsfree_fin_transactions');
-    const localWorkLogs = localStorage.getItem('swedsfree_daily_work_logs');
-    const localWarnings = localStorage.getItem('swedsfree_warning_letters');
+    try {
+      const localInv = localStorage.getItem('swedsfree_inventory');
+      const parsedInv = localInv ? JSON.parse(localInv) : null;
+      if (parsedInv && Array.isArray(parsedInv) && parsedInv.length > 0) setInventory(parsedInv);
+      else setInventory(INITIAL_INVENTORY);
+    } catch (e) {
+      setInventory(INITIAL_INVENTORY);
+    }
 
-    if (localInv) setInventory(JSON.parse(localInv));
-    else setInventory(INITIAL_INVENTORY);
-
-    if (localCust) setCustomers(JSON.parse(localCust));
-    else setCustomers(INITIAL_CUSTOMERS);
+    try {
+      const localCust = localStorage.getItem('swedsfree_customers');
+      const parsedCust = localCust ? JSON.parse(localCust) : null;
+      if (parsedCust && Array.isArray(parsedCust) && parsedCust.length > 0) setCustomers(parsedCust);
+      else setCustomers(INITIAL_CUSTOMERS);
+    } catch (e) {
+      setCustomers(INITIAL_CUSTOMERS);
+    }
 
     let hasOldNames = false;
     let finalEmployees = INITIAL_EMPLOYEES;
+    const localEmp = localStorage.getItem('swedsfree_employees');
     if (localEmp) {
       try {
         const parsed = JSON.parse(localEmp);
@@ -218,7 +222,7 @@ export default function App() {
           localStorage.removeItem('swedsfree_current_user');
           finalEmployees = INITIAL_EMPLOYEES;
           localStorage.setItem('swedsfree_employees', JSON.stringify(INITIAL_EMPLOYEES));
-        } else {
+        } else if (Array.isArray(parsed) && parsed.length > 0) {
           finalEmployees = parsed;
         }
       } catch (e) {
@@ -229,20 +233,49 @@ export default function App() {
     }
     setEmployees(finalEmployees);
 
-    if (localJobs) setJobs(JSON.parse(localJobs));
-    else setJobs(INITIAL_JOBS);
+    try {
+      const localJobs = localStorage.getItem('swedsfree_jobs');
+      const parsedJobs = localJobs ? JSON.parse(localJobs) : null;
+      if (parsedJobs && Array.isArray(parsedJobs) && parsedJobs.length > 0) setJobs(parsedJobs);
+      else setJobs(INITIAL_JOBS);
+    } catch (e) {
+      setJobs(INITIAL_JOBS);
+    }
 
-    if (localInvTx) setInventoryTransactions(JSON.parse(localInvTx));
-    else setInventoryTransactions(INITIAL_INVENTORY_TRANSACTIONS);
+    try {
+      const localInvTx = localStorage.getItem('swedsfree_inv_transactions');
+      const parsedInvTx = localInvTx ? JSON.parse(localInvTx) : null;
+      if (parsedInvTx && Array.isArray(parsedInvTx) && parsedInvTx.length > 0) setInventoryTransactions(parsedInvTx);
+      else setInventoryTransactions(INITIAL_INVENTORY_TRANSACTIONS);
+    } catch (e) {
+      setInventoryTransactions(INITIAL_INVENTORY_TRANSACTIONS);
+    }
 
-    if (localFinTx) setFinancialTransactions(JSON.parse(localFinTx));
-    else setFinancialTransactions(INITIAL_FINANCIALS);
+    try {
+      const localFinTx = localStorage.getItem('swedsfree_fin_transactions');
+      const parsedFinTx = localFinTx ? JSON.parse(localFinTx) : null;
+      if (parsedFinTx && Array.isArray(parsedFinTx) && parsedFinTx.length > 0) setFinancialTransactions(parsedFinTx);
+      else setFinancialTransactions(INITIAL_FINANCIALS);
+    } catch (e) {
+      setFinancialTransactions(INITIAL_FINANCIALS);
+    }
 
-    if (localWorkLogs) setDailyWorkLogs(JSON.parse(localWorkLogs));
-    else setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
+    try {
+      const localWorkLogs = localStorage.getItem('swedsfree_daily_work_logs');
+      const parsedWorkLogs = localWorkLogs ? JSON.parse(localWorkLogs) : null;
+      if (parsedWorkLogs && Array.isArray(parsedWorkLogs) && parsedWorkLogs.length > 0) setDailyWorkLogs(parsedWorkLogs);
+      else setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
+    } catch (e) {
+      setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
+    }
 
-    if (localWarnings) setWarningLetters(JSON.parse(localWarnings));
-    else setWarningLetters([]);
+    try {
+      const localWarnings = localStorage.getItem('swedsfree_warning_letters');
+      if (localWarnings) setWarningLetters(JSON.parse(localWarnings));
+      else setWarningLetters([]);
+    } catch (e) {
+      setWarningLetters([]);
+    }
 
     const localRequests = localStorage.getItem('swedsfree_registration_requests');
     if (localRequests) {
@@ -315,7 +348,7 @@ export default function App() {
 
   // RESET DATABASE ACTION
   const handleResetDatabase = () => {
-    if (window.confirm('Are you sure you want to clear all data and reset the database? All records will be wiped completely.')) {
+    if (window.confirm('Are you sure you want to reset the database to default sample records? Custom changes will be restored to initial sample data.')) {
       localStorage.removeItem('swedsfree_inventory');
       localStorage.removeItem('swedsfree_customers');
       localStorage.removeItem('swedsfree_employees');
@@ -327,16 +360,17 @@ export default function App() {
       localStorage.removeItem('swedsfree_warning_letters');
       localStorage.removeItem('swedswood_saved_invoices');
 
-      setInventory([]);
-      setCustomers([]);
+      setInventory(INITIAL_INVENTORY);
+      setCustomers(INITIAL_CUSTOMERS);
       setEmployees(INITIAL_EMPLOYEES);
-      setJobs([]);
-      setInventoryTransactions([]);
-      setFinancialTransactions([]);
-      setDailyWorkLogs([]);
+      setJobs(INITIAL_JOBS);
+      setInventoryTransactions(INITIAL_INVENTORY_TRANSACTIONS);
+      setFinancialTransactions(INITIAL_FINANCIALS);
+      setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
       setWarningLetters([]);
       setRegistrationRequests([]);
       setActiveTab('dashboard');
+      alert('Database successfully restored with sample records for Woodwork Jobs, Customers, Inventory, Financials, and Work Logs!');
     }
   };
 

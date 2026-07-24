@@ -1721,7 +1721,7 @@ export default function InvoiceReceiptManager({
                           <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-3 border-b border-gray-400">
                             <span className="font-sans font-black text-xs uppercase tracking-wider">Subtotal</span>
                             <span className="font-mono font-black text-sm">
-                              SLL {((Number(invoiceCommissionAmount) || 0) + customInvoiceItems.reduce((sum, item) => sum + item.amount, 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              SLL {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </span>
                           </div>
                           {totals.totalPaid > 0 && (
