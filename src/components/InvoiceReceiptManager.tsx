@@ -264,6 +264,31 @@ export default function InvoiceReceiptManager({
     setNewCustomItemUnitPrice(0);
   };
 
+  const handleUpdateCustomItem = (id: string, field: 'description' | 'quantity' | 'unitPrice' | 'amount', value: string | number) => {
+    setCustomInvoiceItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const currentQty = item.quantity || (parseFloat(item.unitRate) || 1);
+      const currentPrice = item.unitPrice !== undefined ? item.unitPrice : item.amount;
+      
+      if (field === 'description') {
+        return { ...item, description: String(value) };
+      } else if (field === 'quantity') {
+        const newQty = Math.max(1, Number(value) || 1);
+        const newAmount = newQty * currentPrice;
+        return { ...item, quantity: newQty, unitRate: String(newQty), amount: newAmount };
+      } else if (field === 'unitPrice') {
+        const newPrice = Math.max(0, Number(value) || 0);
+        const newAmount = currentQty * newPrice;
+        return { ...item, unitPrice: newPrice, amount: newAmount };
+      } else if (field === 'amount') {
+        const newAmount = Math.max(0, Number(value) || 0);
+        const newPrice = currentQty > 0 ? newAmount / currentQty : newAmount;
+        return { ...item, amount: newAmount, unitPrice: newPrice };
+      }
+      return item;
+    }));
+  };
+
   const handleRemoveCustomItem = (id: string) => {
     setCustomInvoiceItems(prev => prev.filter(item => item.id !== id));
   };
@@ -1579,12 +1604,43 @@ export default function InvoiceReceiptManager({
                           {Number(invoiceCommissionAmount) > 0 && (
                             <tr className="min-h-[36px]">
                               <td className="py-2 px-3 border-r border-gray-400 font-semibold text-gray-800">
-                                <p className="font-bold text-gray-800">{invoiceProjectTitle}</p>
-                                <span className="block text-[10px] text-gray-400 font-normal italic">{invoiceProjectDescription}</span>
+                                {invoicePdfMode === 'EDIT' ? (
+                                  <div className="space-y-1">
+                                    <input
+                                      type="text"
+                                      value={invoiceProjectTitle}
+                                      onChange={(e) => setInvoiceProjectTitle(e.target.value)}
+                                      className="w-full font-bold text-gray-800 border border-blue-300 rounded px-1.5 py-0.5 text-xs bg-white"
+                                      placeholder="Project Title"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={invoiceProjectDescription}
+                                      onChange={(e) => setInvoiceProjectDescription(e.target.value)}
+                                      className="w-full text-[10px] text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 bg-white"
+                                      placeholder="Project Details"
+                                    />
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="font-bold text-gray-800">{invoiceProjectTitle}</p>
+                                    <span className="block text-[10px] text-gray-400 font-normal italic">{invoiceProjectDescription}</span>
+                                  </>
+                                )}
                               </td>
-                              <td className="py-2 px-3 border-r border-gray-400 text-center font-mono">1</td>
+                              <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">1</td>
                               <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
-                                SLL {invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                {invoicePdfMode === 'EDIT' ? (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={invoiceCommissionAmount}
+                                    onChange={(e) => setInvoiceCommissionAmount(Number(e.target.value))}
+                                    className="w-24 text-right border border-blue-300 rounded px-1.5 py-0.5 font-bold font-mono text-xs bg-white"
+                                  />
+                                ) : (
+                                  `SLL ${invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                )}
                               </td>
                               <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
                                 SLL {invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -1600,25 +1656,67 @@ export default function InvoiceReceiptManager({
 
                             return (
                               <tr key={item.id} className="min-h-[36px]">
-                                <td className="py-2 px-3 border-r border-gray-400 font-semibold text-gray-800 flex items-center justify-between">
-                                  <span>{item.description}</span>
+                                <td className="py-2 px-3 border-r border-gray-400 font-semibold text-gray-800 flex items-center justify-between gap-2">
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <input
+                                      type="text"
+                                      value={item.description}
+                                      onChange={(e) => handleUpdateCustomItem(item.id, 'description', e.target.value)}
+                                      className="w-full text-xs font-semibold text-gray-800 border border-blue-300 rounded px-1.5 py-0.5 bg-white"
+                                      placeholder="Item Description"
+                                    />
+                                  ) : (
+                                    <span>{item.description}</span>
+                                  )}
                                   {invoicePdfMode === 'EDIT' && (
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveCustomItem(item.id)}
-                                      className="text-red-500 hover:text-red-700 ml-2 no-print"
+                                      className="text-red-500 hover:text-red-700 no-print cursor-pointer shrink-0"
                                       title="Remove item"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                   )}
                                 </td>
-                                <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">{qty}</td>
+                                <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={qty}
+                                      onChange={(e) => handleUpdateCustomItem(item.id, 'quantity', e.target.value)}
+                                      className="w-14 text-center font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white"
+                                    />
+                                  ) : (
+                                    qty
+                                  )}
+                                </td>
                                 <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
-                                  SLL {unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={unitPrice}
+                                      onChange={(e) => handleUpdateCustomItem(item.id, 'unitPrice', e.target.value)}
+                                      className="w-24 text-right font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white"
+                                    />
+                                  ) : (
+                                    `SLL ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                  )}
                                 </td>
                                 <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
-                                  SLL {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={totalAmount}
+                                      onChange={(e) => handleUpdateCustomItem(item.id, 'amount', e.target.value)}
+                                      className="w-28 text-right font-mono font-black text-xs border border-blue-300 rounded px-1 py-0.5 bg-white"
+                                    />
+                                  ) : (
+                                    `SLL ${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -1995,24 +2093,66 @@ export default function InvoiceReceiptManager({
 
                             return (
                               <tr key={item.id} className="bg-amber-50/10">
-                                <td className="py-2.5 px-3 font-semibold text-gray-800 flex items-center justify-between">
-                                  <span>{item.description}</span>
-                                  {invoicePdfMode === 'EDIT' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveCustomItem(item.id)}
-                                      className="text-red-500 hover:text-red-700 ml-2 no-print"
-                                      title="Remove item"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
+                                <td className="py-2.5 px-3 font-semibold text-gray-800">
+                                  <div className="flex items-center justify-between gap-2">
+                                    {invoicePdfMode === 'EDIT' ? (
+                                      <input
+                                        type="text"
+                                        value={item.description}
+                                        onChange={(e) => handleUpdateCustomItem(item.id, 'description', e.target.value)}
+                                        className="w-full text-xs font-semibold text-gray-800 border border-amber-300 rounded px-1.5 py-0.5 bg-white"
+                                        placeholder="Item Description"
+                                      />
+                                    ) : (
+                                      <span>{item.description}</span>
+                                    )}
+                                    {invoicePdfMode === 'EDIT' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveCustomItem(item.id)}
+                                        className="text-red-500 hover:text-red-700 no-print shrink-0 cursor-pointer"
+                                        title="Remove item"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-600">
-                                  {qty} × {formatCurrency(unitPrice, 0)}
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <div className="flex items-center justify-end gap-1">
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={qty}
+                                        onChange={(e) => handleUpdateCustomItem(item.id, 'quantity', e.target.value)}
+                                        className="w-12 text-center font-mono font-bold text-xs border border-amber-300 rounded px-1 py-0.5 bg-white"
+                                      />
+                                      <span className="text-gray-400">×</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={unitPrice}
+                                        onChange={(e) => handleUpdateCustomItem(item.id, 'unitPrice', e.target.value)}
+                                        className="w-20 text-right font-mono font-bold text-xs border border-amber-300 rounded px-1 py-0.5 bg-white"
+                                      />
+                                    </div>
+                                  ) : (
+                                    `${qty} × ${formatCurrency(unitPrice, 0)}`
+                                  )}
                                 </td>
                                 <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-800">
-                                  {formatCurrency(totalAmount, 0)}
+                                  {invoicePdfMode === 'EDIT' ? (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={totalAmount}
+                                      onChange={(e) => handleUpdateCustomItem(item.id, 'amount', e.target.value)}
+                                      className="w-24 text-right font-mono font-black text-xs border border-amber-300 rounded px-1 py-0.5 bg-white"
+                                    />
+                                  ) : (
+                                    formatCurrency(totalAmount, 0)
+                                  )}
                                 </td>
                               </tr>
                             );
