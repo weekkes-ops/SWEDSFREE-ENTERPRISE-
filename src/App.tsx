@@ -1193,6 +1193,7 @@ export default function App() {
                 currentUser={currentUser}
                 invoiceJobId={invoiceJobId}
                 onClearInvoiceJobId={() => setInvoiceJobId(null)}
+                onUpdateJob={handleUpdateJob}
               />
             )}
 

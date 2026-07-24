@@ -55,6 +55,7 @@ interface InvoiceReceiptManagerProps {
   currentUser: Employee | null;
   invoiceJobId?: string | null;
   onClearInvoiceJobId?: () => void;
+  onUpdateJob?: (updatedJob: Job) => void;
 }
 
 export default function InvoiceReceiptManager({
@@ -62,7 +63,8 @@ export default function InvoiceReceiptManager({
   customers,
   currentUser,
   invoiceJobId,
-  onClearInvoiceJobId
+  onClearInvoiceJobId,
+  onUpdateJob
 }: InvoiceReceiptManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [searchTerm, setSearchTerm] = useState('');
@@ -242,6 +244,49 @@ export default function InvoiceReceiptManager({
   const selectedJob = jobs.find(j => j.id === selectedJobId) || jobs[0] || null;
   const selectedCustomer = selectedJob ? customers.find(c => c.id === selectedJob.customerId) : null;
 
+  // Automatically keep activeInvoice in sync with selectedJob and jobs state updates
+  useEffect(() => {
+    if (selectedJob) {
+      setActiveInvoice(selectedJob);
+    }
+  }, [selectedJobId, selectedJob]);
+
+  // Automatically keep saved invoices in sync with jobs & customer updates
+  useEffect(() => {
+    setSavedInvoices(prev => {
+      let updated = false;
+      const next = prev.map(inv => {
+        const matchingJob = jobs.find(j => j.id === inv.jobId);
+        if (!matchingJob) return inv;
+        const cust = customers.find(c => c.id === matchingJob.customerId);
+
+        const newCustomerName = matchingJob.customerName;
+        const newPhone = cust?.phone || inv.customerPhone;
+        const newEmail = cust?.email || inv.customerEmail;
+        const newAddress = cust?.address || inv.customerAddress;
+
+        if (
+          inv.customerName !== newCustomerName ||
+          (newPhone && inv.customerPhone !== newPhone) ||
+          (newEmail && inv.customerEmail !== newEmail) ||
+          (newAddress && inv.customerAddress !== newAddress)
+        ) {
+          updated = true;
+          return {
+            ...inv,
+            customerName: newCustomerName,
+            customerPhone: newPhone || inv.customerPhone,
+            customerEmail: newEmail || inv.customerEmail,
+            customerAddress: newAddress || inv.customerAddress,
+            lastUpdated: new Date().toISOString()
+          };
+        }
+        return inv;
+      });
+      return updated ? next : prev;
+    });
+  }, [jobs, customers]);
+
   // Add a custom line item inside the invoice preview with Total = Qty * Price
   const handleAddCustomItem = (e: FormEvent) => {
     e.preventDefault();
@@ -417,8 +462,17 @@ export default function InvoiceReceiptManager({
       return [newRecord, ...prev];
     });
 
+    if (activeInvoice && onUpdateJob) {
+      onUpdateJob({
+        ...activeInvoice,
+        title: invoiceProjectTitle || activeInvoice.title,
+        quoteAmount: invoiceCommissionAmount || activeInvoice.quoteAmount,
+        customerName: invoiceCustomerName || activeInvoice.customerName
+      });
+    }
+
     setEditingSavedInvoiceId(recordId);
-    setSaveToast(`Invoice #${newRecord.invoiceNo} saved & updated successfully!`);
+    setSaveToast(`Invoice #${newRecord.invoiceNo} saved & synced to job!`);
     setTimeout(() => setSaveToast(null), 3000);
   };
 
@@ -1121,13 +1175,18 @@ export default function InvoiceReceiptManager({
               {subTab === 'INVOICE' ? (
                 /* INVOICE SPACE PANEL */
                 <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <h4 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                       <FileText className="w-4 h-4 text-wood-600" /> Invoice Document Workspace
                     </h4>
-                    <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 font-bold uppercase px-2 py-0.5 rounded-md">
-                      Drafting Mode
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 font-extrabold uppercase px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-emerald-600" /> Auto-Synced to Job
+                      </span>
+                      <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 font-bold uppercase px-2 py-0.5 rounded-md">
+                        Drafting Mode
+                      </span>
+                    </div>
                   </div>
                   
                   <p className="text-xs text-gray-400 leading-relaxed">
