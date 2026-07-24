@@ -45,6 +45,8 @@ export interface CustomInvoiceItem {
   description: string;
   unitRate: string;
   amount: number;
+  quantity?: number;
+  unitPrice?: number;
 }
 
 interface InvoiceReceiptManagerProps {
@@ -145,8 +147,8 @@ export default function InvoiceReceiptManager({
   // Custom line items in the invoice besides the main flat commission
   const [customInvoiceItems, setCustomInvoiceItems] = useState<CustomInvoiceItem[]>([]);
   const [newCustomItemDesc, setNewCustomItemDesc] = useState("");
-  const [newCustomItemRate, setNewCustomItemRate] = useState("Flat fee");
-  const [newCustomItemAmount, setNewCustomItemAmount] = useState(0);
+  const [newCustomItemQty, setNewCustomItemQty] = useState<number>(1);
+  const [newCustomItemUnitPrice, setNewCustomItemUnitPrice] = useState<number>(0);
 
   // ==========================================
   // INLINE EDITABLE STATES - RECEIPT PDF
@@ -240,20 +242,26 @@ export default function InvoiceReceiptManager({
   const selectedJob = jobs.find(j => j.id === selectedJobId) || jobs[0] || null;
   const selectedCustomer = selectedJob ? customers.find(c => c.id === selectedJob.customerId) : null;
 
-  // Add a custom line item inside the invoice preview
+  // Add a custom line item inside the invoice preview with Total = Qty * Price
   const handleAddCustomItem = (e: FormEvent) => {
     e.preventDefault();
-    if (!newCustomItemDesc.trim() || newCustomItemAmount < 0) return;
+    if (!newCustomItemDesc.trim()) return;
+    const qty = Math.max(1, Number(newCustomItemQty) || 1);
+    const price = Math.max(0, Number(newCustomItemUnitPrice) || 0);
+    const totalAmount = qty * price;
+
     const newItem: CustomInvoiceItem = {
       id: `line-${Date.now()}`,
       description: newCustomItemDesc,
-      unitRate: newCustomItemRate,
-      amount: newCustomItemAmount
+      quantity: qty,
+      unitPrice: price,
+      amount: totalAmount,
+      unitRate: `${qty}`
     };
     setCustomInvoiceItems(prev => [...prev, newItem]);
     setNewCustomItemDesc("");
-    setNewCustomItemRate("Flat fee");
-    setNewCustomItemAmount(0);
+    setNewCustomItemQty(1);
+    setNewCustomItemUnitPrice(0);
   };
 
   const handleRemoveCustomItem = (id: string) => {
@@ -275,9 +283,9 @@ export default function InvoiceReceiptManager({
     setInvoiceTimeline("7/13/2026");
     setInvoiceCommissionAmount(0);
     setCustomInvoiceItems([
-      { id: 'line-scanned-1', description: 'Kitchen drawers complete as per specification', unitRate: '1', amount: 65000 },
-      { id: 'line-scanned-2', description: 'Dinning room shelves complete as specified', unitRate: '1', amount: 25000 },
-      { id: 'line-scanned-3', description: 'Dinning table with 4chairs complete', unitRate: '1', amount: 12500 }
+      { id: 'line-scanned-1', description: 'Kitchen drawers complete as per specification', quantity: 1, unitPrice: 65000, amount: 65000, unitRate: '1' },
+      { id: 'line-scanned-2', description: 'Dinning room shelves complete as specified', quantity: 1, unitPrice: 25000, amount: 25000, unitRate: '1' },
+      { id: 'line-scanned-3', description: 'Dinning table with 4chairs complete', quantity: 1, unitPrice: 12500, amount: 12500, unitRate: '1' }
     ]);
     setInvoiceCustomerMessage("");
   };
@@ -286,8 +294,12 @@ export default function InvoiceReceiptManager({
   const getCalculatedTotals = () => {
     // base commission amount
     const baseComm = Number(invoiceCommissionAmount) || 0;
-    // sum of extra custom items added
-    const baseCustom = customInvoiceItems.reduce((sum, item) => sum + item.amount, 0);
+    // sum of extra custom items added (Total = Qty * Price)
+    const baseCustom = customInvoiceItems.reduce((sum, item) => {
+      const qty = item.quantity || 1;
+      const price = item.unitPrice !== undefined ? item.unitPrice : item.amount;
+      return sum + (qty * price);
+    }, 0);
     const subtotal = baseComm + baseCustom;
     
     const discountAmount = (subtotal * discountPercent) / 100;
@@ -322,12 +334,25 @@ export default function InvoiceReceiptManager({
     const currentStatus = statusOverride || invoiceStatus || 'Issued';
 
     const itemsToSave: SavedInvoiceItem[] = customInvoiceItems.length > 0 
-      ? customInvoiceItems 
+      ? customInvoiceItems.map(item => {
+          const qty = item.quantity || 1;
+          const price = item.unitPrice !== undefined ? item.unitPrice : item.amount;
+          return {
+            id: item.id,
+            description: item.description,
+            unitRate: String(qty),
+            amount: qty * price,
+            quantity: qty,
+            unitPrice: price
+          };
+        })
       : [{
           id: '1',
           description: invoiceProjectTitle || (activeInvoice ? activeInvoice.title : 'Custom Woodwork Order'),
-          unitRate: 'Flat fee',
-          amount: invoiceCommissionAmount || (activeInvoice ? activeInvoice.quoteAmount : 0)
+          unitRate: '1',
+          amount: invoiceCommissionAmount || (activeInvoice ? activeInvoice.quoteAmount : 0),
+          quantity: 1,
+          unitPrice: invoiceCommissionAmount || (activeInvoice ? activeInvoice.quoteAmount : 0)
         }];
 
     const subtotal = itemsToSave.reduce((sum, item) => sum + item.amount, 0);
@@ -1568,29 +1593,36 @@ export default function InvoiceReceiptManager({
                           )}
 
                           {/* Custom Invoice Items */}
-                          {customInvoiceItems.map((item, idx) => (
-                            <tr key={item.id} className="min-h-[36px]">
-                              <td className="py-2 px-3 border-r border-gray-400 font-semibold text-gray-800 flex items-center justify-between">
-                                <span>{item.description}</span>
-                                {invoicePdfMode === 'EDIT' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveCustomItem(item.id)}
-                                    className="text-red-500 hover:text-red-700 ml-2 no-print"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </td>
-                              <td className="py-2 px-3 border-r border-gray-400 text-center font-mono">{item.unitRate || '1'}</td>
-                              <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
-                                SLL {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                              </td>
-                              <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
-                                SLL {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                              </td>
-                            </tr>
-                          ))}
+                          {customInvoiceItems.map((item) => {
+                            const qty = item.quantity || (parseFloat(item.unitRate) || 1);
+                            const unitPrice = item.unitPrice !== undefined ? item.unitPrice : item.amount;
+                            const totalAmount = qty * unitPrice;
+
+                            return (
+                              <tr key={item.id} className="min-h-[36px]">
+                                <td className="py-2 px-3 border-r border-gray-400 font-semibold text-gray-800 flex items-center justify-between">
+                                  <span>{item.description}</span>
+                                  {invoicePdfMode === 'EDIT' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveCustomItem(item.id)}
+                                      className="text-red-500 hover:text-red-700 ml-2 no-print"
+                                      title="Remove item"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">{qty}</td>
+                                <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
+                                  SLL {unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
+                                  SLL {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </td>
+                              </tr>
+                            );
+                          })}
 
                           {/* Empty Ledger Padding Rows to replicate the paper pad style perfectly! */}
                           {Array.from({ length: Math.max(1, 10 - (Number(invoiceCommissionAmount) > 0 ? 1 : 0) - customInvoiceItems.length) }).map((_, idx) => (
@@ -1620,30 +1652,40 @@ export default function InvoiceReceiptManager({
                           />
                         </div>
 
-                        <div className="w-28 space-y-1">
-                          <label className="text-[9px] text-gray-400 font-bold uppercase block">Billing Type</label>
+                        <div className="w-20 space-y-1">
+                          <label className="text-[9px] text-gray-400 font-bold uppercase block">Qty</label>
                           <input
-                            type="text"
-                            placeholder="e.g. 2 Units, Flat fee"
-                            value={newCustomItemRate}
-                            onChange={(e) => setNewCustomItemRate(e.target.value)}
-                            className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-medium"
+                            type="number"
+                            min={1}
+                            required
+                            value={newCustomItemQty}
+                            onChange={(e) => setNewCustomItemQty(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold text-center"
                           />
                         </div>
 
                         <div className="w-28 space-y-1">
-                          <label className="text-[9px] text-gray-400 font-bold uppercase block">Rate Amount (SLL)</label>
+                          <label className="text-[9px] text-gray-400 font-bold uppercase block">Unit Price (SLL)</label>
                           <input
                             type="number"
-                            value={newCustomItemAmount}
-                            onChange={(e) => setNewCustomItemAmount(Number(e.target.value))}
-                            className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold"
+                            min={0}
+                            required
+                            value={newCustomItemUnitPrice}
+                            onChange={(e) => setNewCustomItemUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                            className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold text-right"
                           />
+                        </div>
+
+                        <div className="w-28 space-y-1 text-right">
+                          <label className="text-[9px] text-gray-400 font-bold uppercase block">Total (Qty × Price)</label>
+                          <div className="px-2 py-1 text-xs bg-blue-50 text-blue-900 border border-blue-200 rounded-lg font-mono font-black truncate">
+                            SLL {(newCustomItemQty * newCustomItemUnitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </div>
                         </div>
 
                         <button
                           type="submit"
-                          className="px-3.5 py-1.5 bg-[#0f52ba] hover:bg-blue-800 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs"
+                          className="px-3.5 py-1.5 bg-[#0f52ba] hover:bg-blue-800 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Add Item</span>
@@ -1946,27 +1988,35 @@ export default function InvoiceReceiptManager({
                           ))}
 
                           {/* Render extra custom added line items */}
-                          {customInvoiceItems.map((item) => (
-                            <tr key={item.id} className="bg-amber-50/10">
-                              <td className="py-2.5 px-3 font-semibold text-gray-800 flex items-center justify-between">
-                                <span>{item.description}</span>
-                                {invoicePdfMode === 'EDIT' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveCustomItem(item.id)}
-                                    className="text-red-500 hover:text-red-700 ml-2 no-print"
-                                    title="Remove item"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </td>
-                              <td className="py-2.5 px-3 text-right font-mono text-gray-500">{item.unitRate}</td>
-                              <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-800">
-                                {formatCurrency(item.amount, 0)}
-                              </td>
-                            </tr>
-                          ))}
+                          {customInvoiceItems.map((item) => {
+                            const qty = item.quantity || (parseFloat(item.unitRate) || 1);
+                            const unitPrice = item.unitPrice !== undefined ? item.unitPrice : item.amount;
+                            const totalAmount = qty * unitPrice;
+
+                            return (
+                              <tr key={item.id} className="bg-amber-50/10">
+                                <td className="py-2.5 px-3 font-semibold text-gray-800 flex items-center justify-between">
+                                  <span>{item.description}</span>
+                                  {invoicePdfMode === 'EDIT' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveCustomItem(item.id)}
+                                      className="text-red-500 hover:text-red-700 ml-2 no-print"
+                                      title="Remove item"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-600">
+                                  {qty} × {formatCurrency(unitPrice, 0)}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-800">
+                                  {formatCurrency(totalAmount, 0)}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
 
@@ -1985,30 +2035,40 @@ export default function InvoiceReceiptManager({
                             />
                           </div>
 
-                          <div className="w-28 space-y-1">
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block">Billing Type</label>
+                          <div className="w-20 space-y-1">
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block">Qty</label>
                             <input
-                              type="text"
-                              placeholder="e.g. 2 Units, Flat fee"
-                              value={newCustomItemRate}
-                              onChange={(e) => setNewCustomItemRate(e.target.value)}
-                              className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-medium"
+                              type="number"
+                              min={1}
+                              required
+                              value={newCustomItemQty}
+                              onChange={(e) => setNewCustomItemQty(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold text-center"
                             />
                           </div>
 
                           <div className="w-28 space-y-1">
-                            <label className="text-[9px] text-gray-400 font-bold uppercase block">Rate Amount (Le)</label>
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block">Unit Price (Le)</label>
                             <input
                               type="number"
-                              value={newCustomItemAmount}
-                              onChange={(e) => setNewCustomItemAmount(Number(e.target.value))}
-                              className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold"
+                              min={0}
+                              required
+                              value={newCustomItemUnitPrice}
+                              onChange={(e) => setNewCustomItemUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                              className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold text-right"
                             />
+                          </div>
+
+                          <div className="w-28 space-y-1 text-right">
+                            <label className="text-[9px] text-gray-400 font-bold uppercase block">Total (Qty × Price)</label>
+                            <div className="px-2 py-1 text-xs bg-amber-50 text-amber-900 border border-amber-200 rounded-lg font-mono font-black truncate">
+                              Le {(newCustomItemQty * newCustomItemUnitPrice).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                            </div>
                           </div>
 
                           <button
                             type="submit"
-                            className="px-3.5 py-1.5 bg-wood-700 hover:bg-wood-800 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs"
+                            className="px-3.5 py-1.5 bg-wood-700 hover:bg-wood-800 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Add Item</span>
@@ -2737,12 +2797,17 @@ export function buildInvoicePdfContent(
     // Items rendering
     let itemsToRender: { desc: string; qty: string; price: number; total: number }[] = [];
     if (customItems && customItems.length > 0) {
-      itemsToRender = customItems.map(item => ({
-        desc: item.description,
-        qty: item.unitRate || '1',
-        price: item.amount,
-        total: item.amount
-      }));
+      itemsToRender = customItems.map(item => {
+        const qtyNum = item.quantity || (parseFloat(item.unitRate) || 1);
+        const unitPrice = item.unitPrice !== undefined ? item.unitPrice : item.amount;
+        const lineTotal = qtyNum * unitPrice;
+        return {
+          desc: item.description,
+          qty: String(qtyNum),
+          price: unitPrice,
+          total: lineTotal
+        };
+      });
     } else {
       itemsToRender = [{
         desc: job.title,

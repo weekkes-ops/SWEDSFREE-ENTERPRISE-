@@ -152,6 +152,8 @@ export interface SavedInvoiceItem {
   description: string;
   unitRate: string;
   amount: number;
+  quantity?: number;
+  unitPrice?: number;
 }
 
 export interface SavedInvoice {
