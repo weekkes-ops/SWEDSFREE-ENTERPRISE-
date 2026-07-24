@@ -936,7 +936,7 @@ export default function CustomerManager({
 
                 {/* Footer Signature */}
                 <div className="pt-4 border-t border-gray-200 text-center text-[10px] text-gray-400 space-y-1">
-                  <p className="font-semibold text-gray-600">Prepared by: {currentUser?.name || 'Managing Director'}</p>
+                  <p className="font-semibold text-gray-600">Authorized Signature: _______________________</p>
                   <p>Thank you for choosing Swedswood Enterprise!</p>
                 </div>
 

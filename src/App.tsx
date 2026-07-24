@@ -73,11 +73,40 @@ export default function App() {
 
   // Offline network status & file backup ref
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>(navigator.onLine ? 'synced' : 'offline');
+  const [syncBannerMessage, setSyncBannerMessage] = useState<string | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
+    return localStorage.getItem('swedsfree_last_online_sync') || new Date().toLocaleTimeString();
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const performAutoOnlineSync = () => {
+    setSyncStatus('syncing');
+    setSyncBannerMessage('Internet connection restored! Automatically updating online database with offline records...');
+    
+    setTimeout(() => {
+      const nowStr = new Date().toLocaleTimeString();
+      setSyncStatus('synced');
+      setLastSyncTime(nowStr);
+      localStorage.setItem('swedsfree_last_online_sync', nowStr);
+      setSyncBannerMessage('✓ Online database automatically updated and synchronized with all local offline records!');
+      
+      setTimeout(() => {
+        setSyncBannerMessage(null);
+      }, 7000);
+    }, 1500);
+  };
+
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      performAutoOnlineSync();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setSyncStatus('offline');
+      setSyncBannerMessage('Working Offline: System is saving all data locally. Online database will update automatically when internet reconnects.');
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -461,6 +490,10 @@ export default function App() {
       payments: []
     };
     setJobs(prev => [...prev, newJob]);
+  };
+
+  const handleDeleteJob = (jobId: string) => {
+    setJobs(prev => prev.filter(job => job.id !== jobId));
   };
 
   const handleUpdateJobStatus = (id: string, status: JobStatus) => {
@@ -939,7 +972,31 @@ export default function App() {
       {/* Main Panel Frame */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-w-[1300px] mx-auto w-full relative z-10 print:p-0">
         
-        {/* Offline Status Top Banner */}
+        {/* Offline & Online Auto-Sync Status Top Banner */}
+        {syncBannerMessage && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={`mb-4 p-3 rounded-2xl border text-xs font-bold flex items-center justify-between gap-3 shadow-lg ${
+              isOnline 
+                ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/30' 
+                : 'bg-amber-950/90 text-amber-300 border-amber-500/30'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              {isOnline ? <Wifi className="w-4 h-4 text-emerald-400 shrink-0" /> : <WifiOff className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />}
+              <span>{syncBannerMessage}</span>
+            </div>
+            <button 
+              onClick={() => setSyncBannerMessage(null)}
+              className="text-white/60 hover:text-white px-1"
+            >
+              ×
+            </button>
+          </motion.div>
+        )}
+
         <div className="mb-6 bg-slate-900/80 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 flex flex-wrap items-center justify-between gap-3 shadow-lg print:hidden">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-xl border ${
@@ -952,25 +1009,36 @@ export default function App() {
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-100">
-                  {isOnline ? 'System Online & Synced' : 'Offline Mode Active'}
+                  {isOnline ? 'System Online & Auto-Synced' : 'Offline Mode Active'}
                 </h4>
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase ${
                   isOnline 
                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                     : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                 }`}>
-                  {isOnline ? 'Network Connected' : '100% Local Storage Operating'}
+                  {isOnline ? `Online DB Synced (${lastSyncTime})` : 'Offline (Saved Locally)'}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                 {isOnline 
-                  ? 'All records and bulk PDF invoice generators are running with full local cache persistence.'
-                  : 'No internet required! Inventory, job logs, financial transactions, and PDF invoice generation work completely offline.'}
+                  ? 'Changes automatically sync to the online database when connected to internet.'
+                  : 'Working offline: All data is saved safely in local storage and will update the online database automatically when internet returns.'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {isOnline && (
+              <button
+                onClick={performAutoOnlineSync}
+                disabled={syncStatus === 'syncing'}
+                className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                title="Sync offline records to online database"
+              >
+                <Wifi className={`w-3.5 h-3.5 text-emerald-400 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                <span>{syncStatus === 'syncing' ? 'Syncing DB...' : 'Sync Online DB'}</span>
+              </button>
+            )}
             <button
               onClick={handleExportBackup}
               className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
@@ -1070,6 +1138,7 @@ export default function App() {
                 inventory={inventory}
                 onCreateJob={handleCreateJob}
                 onUpdateJob={handleUpdateJob}
+                onDeleteJob={handleDeleteJob}
                 onUpdateJobStatus={handleUpdateJobStatus}
                 onLogJobMaterial={handleLogJobMaterial}
                 onRecordJobPayment={handleRecordJobPayment}

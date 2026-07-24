@@ -16,7 +16,8 @@ import {
   ChevronRight, 
   CreditCard,
   ShieldAlert,
-  FileText
+  FileText,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -27,6 +28,7 @@ interface JobManagerProps {
   inventory: InventoryItem[];
   onCreateJob: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   onUpdateJob?: (updatedJob: Job) => void;
+  onDeleteJob?: (jobId: string) => void;
   onUpdateJobStatus: (id: string, status: JobStatus) => void;
   onLogJobMaterial: (jobId: string, material: JobMaterial) => void;
   onRecordJobPayment: (jobId: string, payment: Omit<JobPayment, 'id'>) => void;
@@ -43,6 +45,7 @@ export default function JobManager({
   inventory,
   onCreateJob,
   onUpdateJob,
+  onDeleteJob,
   onUpdateJobStatus,
   onLogJobMaterial,
   onRecordJobPayment,
@@ -68,8 +71,6 @@ export default function JobManager({
   const [startDate, setStartDate] = useState('2026-07-20');
   const [dueDate, setDueDate] = useState('2026-08-20');
   const [quoteAmount, setQuoteAmount] = useState(5000);
-  const [laborCost, setLaborCost] = useState(1000);
-  const [otherCosts, setOtherCosts] = useState(200);
 
   // Form states - Edit Job
   const [editJobTitle, setEditJobTitle] = useState('');
@@ -79,8 +80,6 @@ export default function JobManager({
   const [editJobStartDate, setEditJobStartDate] = useState('');
   const [editJobDueDate, setEditJobDueDate] = useState('');
   const [editJobQuoteAmount, setEditJobQuoteAmount] = useState(5000);
-  const [editJobLaborCost, setEditJobLaborCost] = useState(1000);
-  const [editJobOtherCosts, setEditJobOtherCosts] = useState(200);
 
   // Form states - Log Material
   const [materialItemId, setMaterialItemId] = useState(inventory[0]?.id || '');
@@ -105,8 +104,6 @@ export default function JobManager({
     setEditJobStartDate(job.startDate);
     setEditJobDueDate(job.dueDate);
     setEditJobQuoteAmount(job.quoteAmount);
-    setEditJobLaborCost(job.laborCost);
-    setEditJobOtherCosts(job.otherCosts);
     setShowEditJobModal(true);
   };
 
@@ -128,8 +125,8 @@ export default function JobManager({
       startDate: editJobStartDate,
       dueDate: editJobDueDate,
       quoteAmount: editJobQuoteAmount,
-      laborCost: editJobLaborCost,
-      otherCosts: editJobOtherCosts
+      laborCost: activeSelectedJob.laborCost || 0,
+      otherCosts: activeSelectedJob.otherCosts || 0
     };
 
     if (onUpdateJob) {
@@ -156,8 +153,8 @@ export default function JobManager({
       startDate,
       dueDate,
       quoteAmount,
-      laborCost,
-      otherCosts
+      laborCost: 0,
+      otherCosts: 0
     });
 
     // Reset Form
@@ -165,8 +162,6 @@ export default function JobManager({
     setDescription('');
     setAssignedStaff([]);
     setQuoteAmount(5000);
-    setLaborCost(1000);
-    setOtherCosts(200);
     
     setShowCreateModal(false);
     if (onCloseCreateModal) onCloseCreateModal();
@@ -368,6 +363,21 @@ export default function JobManager({
                         >
                           <FileText className="w-3 h-3 text-amber-700" />
                           <span>Create Invoice</span>
+                        </button>
+                      )}
+                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager') && onDeleteJob && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to delete job "${activeSelectedJob.title}"? This action cannot be undone.`)) {
+                              onDeleteJob(activeSelectedJob.id);
+                              setSelectedJob(null);
+                            }
+                          }}
+                          className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
+                          title="Delete Woodwork Job"
+                        >
+                          <Trash2 className="w-3 h-3 text-rose-600" />
+                          <span>Delete Job</span>
                         </button>
                       )}
                     </div>
@@ -678,42 +688,16 @@ export default function JobManager({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Quote Amount (Le)</label>
-                    <input
-                      type="number"
-                      required
-                      min={100}
-                      value={quoteAmount}
-                      onChange={(e) => setQuoteAmount(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Est. Labor Cost (Le)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={laborCost}
-                      onChange={(e) => setLaborCost(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Est. Overhead (Le)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={otherCosts}
-                      onChange={(e) => setOtherCosts(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Quote Amount (Le) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={100}
+                    value={quoteAmount}
+                    onChange={(e) => setQuoteAmount(Number(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                  />
                 </div>
 
                 <div className="flex gap-2 pt-4">
@@ -993,42 +977,16 @@ export default function JobManager({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Client Quote ($)</label>
-                    <input
-                      type="number"
-                      required
-                      min={100}
-                      value={editJobQuoteAmount}
-                      onChange={(e) => setEditJobQuoteAmount(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Labor Budget ($)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={editJobLaborCost}
-                      onChange={(e) => setEditJobLaborCost(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Other Overheads ($)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={editJobOtherCosts}
-                      onChange={(e) => setEditJobOtherCosts(Number(e.target.value))}
-                      className="w-full px-3 py-1.5 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Client Quote (Le) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={100}
+                    value={editJobQuoteAmount}
+                    onChange={(e) => setEditJobQuoteAmount(Number(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
+                  />
                 </div>
 
                 <div className="flex gap-2 pt-4">

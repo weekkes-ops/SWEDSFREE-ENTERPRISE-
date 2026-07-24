@@ -209,7 +209,7 @@ export default function InvoiceReceiptManager({
       setInvoiceTimeline(`${activeInvoice.startDate} to ${activeInvoice.dueDate}`);
       setInvoiceCommissionAmount(activeInvoice.quoteAmount);
       
-      setInvoicePreparedBy(currentUser?.name || 'Managing Director');
+      setInvoicePreparedBy("");
       setCustomInvoiceItems([]); // Reset custom line items
     }
   }, [activeInvoice, customers, currentUser, invoiceTemplate]);
@@ -1705,30 +1705,17 @@ export default function InvoiceReceiptManager({
                     {/* Signatures and Official Stamp */}
                     <div className="mt-8 pt-6 border-t border-gray-200 grid grid-cols-2 gap-8 text-center text-[10px] font-bold text-[#1e3a8a] uppercase">
                       <div className="space-y-4">
-                        <p>PREPARED BY (SWEDS WOOD REPRESENTATIVE):</p>
+                        <p className="text-gray-600 font-bold">Authorized Signature:</p>
                         <div className="h-10 flex items-center justify-center">
-                          {invoicePdfMode === 'EDIT' ? (
-                            <input
-                              type="text"
-                              value={invoicePreparedBy}
-                              onChange={(e) => setInvoicePreparedBy(e.target.value)}
-                              className="font-serif italic text-gray-800 border-b border-gray-300 bg-amber-50 rounded px-2 py-0.5 text-center text-xs w-48 mx-auto"
-                            />
-                          ) : (
-                            <span className="font-serif italic text-gray-800 border-b border-gray-300 px-8 py-1 text-xs">
-                              {invoicePreparedBy}
-                            </span>
-                          )}
+                          <div className="w-48 border-b border-gray-400" />
                         </div>
-                        <p className="text-[8px] text-gray-400 font-normal font-sans">Sweds Wood Enterprise Authorized Signatory</p>
                       </div>
 
                       <div className="space-y-4">
-                        <p>CLIENT ACCEPTANCE & SIGNATURE:</p>
+                        <p className="text-gray-600 font-bold">Customer Signature:</p>
                         <div className="h-10 flex items-center justify-center">
-                          <div className="w-36 border-b border-gray-300" />
+                          <div className="w-48 border-b border-gray-400" />
                         </div>
-                        <p className="text-[8px] text-gray-400 font-normal font-sans">Approved & Received in Perfect Condition</p>
                       </div>
                     </div>
                   </div>
@@ -2087,30 +2074,17 @@ export default function InvoiceReceiptManager({
                     {/* Bottom official Signatures line */}
                     <div className="mt-12 pt-8 border-t border-gray-100 grid grid-cols-2 gap-8 text-center text-[10px] font-bold text-gray-400 uppercase">
                       <div className="space-y-4">
-                        <p>PREPARED BY (SWED WOOD WORK REPRESENTATIVE):</p>
+                        <p className="text-gray-600 font-bold">Authorized Signature:</p>
                         <div className="h-10 flex items-center justify-center">
-                          {invoicePdfMode === 'EDIT' ? (
-                            <input
-                              type="text"
-                              value={invoicePreparedBy}
-                              onChange={(e) => setInvoicePreparedBy(e.target.value)}
-                              className="font-serif italic text-gray-700 border-b border-gray-300 bg-amber-50/50 rounded px-2 py-0.5 text-center text-xs"
-                            />
-                          ) : (
-                            <span className="font-serif italic text-gray-600 border-b border-gray-300 px-8 py-1 text-xs">
-                              {invoicePreparedBy}
-                            </span>
-                          )}
+                          <div className="w-48 border-b border-gray-300" />
                         </div>
-                        <p className="text-[8px] text-gray-400 font-normal">Workshop Authorization Stamp</p>
                       </div>
 
                       <div className="space-y-4">
-                        <p>CLIENT ACCEPTANCE STAMP & SIGNATURE:</p>
+                        <p className="text-gray-600 font-bold">Customer Signature:</p>
                         <div className="h-10 flex items-center justify-center">
-                          <div className="w-36 border-b border-gray-300" />
+                          <div className="w-48 border-b border-gray-300" />
                         </div>
-                        <p className="text-[8px] text-gray-400 font-normal">Approved & Agreed Delivery Terms</p>
                       </div>
                     </div>
                   </>
@@ -2880,20 +2854,13 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(15, 82, 186);
-    doc.text("PREPARED BY (SWEDS WOOD REPRESENTATIVE):", 20, sigY + 3);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(107, 114, 128);
-    doc.text(currentUser?.name || "Managing Director", 20, sigY + 19);
+    doc.text("Authorized Signature:", 20, sigY + 3);
     
     doc.line(115, sigY + 15, 185, sigY + 15);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(15, 82, 186);
-    doc.text("CLIENT ACCEPTANCE & SIGNATURE:", 115, sigY + 3);
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(6.5);
-    doc.setTextColor(107, 114, 128);
-    doc.text("Approved & Received in Perfect Condition", 115, sigY + 19);
+    doc.text("Customer Signature:", 115, sigY + 3);
     
   } else {
     // MODERN DIGITAL PROFESSIONAL TEMPLATE
@@ -3084,20 +3051,12 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(69, 26, 3);
-    doc.text("PREPARED BY (AUTHORISING OFFICER):", 20, sigY + 3);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(107, 114, 128);
-    doc.text(currentUser?.name || "Managing Director", 20, sigY + 19);
+    doc.text("Authorized Signature:", 20, sigY + 3);
     
     doc.line(115, sigY + 15, 185, sigY + 15);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(69, 26, 3);
-    doc.text("CLIENT ACCEPTANCE SIGNATURE:", 115, sigY + 3);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(107, 114, 128);
-    doc.text("Authorized Design Specifications Sign-Off", 115, sigY + 19);
+    doc.text("Customer Signature:", 115, sigY + 3);
   }
 }
