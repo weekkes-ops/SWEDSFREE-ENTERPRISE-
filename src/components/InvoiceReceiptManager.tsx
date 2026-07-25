@@ -149,8 +149,9 @@ export default function InvoiceReceiptManager({
   // Custom line items in the invoice besides the main flat commission
   const [customInvoiceItems, setCustomInvoiceItems] = useState<CustomInvoiceItem[]>([]);
   const [newCustomItemDesc, setNewCustomItemDesc] = useState("");
-  const [newCustomItemQty, setNewCustomItemQty] = useState<number>(1);
-  const [newCustomItemUnitPrice, setNewCustomItemUnitPrice] = useState<number>(0);
+  const [newCustomItemQty, setNewCustomItemQty] = useState<number | string>(1);
+  const [newCustomItemUnitPrice, setNewCustomItemUnitPrice] = useState<number | string>(0);
+  const [invoiceProjectQty, setInvoiceProjectQty] = useState<number | string>(1);
 
   // ==========================================
   // INLINE EDITABLE STATES - RECEIPT PDF
@@ -211,10 +212,31 @@ export default function InvoiceReceiptManager({
       setInvoiceProjectTitle(activeInvoice.title);
       setInvoiceProjectDescription(activeInvoice.description || 'Custom hand-crafted carpentry order.');
       setInvoiceTimeline(`${activeInvoice.startDate} to ${activeInvoice.dueDate}`);
-      setInvoiceCommissionAmount(activeInvoice.quoteAmount);
+      setInvoiceProjectQty(1);
+
+      if (activeInvoice.materialsUsed && activeInvoice.materialsUsed.length > 0) {
+        const matsTotal = activeInvoice.materialsUsed.reduce(
+          (sum, m) => sum + (m.totalCost || (m.quantity * (m.unitCost || 0))),
+          0
+        );
+        const netComm = Math.max(0, activeInvoice.quoteAmount - matsTotal);
+        setInvoiceCommissionAmount(netComm);
+
+        const matItems: CustomInvoiceItem[] = activeInvoice.materialsUsed.map((m, idx) => ({
+          id: `mat-${m.itemId || idx}-${idx}`,
+          description: `Allocated Lumber: ${m.name}`,
+          quantity: m.quantity,
+          unitRate: String(m.quantity),
+          unitPrice: m.unitCost || 0,
+          amount: m.totalCost || (m.quantity * (m.unitCost || 0))
+        }));
+        setCustomInvoiceItems(matItems);
+      } else {
+        setInvoiceCommissionAmount(activeInvoice.quoteAmount);
+        setCustomInvoiceItems([]);
+      }
       
       setInvoicePreparedBy("");
-      setCustomInvoiceItems([]); // Reset custom line items
     }
   }, [activeInvoice, customers, currentUser, invoiceTemplate]);
 
@@ -291,8 +313,8 @@ export default function InvoiceReceiptManager({
   const handleAddCustomItem = (e: FormEvent) => {
     e.preventDefault();
     if (!newCustomItemDesc.trim()) return;
-    const qty = Math.max(1, Number(newCustomItemQty) || 1);
-    const price = Math.max(0, Number(newCustomItemUnitPrice) || 0);
+    const qty = Math.max(1, parseFloat(String(newCustomItemQty)) || 1);
+    const price = Math.max(0, parseFloat(String(newCustomItemUnitPrice)) || 0);
     const totalAmount = qty * price;
 
     const newItem: CustomInvoiceItem = {
@@ -312,22 +334,35 @@ export default function InvoiceReceiptManager({
   const handleUpdateCustomItem = (id: string, field: 'description' | 'quantity' | 'unitPrice' | 'amount', value: string | number) => {
     setCustomInvoiceItems(prev => prev.map(item => {
       if (item.id !== id) return item;
-      const currentQty = item.quantity || (parseFloat(item.unitRate) || 1);
+      const currentQty = item.quantity !== undefined ? item.quantity : (parseFloat(item.unitRate) || 1);
       const currentPrice = item.unitPrice !== undefined ? item.unitPrice : item.amount;
       
       if (field === 'description') {
         return { ...item, description: String(value) };
       } else if (field === 'quantity') {
-        const newQty = Math.max(1, Number(value) || 1);
+        const valStr = String(value);
+        if (valStr === '') {
+          return { ...item, quantity: 0, unitRate: '0', amount: 0 };
+        }
+        const newQty = Math.max(0, parseFloat(valStr) || 0);
         const newAmount = newQty * currentPrice;
         return { ...item, quantity: newQty, unitRate: String(newQty), amount: newAmount };
       } else if (field === 'unitPrice') {
-        const newPrice = Math.max(0, Number(value) || 0);
+        const valStr = String(value);
+        if (valStr === '') {
+          return { ...item, unitPrice: 0, amount: 0 };
+        }
+        const newPrice = Math.max(0, parseFloat(valStr) || 0);
         const newAmount = currentQty * newPrice;
         return { ...item, unitPrice: newPrice, amount: newAmount };
       } else if (field === 'amount') {
-        const newAmount = Math.max(0, Number(value) || 0);
-        const newPrice = currentQty > 0 ? newAmount / currentQty : newAmount;
+        const valStr = String(value);
+        if (valStr === '') {
+          return { ...item, amount: 0, unitPrice: 0 };
+        }
+        const newAmount = Math.max(0, parseFloat(valStr) || 0);
+        const q = currentQty || 1;
+        const newPrice = q > 0 ? newAmount / q : newAmount;
         return { ...item, amount: newAmount, unitPrice: newPrice };
       }
       return item;
@@ -363,10 +398,11 @@ export default function InvoiceReceiptManager({
   // Live calculation of Invoice Totals
   const getCalculatedTotals = () => {
     // base commission amount
-    const baseComm = Number(invoiceCommissionAmount) || 0;
+    const projQty = Math.max(0, parseFloat(String(invoiceProjectQty)) || 1);
+    const baseComm = (Number(invoiceCommissionAmount) || 0) * projQty;
     // sum of extra custom items added (Total = Qty * Price)
     const baseCustom = customInvoiceItems.reduce((sum, item) => {
-      const qty = item.quantity || 1;
+      const qty = item.quantity !== undefined ? item.quantity : (parseFloat(item.unitRate) || 1);
       const price = item.unitPrice !== undefined ? item.unitPrice : item.amount;
       return sum + (qty * price);
     }, 0);
@@ -402,28 +438,45 @@ export default function InvoiceReceiptManager({
   // ==========================================
   const handleSaveInvoiceRecord = (statusOverride?: SavedInvoice['status']) => {
     const currentStatus = statusOverride || invoiceStatus || 'Issued';
+    const projQty = Math.max(0, parseFloat(String(invoiceProjectQty)) || 1);
+    const unitPrice = invoiceCommissionAmount !== undefined ? invoiceCommissionAmount : (activeInvoice ? activeInvoice.quoteAmount : 0);
 
-    const itemsToSave: SavedInvoiceItem[] = customInvoiceItems.length > 0 
-      ? customInvoiceItems.map(item => {
-          const qty = item.quantity || 1;
-          const price = item.unitPrice !== undefined ? item.unitPrice : item.amount;
-          return {
-            id: item.id,
-            description: item.description,
-            unitRate: String(qty),
-            amount: qty * price,
-            quantity: qty,
-            unitPrice: price
-          };
-        })
-      : [{
-          id: '1',
-          description: invoiceProjectTitle || (activeInvoice ? activeInvoice.title : 'Custom Woodwork Order'),
-          unitRate: '1',
-          amount: invoiceCommissionAmount || (activeInvoice ? activeInvoice.quoteAmount : 0),
-          quantity: 1,
-          unitPrice: invoiceCommissionAmount || (activeInvoice ? activeInvoice.quoteAmount : 0)
-        }];
+    let itemsToSave: SavedInvoiceItem[] = [];
+
+    if (customInvoiceItems.length > 0) {
+      itemsToSave = customInvoiceItems.map(item => {
+        const qty = item.quantity !== undefined ? item.quantity : (parseFloat(item.unitRate) || 1);
+        const price = item.unitPrice !== undefined ? item.unitPrice : item.amount;
+        return {
+          id: item.id,
+          description: item.description,
+          unitRate: String(qty),
+          amount: qty * price,
+          quantity: qty,
+          unitPrice: price
+        };
+      });
+      const projTitle = invoiceProjectTitle || (activeInvoice ? activeInvoice.title : 'Custom Woodwork Order');
+      if (unitPrice > 0 && !customInvoiceItems.some(i => i.description.includes(projTitle))) {
+        itemsToSave.unshift({
+          id: 'proj-main',
+          description: projTitle,
+          unitRate: String(projQty),
+          amount: projQty * unitPrice,
+          quantity: projQty,
+          unitPrice: unitPrice
+        });
+      }
+    } else {
+      itemsToSave = [{
+        id: '1',
+        description: invoiceProjectTitle || (activeInvoice ? activeInvoice.title : 'Custom Woodwork Order'),
+        unitRate: String(projQty),
+        amount: projQty * unitPrice,
+        quantity: projQty,
+        unitPrice: unitPrice
+      }];
+    }
 
     const subtotal = itemsToSave.reduce((sum, item) => sum + item.amount, 0);
     const recordId = editingSavedInvoiceId || `inv-${Date.now()}`;
@@ -466,13 +519,33 @@ export default function InvoiceReceiptManager({
       onUpdateJob({
         ...activeInvoice,
         title: invoiceProjectTitle || activeInvoice.title,
-        quoteAmount: invoiceCommissionAmount || activeInvoice.quoteAmount,
+        description: invoiceProjectDescription || activeInvoice.description,
+        quoteAmount: invoiceCommissionAmount !== undefined ? invoiceCommissionAmount : activeInvoice.quoteAmount,
         customerName: invoiceCustomerName || activeInvoice.customerName
       });
     }
 
     setEditingSavedInvoiceId(recordId);
     setSaveToast(`Invoice #${newRecord.invoiceNo} saved & synced to job!`);
+    setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  const handleImportJobMaterials = () => {
+    if (!activeInvoice || !activeInvoice.materialsUsed || activeInvoice.materialsUsed.length === 0) {
+      setSaveToast("No job materials found to import");
+      setTimeout(() => setSaveToast(null), 2500);
+      return;
+    }
+    const importedItems: CustomInvoiceItem[] = activeInvoice.materialsUsed.map(m => ({
+      id: `mat-${m.id}-${Date.now()}`,
+      description: `Allocated Lumber / Material: ${m.name}`,
+      quantity: m.quantity,
+      unitRate: String(m.quantity),
+      unitPrice: m.unitCost || 0,
+      amount: m.totalCost || (m.quantity * (m.unitCost || 0))
+    }));
+    setCustomInvoiceItems(prev => [...prev, ...importedItems]);
+    setSaveToast(`Imported ${importedItems.length} job materials to invoice line items!`);
     setTimeout(() => setSaveToast(null), 3000);
   };
 
@@ -608,7 +681,11 @@ export default function InvoiceReceiptManager({
       invoiceCustomerAddress,
       invoiceCustomerPhone,
       invoiceCustomerEmail,
-      invoiceCustomerMessage
+      invoiceCustomerMessage,
+      invoiceProjectTitle,
+      invoiceProjectDescription,
+      invoiceCommissionAmount,
+      invoiceProjectQty
     );
     const cleanName = (invoiceCustomerName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
     doc.save(`Invoice_${invoiceNo || '042'}_${cleanName}.pdf`);
@@ -689,9 +766,25 @@ export default function InvoiceReceiptManager({
             width: 100%;
             background: white !important;
             color: black !important;
-            padding: 1.5cm !important;
+            padding: 1cm !important;
             box-shadow: none !important;
             border: none !important;
+          }
+          #print-area input,
+          #print-area textarea,
+          #print-area select {
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            color: #0f172a !important;
+            font-weight: inherit !important;
+            font-size: inherit !important;
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            resize: none !important;
           }
           .no-print {
             display: none !important;
@@ -1385,10 +1478,21 @@ export default function InvoiceReceiptManager({
                   {invoiceTemplate === 'SWEDS_WOOD' && (
                     <button
                       onClick={handleLoadScannedSample}
-                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1 transition shadow-2xs"
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1 transition shadow-2xs cursor-pointer"
                       title="Load exact items and pricing from the physical paper scan"
                     >
                       <span>Load Scanned Image Sample</span>
+                    </button>
+                  )}
+
+                  {activeInvoice?.materialsUsed && activeInvoice.materialsUsed.length > 0 && (
+                    <button
+                      onClick={handleImportJobMaterials}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+                      title="Import consumed job materials as itemized invoice line items"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Import Job Materials ({activeInvoice.materialsUsed.length})</span>
                     </button>
                   )}
 
@@ -1510,12 +1614,15 @@ export default function InvoiceReceiptManager({
                                 <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 w-28 uppercase text-[10px]">Invoice No.</td>
                                 <td className="p-1.5 font-mono font-bold text-gray-800">
                                   {invoicePdfMode === 'EDIT' ? (
-                                    <input
-                                      type="text"
-                                      value={invoiceNo}
-                                      onChange={(e) => setInvoiceNo(e.target.value)}
-                                      className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden font-bold"
-                                    />
+                                    <>
+                                      <span className="hidden print:inline font-mono font-bold">{invoiceNo}</span>
+                                      <input
+                                        type="text"
+                                        value={invoiceNo}
+                                        onChange={(e) => setInvoiceNo(e.target.value)}
+                                        className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden font-bold print:hidden"
+                                      />
+                                    </>
                                   ) : (
                                     invoiceNo
                                   )}
@@ -1525,12 +1632,15 @@ export default function InvoiceReceiptManager({
                                 <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Address</td>
                                 <td className="p-1.5 text-gray-700 font-semibold">
                                   {invoicePdfMode === 'EDIT' ? (
-                                    <input
-                                      type="text"
-                                      value={invoiceCompanyContact}
-                                      onChange={(e) => setInvoiceCompanyContact(e.target.value)}
-                                      className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden"
-                                    />
+                                    <>
+                                      <span className="hidden print:inline font-semibold text-gray-700">{invoiceCompanyContact}</span>
+                                      <input
+                                        type="text"
+                                        value={invoiceCompanyContact}
+                                        onChange={(e) => setInvoiceCompanyContact(e.target.value)}
+                                        className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden print:hidden"
+                                      />
+                                    </>
                                   ) : (
                                     invoiceCompanyContact
                                   )}
@@ -1540,12 +1650,15 @@ export default function InvoiceReceiptManager({
                                 <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Date</td>
                                 <td className="p-1.5 font-mono text-gray-800">
                                   {invoicePdfMode === 'EDIT' ? (
-                                    <input
-                                      type="text"
-                                      value={invoiceDate}
-                                      onChange={(e) => setInvoiceDate(e.target.value)}
-                                      className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden"
-                                    />
+                                    <>
+                                      <span className="hidden print:inline font-mono">{invoiceDate}</span>
+                                      <input
+                                        type="text"
+                                        value={invoiceDate}
+                                        onChange={(e) => setInvoiceDate(e.target.value)}
+                                        className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden print:hidden"
+                                      />
+                                    </>
                                   ) : (
                                     invoiceDate
                                   )}
@@ -1555,12 +1668,15 @@ export default function InvoiceReceiptManager({
                                 <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Terms (days)</td>
                                 <td className="p-1.5 text-gray-700 font-mono">
                                   {invoicePdfMode === 'EDIT' ? (
-                                    <input
-                                      type="text"
-                                      value={invoiceTerms}
-                                      onChange={(e) => setInvoiceTerms(e.target.value)}
-                                      className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden"
-                                    />
+                                    <>
+                                      <span className="hidden print:inline font-mono">{invoiceTerms}</span>
+                                      <input
+                                        type="text"
+                                        value={invoiceTerms}
+                                        onChange={(e) => setInvoiceTerms(e.target.value)}
+                                        className="w-full bg-amber-50 border border-amber-200 rounded px-1 text-xs outline-hidden print:hidden"
+                                      />
+                                    </>
                                   ) : (
                                     invoiceTerms
                                   )}
@@ -1591,12 +1707,15 @@ export default function InvoiceReceiptManager({
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-gray-500 w-16 uppercase text-[9px]">Name:</span>
                             {invoicePdfMode === 'EDIT' ? (
-                              <input
-                                type="text"
-                                value={invoiceCustomerName}
-                                onChange={(e) => setInvoiceCustomerName(e.target.value)}
-                                className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden font-bold text-gray-800"
-                              />
+                              <>
+                                <span className="hidden print:inline font-bold text-gray-800">{invoiceCustomerName}</span>
+                                <input
+                                  type="text"
+                                  value={invoiceCustomerName}
+                                  onChange={(e) => setInvoiceCustomerName(e.target.value)}
+                                  className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden font-bold text-gray-800 print:hidden"
+                                />
+                              </>
                             ) : (
                               <span className="font-bold text-gray-900">{invoiceCustomerName}</span>
                             )}
@@ -1605,12 +1724,15 @@ export default function InvoiceReceiptManager({
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-gray-500 w-16 uppercase text-[9px]">Mobile:</span>
                             {invoicePdfMode === 'EDIT' ? (
-                              <input
-                                type="text"
-                                value={invoiceCustomerPhone}
-                                onChange={(e) => setInvoiceCustomerPhone(e.target.value)}
-                                className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden font-mono"
-                              />
+                              <>
+                                <span className="hidden print:inline font-mono font-semibold">{invoiceCustomerPhone}</span>
+                                <input
+                                  type="text"
+                                  value={invoiceCustomerPhone}
+                                  onChange={(e) => setInvoiceCustomerPhone(e.target.value)}
+                                  className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden font-mono print:hidden"
+                                />
+                              </>
                             ) : (
                               <span className="font-mono text-gray-800 font-semibold">{invoiceCustomerPhone || ''}</span>
                             )}
@@ -1619,12 +1741,15 @@ export default function InvoiceReceiptManager({
                           <div className="flex items-start gap-1.5 md:col-span-1">
                             <span className="font-bold text-gray-500 w-16 uppercase text-[9px] pt-0.5">Address:</span>
                             {invoicePdfMode === 'EDIT' ? (
-                              <input
-                                type="text"
-                                value={invoiceCustomerAddress}
-                                onChange={(e) => setInvoiceCustomerAddress(e.target.value)}
-                                className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden text-gray-700 font-semibold"
-                              />
+                              <>
+                                <span className="hidden print:inline font-semibold text-gray-700">{invoiceCustomerAddress}</span>
+                                <input
+                                  type="text"
+                                  value={invoiceCustomerAddress}
+                                  onChange={(e) => setInvoiceCustomerAddress(e.target.value)}
+                                  className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden text-gray-700 font-semibold print:hidden"
+                                />
+                              </>
                             ) : (
                               <span className="text-gray-700 font-bold">{invoiceCustomerAddress}</span>
                             )}
@@ -1633,12 +1758,15 @@ export default function InvoiceReceiptManager({
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-gray-500 w-16 uppercase text-[9px]">Email:</span>
                             {invoicePdfMode === 'EDIT' ? (
-                              <input
-                                type="text"
-                                value={invoiceCustomerEmail}
-                                onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
-                                className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden text-gray-600"
-                              />
+                              <>
+                                <span className="hidden print:inline font-semibold text-gray-600">{invoiceCustomerEmail}</span>
+                                <input
+                                  type="text"
+                                  value={invoiceCustomerEmail}
+                                  onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
+                                  className="flex-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 text-xs outline-hidden text-gray-600 print:hidden"
+                                />
+                              </>
                             ) : (
                               <span className="text-gray-600 font-semibold">{invoiceCustomerEmail}</span>
                             )}
@@ -1664,22 +1792,28 @@ export default function InvoiceReceiptManager({
                             <tr className="min-h-[36px]">
                               <td className="py-2 px-3 border-r border-gray-400 font-semibold text-gray-800">
                                 {invoicePdfMode === 'EDIT' ? (
-                                  <div className="space-y-1">
-                                    <input
-                                      type="text"
-                                      value={invoiceProjectTitle}
-                                      onChange={(e) => setInvoiceProjectTitle(e.target.value)}
-                                      className="w-full font-bold text-gray-800 border border-blue-300 rounded px-1.5 py-0.5 text-xs bg-white"
-                                      placeholder="Project Title"
-                                    />
-                                    <input
-                                      type="text"
-                                      value={invoiceProjectDescription}
-                                      onChange={(e) => setInvoiceProjectDescription(e.target.value)}
-                                      className="w-full text-[10px] text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 bg-white"
-                                      placeholder="Project Details"
-                                    />
-                                  </div>
+                                  <>
+                                    <div className="hidden print:block space-y-0.5">
+                                      <p className="font-bold text-gray-800">{invoiceProjectTitle}</p>
+                                      <p className="text-[10px] text-gray-500 font-normal italic">{invoiceProjectDescription}</p>
+                                    </div>
+                                    <div className="space-y-1 print:hidden">
+                                      <input
+                                        type="text"
+                                        value={invoiceProjectTitle}
+                                        onChange={(e) => setInvoiceProjectTitle(e.target.value)}
+                                        className="w-full font-bold text-gray-800 border border-blue-300 rounded px-1.5 py-0.5 text-xs bg-white"
+                                        placeholder="Project Title"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={invoiceProjectDescription}
+                                        onChange={(e) => setInvoiceProjectDescription(e.target.value)}
+                                        className="w-full text-[10px] text-gray-600 border border-gray-200 rounded px-1.5 py-0.5 bg-white"
+                                        placeholder="Project Details"
+                                      />
+                                    </div>
+                                  </>
                                 ) : (
                                   <>
                                     <p className="font-bold text-gray-800">{invoiceProjectTitle}</p>
@@ -1687,29 +1821,50 @@ export default function InvoiceReceiptManager({
                                   </>
                                 )}
                               </td>
-                              <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">1</td>
+                              <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">
+                                {invoicePdfMode === 'EDIT' ? (
+                                  <>
+                                    <span className="hidden print:inline font-mono font-bold">{invoiceProjectQty || 1}</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={invoiceProjectQty === 0 ? '' : invoiceProjectQty}
+                                      onChange={(e) => setInvoiceProjectQty(e.target.value === '' ? '' : e.target.value)}
+                                      className="w-14 text-center font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white print:hidden"
+                                    />
+                                  </>
+                                ) : (
+                                  invoiceProjectQty || 1
+                                )}
+                              </td>
                               <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
                                 {invoicePdfMode === 'EDIT' ? (
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={invoiceCommissionAmount}
-                                    onChange={(e) => setInvoiceCommissionAmount(Number(e.target.value))}
-                                    className="w-24 text-right border border-blue-300 rounded px-1.5 py-0.5 font-bold font-mono text-xs bg-white"
-                                  />
+                                  <>
+                                    <span className="hidden print:inline font-mono font-bold text-gray-700">
+                                      SLL {invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={invoiceCommissionAmount}
+                                      onChange={(e) => setInvoiceCommissionAmount(Number(e.target.value))}
+                                      className="w-24 text-right border border-blue-300 rounded px-1.5 py-0.5 font-bold font-mono text-xs bg-white print:hidden"
+                                    />
+                                  </>
                                 ) : (
                                   `SLL ${invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                 )}
                               </td>
                               <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
-                                SLL {invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                SLL {((Number(invoiceCommissionAmount) || 0) * (parseFloat(String(invoiceProjectQty)) || 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </td>
                             </tr>
                           )}
 
                           {/* Custom Invoice Items */}
                           {customInvoiceItems.map((item) => {
-                            const qty = item.quantity || (parseFloat(item.unitRate) || 1);
+                            const qty = item.quantity !== undefined ? item.quantity : (parseFloat(item.unitRate) || 1);
                             const unitPrice = item.unitPrice !== undefined ? item.unitPrice : item.amount;
                             const totalAmount = qty * unitPrice;
 
@@ -1717,13 +1872,16 @@ export default function InvoiceReceiptManager({
                               <tr key={item.id} className="min-h-[36px]">
                                 <td className="py-2 px-3 border-r border-gray-400 font-semibold text-gray-800 flex items-center justify-between gap-2">
                                   {invoicePdfMode === 'EDIT' ? (
-                                    <input
-                                      type="text"
-                                      value={item.description}
-                                      onChange={(e) => handleUpdateCustomItem(item.id, 'description', e.target.value)}
-                                      className="w-full text-xs font-semibold text-gray-800 border border-blue-300 rounded px-1.5 py-0.5 bg-white"
-                                      placeholder="Item Description"
-                                    />
+                                    <>
+                                      <span className="hidden print:inline font-semibold text-gray-800">{item.description}</span>
+                                      <input
+                                        type="text"
+                                        value={item.description}
+                                        onChange={(e) => handleUpdateCustomItem(item.id, 'description', e.target.value)}
+                                        className="w-full text-xs font-semibold text-gray-800 border border-blue-300 rounded px-1.5 py-0.5 bg-white print:hidden"
+                                        placeholder="Item Description"
+                                      />
+                                    </>
                                   ) : (
                                     <span>{item.description}</span>
                                   )}
@@ -1740,39 +1898,53 @@ export default function InvoiceReceiptManager({
                                 </td>
                                 <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">
                                   {invoicePdfMode === 'EDIT' ? (
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      value={qty}
-                                      onChange={(e) => handleUpdateCustomItem(item.id, 'quantity', e.target.value)}
-                                      className="w-14 text-center font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white"
-                                    />
+                                    <>
+                                      <span className="hidden print:inline font-mono font-bold">{qty}</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={item.quantity === 0 ? '' : (item.quantity ?? qty)}
+                                        onChange={(e) => handleUpdateCustomItem(item.id, 'quantity', e.target.value)}
+                                        className="w-14 text-center font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white print:hidden"
+                                      />
+                                    </>
                                   ) : (
                                     qty
                                   )}
                                 </td>
                                 <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
                                   {invoicePdfMode === 'EDIT' ? (
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      value={unitPrice}
-                                      onChange={(e) => handleUpdateCustomItem(item.id, 'unitPrice', e.target.value)}
-                                      className="w-24 text-right font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white"
-                                    />
+                                    <>
+                                      <span className="hidden print:inline font-mono font-bold text-gray-700">
+                                        SLL {unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={unitPrice}
+                                        onChange={(e) => handleUpdateCustomItem(item.id, 'unitPrice', e.target.value)}
+                                        className="w-24 text-right font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white print:hidden"
+                                      />
+                                    </>
                                   ) : (
                                     `SLL ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                   )}
                                 </td>
                                 <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
                                   {invoicePdfMode === 'EDIT' ? (
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      value={totalAmount}
-                                      onChange={(e) => handleUpdateCustomItem(item.id, 'amount', e.target.value)}
-                                      className="w-28 text-right font-mono font-black text-xs border border-blue-300 rounded px-1 py-0.5 bg-white"
-                                    />
+                                    <>
+                                      <span className="hidden print:inline font-mono font-black text-gray-800">
+                                        SLL {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={totalAmount}
+                                        onChange={(e) => handleUpdateCustomItem(item.id, 'amount', e.target.value)}
+                                        className="w-28 text-right font-mono font-black text-xs border border-blue-300 rounded px-1 py-0.5 bg-white print:hidden"
+                                      />
+                                    </>
                                   ) : (
                                     `SLL ${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                   )}
@@ -1814,9 +1986,10 @@ export default function InvoiceReceiptManager({
                           <input
                             type="number"
                             min={1}
+                            step="any"
                             required
                             value={newCustomItemQty}
-                            onChange={(e) => setNewCustomItemQty(Math.max(1, parseInt(e.target.value) || 1))}
+                            onChange={(e) => setNewCustomItemQty(e.target.value === '' ? '' : e.target.value)}
                             className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold text-center"
                           />
                         </div>
@@ -1826,9 +1999,10 @@ export default function InvoiceReceiptManager({
                           <input
                             type="number"
                             min={0}
+                            step="any"
                             required
                             value={newCustomItemUnitPrice}
-                            onChange={(e) => setNewCustomItemUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                            onChange={(e) => setNewCustomItemUnitPrice(e.target.value === '' ? '' : e.target.value)}
                             className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold text-right"
                           />
                         </div>
@@ -1836,7 +2010,7 @@ export default function InvoiceReceiptManager({
                         <div className="w-28 space-y-1 text-right">
                           <label className="text-[9px] text-gray-400 font-bold uppercase block">Total (Qty × Price)</label>
                           <div className="px-2 py-1 text-xs bg-blue-50 text-blue-900 border border-blue-200 rounded-lg font-mono font-black truncate">
-                            SLL {(newCustomItemQty * newCustomItemUnitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            SLL {((Number(newCustomItemQty) || 0) * (Number(newCustomItemUnitPrice) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </div>
                         </div>
 
@@ -1937,12 +2111,15 @@ export default function InvoiceReceiptManager({
                             )}
                           </div>
                           {invoicePdfMode === 'EDIT' ? (
-                            <input
-                              type="text"
-                              value={invoiceCompany}
-                              onChange={(e) => setInvoiceCompany(e.target.value)}
-                              className="font-display font-black text-lg uppercase tracking-wider text-wood-900 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 outline-hidden"
-                            />
+                            <>
+                              <span className="hidden print:inline font-display font-black text-lg uppercase tracking-wider text-wood-900">{invoiceCompany}</span>
+                              <input
+                                type="text"
+                                value={invoiceCompany}
+                                onChange={(e) => setInvoiceCompany(e.target.value)}
+                                className="font-display font-black text-lg uppercase tracking-wider text-wood-900 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 outline-hidden print:hidden"
+                              />
+                            </>
                           ) : (
                             <span className="font-display font-black text-lg uppercase tracking-wider text-wood-900">
                               {invoiceCompany}
@@ -1951,12 +2128,15 @@ export default function InvoiceReceiptManager({
                         </div>
 
                         {invoicePdfMode === 'EDIT' ? (
-                          <textarea
-                            rows={4}
-                            value={invoiceCompanyContact}
-                            onChange={(e) => setInvoiceCompanyContact(e.target.value)}
-                            className="text-xs text-gray-600 leading-relaxed font-semibold bg-amber-50/50 border border-amber-200 rounded p-1.5 outline-hidden w-full"
-                          />
+                          <>
+                            <p className="hidden print:block text-xs text-gray-500 leading-relaxed font-semibold whitespace-pre-line">{invoiceCompanyContact}</p>
+                            <textarea
+                              rows={4}
+                              value={invoiceCompanyContact}
+                              onChange={(e) => setInvoiceCompanyContact(e.target.value)}
+                              className="text-xs text-gray-600 leading-relaxed font-semibold bg-amber-50/50 border border-amber-200 rounded p-1.5 outline-hidden w-full print:hidden"
+                            />
+                          </>
                         ) : (
                           <p className="text-xs text-gray-500 leading-relaxed font-semibold whitespace-pre-line">
                             {invoiceCompanyContact}
@@ -1970,12 +2150,15 @@ export default function InvoiceReceiptManager({
                           <div className="flex md:justify-end items-center gap-1">
                             <span>Invoice No:</span>
                             {invoicePdfMode === 'EDIT' ? (
-                              <input
-                                type="text"
-                                value={invoiceNo}
-                                onChange={(e) => setInvoiceNo(e.target.value)}
-                                className="font-mono text-gray-800 font-bold bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-28 text-right"
-                              />
+                              <>
+                                <span className="hidden print:inline font-mono text-gray-800 font-bold">{invoiceNo}</span>
+                                <input
+                                  type="text"
+                                  value={invoiceNo}
+                                  onChange={(e) => setInvoiceNo(e.target.value)}
+                                  className="font-mono text-gray-800 font-bold bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-28 text-right print:hidden"
+                                />
+                              </>
                             ) : (
                               <span className="font-mono text-gray-800 font-bold">{invoiceNo}</span>
                             )}
@@ -1984,12 +2167,15 @@ export default function InvoiceReceiptManager({
                           <div className="flex md:justify-end items-center gap-1">
                             <span>Date:</span>
                             {invoicePdfMode === 'EDIT' ? (
-                              <input
-                                type="date"
-                                value={invoiceDate}
-                                onChange={(e) => setInvoiceDate(e.target.value)}
-                                className="font-mono text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-28 text-right"
-                              />
+                              <>
+                                <span className="hidden print:inline font-mono text-gray-800">{invoiceDate}</span>
+                                <input
+                                  type="date"
+                                  value={invoiceDate}
+                                  onChange={(e) => setInvoiceDate(e.target.value)}
+                                  className="font-mono text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-28 text-right print:hidden"
+                                />
+                              </>
                             ) : (
                               <span className="font-mono text-gray-800">{invoiceDate}</span>
                             )}
@@ -1998,12 +2184,15 @@ export default function InvoiceReceiptManager({
                           <div className="flex md:justify-end items-center gap-1">
                             <span>Terms:</span>
                             {invoicePdfMode === 'EDIT' ? (
-                              <input
-                                type="text"
-                                value={invoiceTerms}
-                                onChange={(e) => setInvoiceTerms(e.target.value)}
-                                className="text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-48 text-right"
-                              />
+                              <>
+                                <span className="hidden print:inline text-gray-800 font-bold">{invoiceTerms}</span>
+                                <input
+                                  type="text"
+                                  value={invoiceTerms}
+                                  onChange={(e) => setInvoiceTerms(e.target.value)}
+                                  className="text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1 py-0.5 text-[11px] w-48 text-right print:hidden"
+                                />
+                              </>
                             ) : (
                               <span className="text-gray-800 font-bold">{invoiceTerms}</span>
                             )}
@@ -2017,43 +2206,54 @@ export default function InvoiceReceiptManager({
                       <div className="space-y-1 bg-gray-50/60 p-4 rounded-xl border border-gray-100">
                         <span className="font-bold text-wood-950 uppercase tracking-wider block mb-1.5">CLIENT DEPOSITOR:</span>
                         {invoicePdfMode === 'EDIT' ? (
-                          <div className="space-y-1">
-                            <input
-                              type="text"
-                              value={invoiceCustomerName}
-                              onChange={(e) => setInvoiceCustomerName(e.target.value)}
-                              className="text-xs font-black text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                              placeholder="Client Name"
-                            />
-                            <input
-                              type="text"
-                              value={invoiceCustomerCompany}
-                              onChange={(e) => setInvoiceCustomerCompany(e.target.value)}
-                              className="text-xs font-bold text-wood-700 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                              placeholder="Client Company"
-                            />
-                            <input
-                              type="text"
-                              value={invoiceCustomerPhone}
-                              onChange={(e) => setInvoiceCustomerPhone(e.target.value)}
-                              className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                              placeholder="Phone Number"
-                            />
-                            <input
-                              type="text"
-                              value={invoiceCustomerEmail}
-                              onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
-                              className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                              placeholder="Email address"
-                            />
-                            <input
-                              type="text"
-                              value={invoiceCustomerAddress}
-                              onChange={(e) => setInvoiceCustomerAddress(e.target.value)}
-                              className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                              placeholder="Delivery Address"
-                            />
-                          </div>
+                          <>
+                            <div className="hidden print:block space-y-0.5">
+                              <p className="text-sm font-black text-gray-800">{invoiceCustomerName}</p>
+                              {invoiceCustomerCompany && (
+                                <p className="font-bold text-wood-800">{invoiceCustomerCompany}</p>
+                              )}
+                              <p className="text-gray-500 font-semibold mt-1">Phone: {invoiceCustomerPhone || 'N/A'}</p>
+                              <p className="text-gray-500 font-semibold">Email: {invoiceCustomerEmail || 'N/A'}</p>
+                              <p className="text-gray-500 leading-tight font-semibold mt-1">Delivery: {invoiceCustomerAddress || 'N/A'}</p>
+                            </div>
+                            <div className="space-y-1 print:hidden">
+                              <input
+                                type="text"
+                                value={invoiceCustomerName}
+                                onChange={(e) => setInvoiceCustomerName(e.target.value)}
+                                className="text-xs font-black text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                                placeholder="Client Name"
+                              />
+                              <input
+                                type="text"
+                                value={invoiceCustomerCompany}
+                                onChange={(e) => setInvoiceCustomerCompany(e.target.value)}
+                                className="text-xs font-bold text-wood-700 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                                placeholder="Client Company"
+                              />
+                              <input
+                                type="text"
+                                value={invoiceCustomerPhone}
+                                onChange={(e) => setInvoiceCustomerPhone(e.target.value)}
+                                className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                                placeholder="Phone Number"
+                              />
+                              <input
+                                type="text"
+                                value={invoiceCustomerEmail}
+                                onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
+                                className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                                placeholder="Email address"
+                              />
+                              <input
+                                type="text"
+                                value={invoiceCustomerAddress}
+                                onChange={(e) => setInvoiceCustomerAddress(e.target.value)}
+                                className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                                placeholder="Delivery Address"
+                              />
+                            </div>
+                          </>
                         ) : (
                           <>
                             <p className="text-sm font-black text-gray-800">{invoiceCustomerName}</p>
@@ -2070,27 +2270,34 @@ export default function InvoiceReceiptManager({
                       <div className="space-y-1 bg-gray-50/60 p-4 rounded-xl border border-gray-100">
                         <span className="font-bold text-wood-950 uppercase tracking-wider block mb-1.5">PROJECT / DESIGN FOCUS:</span>
                         {invoicePdfMode === 'EDIT' ? (
-                          <div className="space-y-1">
-                            <input
-                              type="text"
-                              value={invoiceProjectTitle}
-                              onChange={(e) => setInvoiceProjectTitle(e.target.value)}
-                              className="text-xs font-black text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                            />
-                            <textarea
-                              rows={2}
-                              value={invoiceProjectDescription}
-                              onChange={(e) => setInvoiceProjectDescription(e.target.value)}
-                              className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded p-1.5 w-full"
-                            />
-                            <input
-                              type="text"
-                              value={invoiceTimeline}
-                              onChange={(e) => setInvoiceTimeline(e.target.value)}
-                              className="text-xs font-semibold text-gray-700 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
-                              placeholder="Timeline"
-                            />
-                          </div>
+                          <>
+                            <div className="hidden print:block space-y-0.5">
+                              <p className="text-sm font-black text-gray-800">{invoiceProjectTitle}</p>
+                              <p className="text-gray-500 leading-relaxed font-semibold">{invoiceProjectDescription}</p>
+                              <p className="text-gray-500 font-semibold mt-2">Workshop Timeline: <strong className="text-gray-800">{invoiceTimeline}</strong></p>
+                            </div>
+                            <div className="space-y-1 print:hidden">
+                              <input
+                                type="text"
+                                value={invoiceProjectTitle}
+                                onChange={(e) => setInvoiceProjectTitle(e.target.value)}
+                                className="text-xs font-black text-gray-800 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                              />
+                              <textarea
+                                rows={2}
+                                value={invoiceProjectDescription}
+                                onChange={(e) => setInvoiceProjectDescription(e.target.value)}
+                                className="text-xs text-gray-600 bg-amber-50/50 border border-amber-200 rounded p-1.5 w-full"
+                              />
+                              <input
+                                type="text"
+                                value={invoiceTimeline}
+                                onChange={(e) => setInvoiceTimeline(e.target.value)}
+                                className="text-xs font-semibold text-gray-700 bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 w-full"
+                                placeholder="Timeline"
+                              />
+                            </div>
+                          </>
                         ) : (
                           <>
                             <p className="text-sm font-black text-gray-800">{invoiceProjectTitle}</p>
@@ -2107,46 +2314,49 @@ export default function InvoiceReceiptManager({
                         <thead>
                           <tr className="border-b border-gray-300 text-wood-950 font-bold uppercase bg-gray-50 text-[10px] tracking-wider">
                             <th className="py-2.5 px-3">Itemized Production Scope & Timber Milling</th>
-                            <th className="py-2.5 px-3 text-right">Unit Rate / Unit Size</th>
-                            <th className="py-2.5 px-3 text-right">Cleared Value</th>
+                            <th className="py-2.5 px-3 text-right">Unit Rate / Price Breakdown</th>
+                            <th className="py-2.5 px-3 text-right">Total Cleared Value</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          <tr>
-                            <td className="py-3 px-3">
-                              <p className="font-bold text-gray-800">Bespoke Workshop Commission Fee</p>
-                              <span className="text-[10px] text-gray-400 font-semibold">Fine assembly, wood joinery, sanding, and hand polished finish.</span>
-                            </td>
-                            <td className="py-3 px-3 text-right font-mono text-gray-600">Flat commission</td>
-                            <td className="py-3 px-3 text-right font-mono font-bold text-gray-800">
-                              {invoicePdfMode === 'EDIT' ? (
-                                <input
-                                  type="number"
-                                  value={invoiceCommissionAmount}
-                                  onChange={(e) => setInvoiceCommissionAmount(Number(e.target.value))}
-                                  className="w-28 text-right bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 font-bold outline-hidden font-mono text-xs"
-                                />
-                              ) : (
-                                formatCurrency(invoiceCommissionAmount, 0)
-                              )}
-                            </td>
-                          </tr>
-
-                          {/* Consumed standard materials */}
-                          {activeInvoice.materialsUsed.map((m, idx) => (
-                            <tr key={idx} className="bg-gray-50/30">
-                              <td className="py-2.5 px-3">
-                                <span className="font-bold">Allocated Lumber: {m.name}</span>
-                                <span className="block text-[9px] text-gray-400 font-semibold">Consumed in construction logs.</span>
+                          {Number(invoiceCommissionAmount) > 0 && (
+                            <tr>
+                              <td className="py-3 px-3">
+                                <p className="font-bold text-gray-800">Bespoke Workshop Commission Fee</p>
+                                <span className="text-[10px] text-gray-400 font-semibold">Fine assembly, wood joinery, sanding, and hand polished finish.</span>
                               </td>
-                              <td className="py-2.5 px-3 text-right font-mono text-gray-500">{m.quantity} Units</td>
-                              <td className="py-2.5 px-3 text-right font-mono text-gray-400">Included in Quote</td>
+                              <td className="py-3 px-3 text-right font-mono text-gray-600 font-bold">
+                                {invoicePdfMode === 'EDIT' ? (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="any"
+                                      value={invoiceProjectQty === 0 ? '' : invoiceProjectQty}
+                                      onChange={(e) => setInvoiceProjectQty(e.target.value === '' ? '' : e.target.value)}
+                                      className="w-12 text-center font-mono font-bold text-xs border border-amber-300 rounded px-1 py-0.5 bg-white"
+                                    />
+                                    <span className="text-gray-400">×</span>
+                                    <input
+                                      type="number"
+                                      value={invoiceCommissionAmount}
+                                      onChange={(e) => setInvoiceCommissionAmount(Number(e.target.value))}
+                                      className="w-24 text-right bg-amber-50/50 border border-amber-200 rounded px-1.5 py-0.5 font-bold outline-hidden font-mono text-xs"
+                                    />
+                                  </div>
+                                ) : (
+                                  `${invoiceProjectQty || 1} Set(s) × ${formatCurrency(invoiceCommissionAmount, 0)}`
+                                )}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono font-bold text-gray-800">
+                                {formatCurrency((Number(invoiceCommissionAmount) || 0) * (parseFloat(String(invoiceProjectQty)) || 1), 0)}
+                              </td>
                             </tr>
-                          ))}
+                          )}
 
                           {/* Render extra custom added line items */}
                           {customInvoiceItems.map((item) => {
-                            const qty = item.quantity || (parseFloat(item.unitRate) || 1);
+                            const qty = item.quantity !== undefined ? item.quantity : (parseFloat(item.unitRate) || 1);
                             const unitPrice = item.unitPrice !== undefined ? item.unitPrice : item.amount;
                             const totalAmount = qty * unitPrice;
 
@@ -2182,8 +2392,9 @@ export default function InvoiceReceiptManager({
                                     <div className="flex items-center justify-end gap-1">
                                       <input
                                         type="number"
-                                        min="1"
-                                        value={qty}
+                                        min="0"
+                                        step="any"
+                                        value={item.quantity === 0 ? '' : (item.quantity ?? qty)}
                                         onChange={(e) => handleUpdateCustomItem(item.id, 'quantity', e.target.value)}
                                         className="w-12 text-center font-mono font-bold text-xs border border-amber-300 rounded px-1 py-0.5 bg-white"
                                       />
@@ -2191,7 +2402,7 @@ export default function InvoiceReceiptManager({
                                       <input
                                         type="number"
                                         min="0"
-                                        value={unitPrice}
+                                        value={unitPrice === 0 ? '' : unitPrice}
                                         onChange={(e) => handleUpdateCustomItem(item.id, 'unitPrice', e.target.value)}
                                         className="w-20 text-right font-mono font-bold text-xs border border-amber-300 rounded px-1 py-0.5 bg-white"
                                       />
@@ -2239,9 +2450,10 @@ export default function InvoiceReceiptManager({
                             <input
                               type="number"
                               min={1}
+                              step="any"
                               required
                               value={newCustomItemQty}
-                              onChange={(e) => setNewCustomItemQty(Math.max(1, parseInt(e.target.value) || 1))}
+                              onChange={(e) => setNewCustomItemQty(e.target.value === '' ? '' : e.target.value)}
                               className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold text-center"
                             />
                           </div>
@@ -2251,9 +2463,10 @@ export default function InvoiceReceiptManager({
                             <input
                               type="number"
                               min={0}
+                              step="any"
                               required
                               value={newCustomItemUnitPrice}
-                              onChange={(e) => setNewCustomItemUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                              onChange={(e) => setNewCustomItemUnitPrice(e.target.value === '' ? '' : e.target.value)}
                               className="w-full px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-hidden font-mono font-bold text-right"
                             />
                           </div>
@@ -2261,7 +2474,7 @@ export default function InvoiceReceiptManager({
                           <div className="w-28 space-y-1 text-right">
                             <label className="text-[9px] text-gray-400 font-bold uppercase block">Total (Qty × Price)</label>
                             <div className="px-2 py-1 text-xs bg-amber-50 text-amber-900 border border-amber-200 rounded-lg font-mono font-black truncate">
-                              Le {(newCustomItemQty * newCustomItemUnitPrice).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                              Le {((Number(newCustomItemQty) || 0) * (Number(newCustomItemUnitPrice) || 0)).toLocaleString(undefined, { minimumFractionDigits: 0 })}
                             </div>
                           </div>
 
@@ -2834,9 +3047,16 @@ export function buildInvoicePdfContent(
   addressOverride?: string,
   phoneOverride?: string,
   emailOverride?: string,
-  customerMessageOverride?: string
+  customerMessageOverride?: string,
+  projectTitleOverride?: string,
+  projectDescriptionOverride?: string,
+  commissionAmountOverride?: number,
+  projectQtyOverride?: number | string
 ) {
   const isSwedsWood = template === 'SWEDS_WOOD';
+  const projectTitle = projectTitleOverride || job.title;
+  const projectDescription = projectDescriptionOverride || job.description;
+  const commissionAmount = commissionAmountOverride !== undefined ? commissionAmountOverride : job.quoteAmount;
   
   if (isSwedsWood) {
     // SWEDS WOOD ENTERPRISE OFFICIAL PAPER STYLE
@@ -2997,7 +3217,7 @@ export function buildInvoicePdfContent(
     let itemsToRender: { desc: string; qty: string; price: number; total: number }[] = [];
     if (customItems && customItems.length > 0) {
       itemsToRender = customItems.map(item => {
-        const qtyNum = item.quantity || (parseFloat(item.unitRate) || 1);
+        const qtyNum = item.quantity !== undefined ? item.quantity : (parseFloat(item.unitRate) || 1);
         const unitPrice = item.unitPrice !== undefined ? item.unitPrice : item.amount;
         const lineTotal = qtyNum * unitPrice;
         return {
@@ -3007,12 +3227,48 @@ export function buildInvoicePdfContent(
           total: lineTotal
         };
       });
+      if (commissionAmount > 0 && !customItems.some(i => i.description.includes(projectTitle))) {
+        const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
+        itemsToRender.unshift({
+          desc: projectTitle,
+          qty: String(projQtyNum),
+          price: commissionAmount,
+          total: commissionAmount * projQtyNum
+        });
+      }
+    } else if (job.materialsUsed && job.materialsUsed.length > 0) {
+      const matsTotal = job.materialsUsed.reduce((s, m) => s + (m.totalCost || (m.quantity * (m.unitCost || 0))), 0);
+      const effectiveComm = commissionAmountOverride !== undefined ? commissionAmountOverride : Math.max(0, job.quoteAmount - matsTotal);
+      const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
+
+      itemsToRender = [];
+      if (effectiveComm > 0) {
+        itemsToRender.push({
+          desc: projectTitle,
+          qty: String(projQtyNum),
+          price: effectiveComm,
+          total: effectiveComm * projQtyNum
+        });
+      }
+
+      job.materialsUsed.forEach(m => {
+        const qtyNum = m.quantity || 1;
+        const unitPrice = m.unitCost || 0;
+        const lineTotal = m.totalCost || (qtyNum * unitPrice);
+        itemsToRender.push({
+          desc: `Allocated Lumber: ${m.name}`,
+          qty: String(qtyNum),
+          price: unitPrice,
+          total: lineTotal
+        });
+      });
     } else {
+      const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
       itemsToRender = [{
-        desc: job.title,
-        qty: '1',
-        price: job.quoteAmount,
-        total: job.quoteAmount
+        desc: projectTitle,
+        qty: String(projQtyNum),
+        price: commissionAmount,
+        total: commissionAmount * projQtyNum
       }];
     }
 
@@ -3164,8 +3420,15 @@ export function buildInvoicePdfContent(
     doc.setFontSize(8);
     doc.setTextColor(55, 65, 81);
     
-    doc.text(`Invoice No: INV-${job.id.slice(4).toUpperCase()}`, 195, 26, { align: 'right' });
-    doc.text(`Date: ${job.startDate}`, 195, 31, { align: 'right' });
+    const modernInvNo = invoiceNoOverride || `INV-${job.id.slice(4).toUpperCase()}`;
+    const modernInvDate = dateOverride || job.startDate;
+    const modernCustName = customerNameOverride || job.customerName;
+    const modernCustPhone = phoneOverride !== undefined ? phoneOverride : (customer?.phone || "N/A");
+    const modernCustEmail = emailOverride !== undefined ? emailOverride : (customer?.email || "N/A");
+    const modernCustAddr = addressOverride || customer?.address || "N/A";
+
+    doc.text(`Invoice No: ${modernInvNo}`, 195, 26, { align: 'right' });
+    doc.text(`Date: ${modernInvDate}`, 195, 31, { align: 'right' });
     doc.text(`Terms: Payment Clear / Standard Log`, 195, 36, { align: 'right' });
 
     doc.setDrawColor(229, 231, 235);
@@ -3190,14 +3453,14 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(17, 24, 39);
-    doc.text(job.customerName, 18, 62);
+    doc.text(modernCustName, 18, 62);
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(75, 85, 99);
-    doc.text(`Phone: ${customer?.phone || "N/A"}`, 18, 67);
-    doc.text(`Email: ${customer?.email || "N/A"}`, 18, 71);
-    doc.text(`Delivery: ${customer?.address || "N/A"}`, 18, 75);
+    doc.text(`Phone: ${modernCustPhone}`, 18, 67);
+    doc.text(`Email: ${modernCustEmail}`, 18, 71);
+    doc.text(`Delivery: ${modernCustAddr}`, 18, 75);
 
     // Project Details
     doc.setFillColor(245, 245, 244);
@@ -3213,12 +3476,12 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(17, 24, 39);
-    doc.text(job.title, 111, 62);
+    doc.text(projectTitle, 111, 62);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(75, 85, 99);
-    const splitProjDesc = doc.splitTextToSize(job.description || "Custom hand-crafted carpentry order.", blockWidth - 8);
+    const splitProjDesc = doc.splitTextToSize(projectDescription || "Custom hand-crafted carpentry order.", blockWidth - 8);
     doc.text(splitProjDesc, 111, 67);
     doc.text(`Workshop Timeline: ${job.startDate} to ${job.dueDate}`, 111, 75);
 
@@ -3237,7 +3500,7 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(31, 41, 55);
-    doc.text("Bespoke Workshop Commission Fee", 19, tableY + 14);
+    doc.text(projectTitle, 19, tableY + 14);
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
@@ -3251,7 +3514,7 @@ export function buildInvoicePdfContent(
     
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(31, 41, 55);
-    const quotePriceStr = `Le ${job.quoteAmount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
+    const quotePriceStr = `Le ${commissionAmount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
     doc.text(quotePriceStr, 191, tableY + 14, { align: 'right' });
 
     doc.setDrawColor(209, 213, 219);
