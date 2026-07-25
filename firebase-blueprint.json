@@ -1,0 +1,153 @@
+{
+  "entities": {
+    "inventory": {
+      "title": "Inventory Item",
+      "description": "Lumber, plywood, hardware, finishes and raw materials in stock",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "currentStock": { "type": "number" },
+        "minStockThreshold": { "type": "number" },
+        "unitCost": { "type": "number" },
+        "lastUpdated": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "unit", "currentStock"]
+    },
+    "customers": {
+      "title": "Customer",
+      "description": "Workshop client records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "company": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "notes": { "type": "string" },
+        "registrationDate": { "type": "string" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "employees": {
+      "title": "Employee",
+      "description": "Carpenters, carvers, polishers, and staff",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "status": { "type": "string" },
+        "baseSalary": { "type": "number" },
+        "dailyRate": { "type": "number" },
+        "hireDate": { "type": "string" }
+      },
+      "required": ["id", "name", "role"]
+    },
+    "jobs": {
+      "title": "Job",
+      "description": "Woodwork projects, commissions, quotes and order tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "startDate": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "quoteAmount": { "type": "number" },
+        "laborCost": { "type": "number" },
+        "otherCosts": { "type": "number" }
+      },
+      "required": ["id", "title", "customerName", "status"]
+    },
+    "inventoryTransactions": {
+      "title": "Inventory Transaction",
+      "description": "Inwards lumber logs and outwards material consumption",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "type": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unitCost": { "type": "number" },
+        "totalValue": { "type": "number" },
+        "date": { "type": "string" },
+        "purpose": { "type": "string" }
+      },
+      "required": ["id", "itemId", "type", "quantity"]
+    },
+    "financialTransactions": {
+      "title": "Financial Transaction",
+      "description": "Workshop ledger incomes and expenditures",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "type", "category", "amount", "date"]
+    },
+    "dailyWorkLogs": {
+      "title": "Daily Work Log",
+      "description": "Staff daily duty logs and progress reports",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "date": { "type": "string" },
+        "comment": { "type": "string" }
+      },
+      "required": ["id", "employeeId", "date"]
+    },
+    "registrationRequests": {
+      "title": "Registration Request",
+      "description": "Staff account requests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "name", "email"]
+    },
+    "warningLetters": {
+      "title": "Warning Letter",
+      "description": "HR discipline records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "employeeId", "date"]
+    },
+    "savedInvoices": {
+      "title": "Saved Invoice",
+      "description": "Stored receipt and invoice records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNo": { "type": "string" },
+        "customerName": { "type": "string" },
+        "subtotal": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "invoiceNo", "customerName"]
+    }
+  }
+}

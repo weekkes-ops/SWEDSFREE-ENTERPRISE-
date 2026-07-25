@@ -38,6 +38,7 @@ import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
 
 // Seed data & types
+import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments } from './lib/firestoreService';
 import { 
   INITIAL_INVENTORY, 
   INITIAL_CUSTOMERS, 
@@ -191,113 +192,63 @@ export default function App() {
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>([]);
   const [warningLetters, setWarningLetters] = useState<WarningLetter[]>([]);
 
-  // 1. Initial Load from localStorage or Seeds
+  // 1. Initial Load & Real-Time Sync from Firestore Database
   useEffect(() => {
-    try {
-      const localInv = localStorage.getItem('swedsfree_inventory');
-      const parsedInv = localInv ? JSON.parse(localInv) : null;
-      if (parsedInv && Array.isArray(parsedInv) && parsedInv.length > 0) setInventory(parsedInv);
-      else setInventory(INITIAL_INVENTORY);
-    } catch (e) {
-      setInventory(INITIAL_INVENTORY);
-    }
+    const unsubs: (() => void)[] = [];
 
-    try {
-      const localCust = localStorage.getItem('swedsfree_customers');
-      const parsedCust = localCust ? JSON.parse(localCust) : null;
-      if (parsedCust && Array.isArray(parsedCust) && parsedCust.length > 0) setCustomers(parsedCust);
-      else setCustomers(INITIAL_CUSTOMERS);
-    } catch (e) {
-      setCustomers(INITIAL_CUSTOMERS);
-    }
+    // Generic helper to subscribe to a collection and auto-seed/migrate if empty
+    const syncCollection = <T extends { id: string }>(
+      collectionName: string,
+      setter: React.Dispatch<React.SetStateAction<T[]>>,
+      localKey: string,
+      initialSeed: T[]
+    ) => {
+      let hasSeeded = false;
+      const unsub = subscribeToCollection<T>(collectionName, (items) => {
+        if (items && items.length > 0) {
+          setter(items);
+          localStorage.setItem(localKey, JSON.stringify(items));
+        } else if (!hasSeeded) {
+          hasSeeded = true;
+          let existingLocal: T[] = [];
+          try {
+            const raw = localStorage.getItem(localKey);
+            if (raw) existingLocal = JSON.parse(raw);
+          } catch (e) {}
 
-    let hasOldNames = false;
-    let finalEmployees = INITIAL_EMPLOYEES;
-    const localEmp = localStorage.getItem('swedsfree_employees');
-    if (localEmp) {
-      try {
-        const parsed = JSON.parse(localEmp);
-        hasOldNames = parsed.some((e: any) => e.name === 'Alimamy Kamara' || e.name === 'Emmanuel Cole');
-        if (hasOldNames) {
-          localStorage.removeItem('swedsfree_current_user');
-          finalEmployees = INITIAL_EMPLOYEES;
-          localStorage.setItem('swedsfree_employees', JSON.stringify(INITIAL_EMPLOYEES));
-        } else if (Array.isArray(parsed) && parsed.length > 0) {
-          finalEmployees = parsed;
+          const dataToSave = (existingLocal && existingLocal.length > 0) ? existingLocal : initialSeed;
+          if (dataToSave && dataToSave.length > 0) {
+            setter(dataToSave);
+            saveBatchDocuments(collectionName, dataToSave);
+          }
         }
-      } catch (e) {
-        finalEmployees = INITIAL_EMPLOYEES;
-      }
-    } else {
-      localStorage.setItem('swedsfree_employees', JSON.stringify(INITIAL_EMPLOYEES));
-    }
-    setEmployees(finalEmployees);
+      });
+      unsubs.push(unsub);
+    };
 
-    try {
-      const localJobs = localStorage.getItem('swedsfree_jobs');
-      const parsedJobs = localJobs ? JSON.parse(localJobs) : null;
-      if (parsedJobs && Array.isArray(parsedJobs) && parsedJobs.length > 0) setJobs(parsedJobs);
-      else setJobs(INITIAL_JOBS);
-    } catch (e) {
-      setJobs(INITIAL_JOBS);
-    }
+    syncCollection('inventory', setInventory, 'swedsfree_inventory', INITIAL_INVENTORY);
+    syncCollection('customers', setCustomers, 'swedsfree_customers', INITIAL_CUSTOMERS);
+    syncCollection('employees', setEmployees, 'swedsfree_employees', INITIAL_EMPLOYEES);
+    syncCollection('jobs', setJobs, 'swedsfree_jobs', INITIAL_JOBS);
+    syncCollection('inventoryTransactions', setInventoryTransactions, 'swedsfree_inv_transactions', INITIAL_INVENTORY_TRANSACTIONS);
+    syncCollection('financialTransactions', setFinancialTransactions, 'swedsfree_fin_transactions', INITIAL_FINANCIALS);
+    syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs', INITIAL_DAILY_WORK_LOGS);
+    syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests', []);
+    syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters', []);
 
-    try {
-      const localInvTx = localStorage.getItem('swedsfree_inv_transactions');
-      const parsedInvTx = localInvTx ? JSON.parse(localInvTx) : null;
-      if (parsedInvTx && Array.isArray(parsedInvTx) && parsedInvTx.length > 0) setInventoryTransactions(parsedInvTx);
-      else setInventoryTransactions(INITIAL_INVENTORY_TRANSACTIONS);
-    } catch (e) {
-      setInventoryTransactions(INITIAL_INVENTORY_TRANSACTIONS);
-    }
-
-    try {
-      const localFinTx = localStorage.getItem('swedsfree_fin_transactions');
-      const parsedFinTx = localFinTx ? JSON.parse(localFinTx) : null;
-      if (parsedFinTx && Array.isArray(parsedFinTx) && parsedFinTx.length > 0) setFinancialTransactions(parsedFinTx);
-      else setFinancialTransactions(INITIAL_FINANCIALS);
-    } catch (e) {
-      setFinancialTransactions(INITIAL_FINANCIALS);
-    }
-
-    try {
-      const localWorkLogs = localStorage.getItem('swedsfree_daily_work_logs');
-      const parsedWorkLogs = localWorkLogs ? JSON.parse(localWorkLogs) : null;
-      if (parsedWorkLogs && Array.isArray(parsedWorkLogs) && parsedWorkLogs.length > 0) setDailyWorkLogs(parsedWorkLogs);
-      else setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
-    } catch (e) {
-      setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
-    }
-
-    try {
-      const localWarnings = localStorage.getItem('swedsfree_warning_letters');
-      if (localWarnings) setWarningLetters(JSON.parse(localWarnings));
-      else setWarningLetters([]);
-    } catch (e) {
-      setWarningLetters([]);
-    }
-
-    const localRequests = localStorage.getItem('swedsfree_registration_requests');
-    if (localRequests) {
-      setRegistrationRequests(JSON.parse(localRequests));
-    } else {
-      setRegistrationRequests([]);
-      localStorage.setItem('swedsfree_registration_requests', JSON.stringify([]));
-    }
-
+    // Load logged in user
     const localUser = localStorage.getItem('swedsfree_current_user');
     if (localUser) {
       try {
-        if (hasOldNames) {
-          localStorage.removeItem('swedsfree_current_user');
-          setCurrentUser(null);
-        } else {
-          setCurrentUser(JSON.parse(localUser));
-        }
+        setCurrentUser(JSON.parse(localUser));
       } catch (e) {
         console.error(e);
       }
     }
+
+    return () => {
+      unsubs.forEach(unsub => unsub());
+    };
   }, []);
 
   // Sync current user to localStorage
@@ -369,8 +320,19 @@ export default function App() {
       setDailyWorkLogs(INITIAL_DAILY_WORK_LOGS);
       setWarningLetters([]);
       setRegistrationRequests([]);
+
+      saveBatchDocuments('inventory', INITIAL_INVENTORY);
+      saveBatchDocuments('customers', INITIAL_CUSTOMERS);
+      saveBatchDocuments('employees', INITIAL_EMPLOYEES);
+      saveBatchDocuments('jobs', INITIAL_JOBS);
+      saveBatchDocuments('inventoryTransactions', INITIAL_INVENTORY_TRANSACTIONS);
+      saveBatchDocuments('financialTransactions', INITIAL_FINANCIALS);
+      saveBatchDocuments('dailyWorkLogs', INITIAL_DAILY_WORK_LOGS);
+      saveBatchDocuments('registrationRequests', []);
+      saveBatchDocuments('warningLetters', []);
+
       setActiveTab('dashboard');
-      alert('Database successfully restored with sample records for Woodwork Jobs, Customers, Inventory, Financials, and Work Logs!');
+      alert('Database successfully restored with sample records in Cloud Firestore for Woodwork Jobs, Customers, Inventory, Financials, and Work Logs!');
     }
   };
 
@@ -388,6 +350,7 @@ export default function App() {
       lastUpdated: dateStr
     };
     setInventory(prev => [newItem, ...prev]);
+    saveDocument('inventory', newItem);
 
     // Log inwards transaction & financial expenditure if initial stock > 0
     if (item.currentStock > 0) {
@@ -405,6 +368,7 @@ export default function App() {
         purpose: 'Initial Stock Registration'
       };
       setInventoryTransactions(prev => [...prev, initTx]);
+      saveDocument('inventoryTransactions', initTx);
 
       const finId = `fin-inv-init-${Date.now()}`;
       const finTx: FinancialTransaction = {
@@ -417,6 +381,7 @@ export default function App() {
         referenceId: txId
       };
       setFinancialTransactions(prev => [...prev, finTx]);
+      saveDocument('financialTransactions', finTx);
     }
   };
 
@@ -434,17 +399,20 @@ export default function App() {
     setInventory(prev => prev.map(item => {
       if (item.id === tx.itemId) {
         const stockDiff = tx.type === 'INWARDS' ? tx.quantity : -tx.quantity;
-        return {
+        const updatedItem = {
           ...item,
           currentStock: Math.max(0, item.currentStock + stockDiff),
           lastUpdated: dateStr
         };
+        saveDocument('inventory', updatedItem);
+        return updatedItem;
       }
       return item;
     }));
 
     // 2. Append transaction log
     setInventoryTransactions(prev => [...prev, newTx]);
+    saveDocument('inventoryTransactions', newTx);
 
     // 3. Post to Financial Ledger correctly (avoiding treating internal consumption as scrap sales income)
     const financialId = `fin-inv-${Date.now()}`;
@@ -486,6 +454,7 @@ export default function App() {
       referenceId: transactionId
     };
     setFinancialTransactions(prev => [...prev, newFinTx]);
+    saveDocument('financialTransactions', newFinTx);
   };
 
   // B. Customer mutators
@@ -496,6 +465,7 @@ export default function App() {
       registrationDate: new Date().toISOString().split('T')[0]
     };
     setCustomers(prev => [...prev, newCustomer]);
+    saveDocument('customers', newCustomer);
   };
 
   // C. Employee mutators
@@ -506,11 +476,16 @@ export default function App() {
       hireDate: new Date().toISOString().split('T')[0]
     };
     setEmployees(prev => [...prev, newEmployee]);
+    saveDocument('employees', newEmployee);
   };
 
   const handleUpdateEmployeeStatus = (id: string, status: EmployeeStatus) => {
     setEmployees(prev => prev.map(emp => {
-      if (emp.id === id) return { ...emp, status };
+      if (emp.id === id) {
+        const updated = { ...emp, status };
+        saveDocument('employees', updated);
+        return updated;
+      }
       return emp;
     }));
   };
@@ -524,15 +499,21 @@ export default function App() {
       payments: []
     };
     setJobs(prev => [...prev, newJob]);
+    saveDocument('jobs', newJob);
   };
 
   const handleDeleteJob = (jobId: string) => {
     setJobs(prev => prev.filter(job => job.id !== jobId));
+    deleteDocument('jobs', jobId);
   };
 
   const handleUpdateJobStatus = (id: string, status: JobStatus) => {
     setJobs(prev => prev.map(job => {
-      if (job.id === id) return { ...job, status };
+      if (job.id === id) {
+        const updated = { ...job, status };
+        saveDocument('jobs', updated);
+        return updated;
+      }
       return job;
     }));
   };
@@ -545,11 +526,13 @@ export default function App() {
     // 1. Subtract from core inventory reserves
     setInventory(prev => prev.map(item => {
       if (item.id === jobMaterial.itemId) {
-        return {
+        const updatedItem = {
           ...item,
           currentStock: Math.max(0, item.currentStock - jobMaterial.quantity),
           lastUpdated: dateStr
         };
+        saveDocument('inventory', updatedItem);
+        return updatedItem;
       }
       return item;
     }));
@@ -568,14 +551,17 @@ export default function App() {
       referenceId: jobId
     };
     setInventoryTransactions(prev => [...prev, invTx]);
+    saveDocument('inventoryTransactions', invTx);
 
     // 3. Append to Job material consumption list
     setJobs(prev => prev.map(job => {
       if (job.id === jobId) {
-        return {
+        const updatedJob = {
           ...job,
           materialsUsed: [...job.materialsUsed, jobMaterial]
         };
+        saveDocument('jobs', updatedJob);
+        return updatedJob;
       }
       return job;
     }));
@@ -592,6 +578,7 @@ export default function App() {
       referenceId: jobId
     };
     setFinancialTransactions(prev => [...prev, finTx]);
+    saveDocument('financialTransactions', finTx);
   };
 
   // Record Payment received from customer on custom woodwork job
@@ -607,10 +594,12 @@ export default function App() {
     // 1. Log payment inside job object
     setJobs(prev => prev.map(job => {
       if (job.id === jobId) {
-        return {
+        const updatedJob = {
           ...job,
           payments: [...job.payments, newPayment]
         };
+        saveDocument('jobs', updatedJob);
+        return updatedJob;
       }
       return job;
     }));
@@ -627,6 +616,7 @@ export default function App() {
       referenceId: jobId
     };
     setFinancialTransactions(prev => [...prev, finTx]);
+    saveDocument('financialTransactions', finTx);
   };
 
   // E. Manual financial ledger mutators
@@ -636,14 +626,17 @@ export default function App() {
       id: `fin-manual-${Date.now()}`
     };
     setFinancialTransactions(prev => [...prev, newTx]);
+    saveDocument('financialTransactions', newTx);
   };
 
   const handleUpdateFinancialTransaction = (updatedTx: FinancialTransaction) => {
     setFinancialTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
+    saveDocument('financialTransactions', updatedTx);
   };
 
   const handleDeleteFinancialTransaction = (id: string) => {
     setFinancialTransactions(prev => prev.filter(t => t.id !== id));
+    deleteDocument('financialTransactions', id);
   };
 
   // F. Daily work upload mutators
@@ -653,6 +646,7 @@ export default function App() {
       id: `log-${Date.now()}`
     };
     setDailyWorkLogs(prev => [newLog, ...prev]);
+    saveDocument('dailyWorkLogs', newLog);
   };
 
   // Record Warning Letter
@@ -662,6 +656,7 @@ export default function App() {
       id: `warn-${Date.now()}`
     };
     setWarningLetters(prev => [newWarning, ...prev]);
+    saveDocument('warningLetters', newWarning);
   };
 
   // Record Updators
@@ -669,6 +664,7 @@ export default function App() {
     const originalItem = inventory.find(item => item.id === updatedItem.id);
     
     setInventory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
+    saveDocument('inventory', updatedItem);
 
     // Log adjustment if stock level changed
     if (originalItem && originalItem.currentStock !== updatedItem.currentStock) {
@@ -692,6 +688,7 @@ export default function App() {
         purpose: `Manual Stock Adjustment (${originalItem.currentStock} -> ${updatedItem.currentStock})`
       };
       setInventoryTransactions(prev => [...prev, adjTx]);
+      saveDocument('inventoryTransactions', adjTx);
 
       // Post the adjustment to the financial ledger as EXPENDITURE/Loss
       const finId = `fin-inv-adj-${Date.now()}`;
@@ -705,33 +702,46 @@ export default function App() {
         referenceId: txId
       };
       setFinancialTransactions(prev => [...prev, finTx]);
+      saveDocument('financialTransactions', finTx);
     }
   };
 
   const handleDeleteInventoryItem = (id: string) => {
     setInventory(prev => prev.filter(item => item.id !== id));
+    deleteDocument('inventory', id);
   };
 
   const handleUpdateCustomer = (updatedCustomer: Customer) => {
     setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
-    setJobs(prev => prev.map(j => j.customerId === updatedCustomer.id ? { ...j, customerName: updatedCustomer.name } : j));
+    saveDocument('customers', updatedCustomer);
+    setJobs(prev => prev.map(j => {
+      if (j.customerId === updatedCustomer.id) {
+        const updatedJ = { ...j, customerName: updatedCustomer.name };
+        saveDocument('jobs', updatedJ);
+        return updatedJ;
+      }
+      return j;
+    }));
   };
 
   const handleUpdateEmployee = (updatedEmployee: Employee) => {
     setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
+    saveDocument('employees', updatedEmployee);
   };
 
   const handleUpdateJob = (updatedJob: Job) => {
     setJobs(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
+    saveDocument('jobs', updatedJob);
   };
 
   const handleDeleteCustomer = (id: string) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
-    // Also, clear/adjust jobs that might refer to this customer or keep them as is
+    deleteDocument('customers', id);
   };
 
   const handleDeleteEmployee = (id: string) => {
     setEmployees(prev => prev.filter(emp => emp.id !== id));
+    deleteDocument('employees', id);
   };
 
   // G. Registration request and approval handlers
@@ -747,6 +757,7 @@ export default function App() {
       requestDate: new Date().toISOString().split('T')[0]
     };
     setRegistrationRequests(prev => [newRequest, ...prev]);
+    saveDocument('registrationRequests', newRequest);
   };
 
   const handleApproveRequest = (requestId: string) => {
@@ -783,11 +794,19 @@ export default function App() {
     };
 
     setEmployees(prev => [newEmp, ...prev]);
-    setRegistrationRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'Approved' } : r));
+    saveDocument('employees', newEmp);
+    const updatedReq: RegistrationRequest = { ...req, status: 'Approved' };
+    setRegistrationRequests(prev => prev.map(r => r.id === requestId ? updatedReq : r));
+    saveDocument('registrationRequests', updatedReq);
   };
 
   const handleRejectRequest = (requestId: string) => {
-    setRegistrationRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'Rejected' } : r));
+    const req = registrationRequests.find(r => r.id === requestId);
+    if (req) {
+      const updatedReq: RegistrationRequest = { ...req, status: 'Rejected' };
+      setRegistrationRequests(prev => prev.map(r => r.id === requestId ? updatedReq : r));
+      saveDocument('registrationRequests', updatedReq);
+    }
   };
 
   // Handle auto shortcuts redirection

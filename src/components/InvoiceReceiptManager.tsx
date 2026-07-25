@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { Job, Customer, Employee, formatCurrency, JobPayment, FinancialCategory, SavedInvoice, SavedInvoiceItem } from '../types';
+import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments } from '../lib/firestoreService';
 import { 
   FileText, 
   Receipt, 
@@ -85,6 +86,28 @@ export default function InvoiceReceiptManager({
     }
     return [];
   });
+
+  useEffect(() => {
+    let seeded = false;
+    const unsub = subscribeToCollection<SavedInvoice>('savedInvoices', (items) => {
+      if (items.length > 0) {
+        setSavedInvoices(items);
+        localStorage.setItem('swedswood_saved_invoices', JSON.stringify(items));
+      } else if (!seeded) {
+        seeded = true;
+        let localItems: SavedInvoice[] = [];
+        try {
+          const raw = localStorage.getItem('swedswood_saved_invoices');
+          if (raw) localItems = JSON.parse(raw);
+        } catch (e) {}
+        if (localItems && localItems.length > 0) {
+          setSavedInvoices(localItems);
+          saveBatchDocuments('savedInvoices', localItems);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const [editingSavedInvoiceId, setEditingSavedInvoiceId] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState<string | null>(null);
@@ -515,6 +538,8 @@ export default function InvoiceReceiptManager({
       return [newRecord, ...prev];
     });
 
+    saveDocument('savedInvoices', newRecord);
+
     if (activeInvoice && onUpdateJob) {
       onUpdateJob({
         ...activeInvoice,
@@ -643,6 +668,7 @@ export default function InvoiceReceiptManager({
 
   const handleDeleteSavedInvoice = (id: string) => {
     setSavedInvoices(prev => prev.filter(inv => inv.id !== id));
+    deleteDocument('savedInvoices', id);
     if (editingSavedInvoiceId === id) {
       setEditingSavedInvoiceId(null);
     }
@@ -652,6 +678,11 @@ export default function InvoiceReceiptManager({
   };
 
   const handleUpdateInvoiceStatus = (id: string, newStatus: SavedInvoice['status']) => {
+    const inv = savedInvoices.find(s => s.id === id);
+    if (inv) {
+      const updated = { ...inv, status: newStatus, lastUpdated: new Date().toISOString() };
+      saveDocument('savedInvoices', updated);
+    }
     setSavedInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: newStatus, lastUpdated: new Date().toISOString() } : inv));
     if (editingSavedInvoiceId === id) {
       setInvoiceStatus(newStatus);
