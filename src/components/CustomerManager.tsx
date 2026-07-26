@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Customer, Job, Employee, JobPayment, formatCurrency } from '../types';
+import { DEFAULT_300X300_SIGNATURE, DEFAULT_300X300_STAMP } from './InvoiceReceiptManager';
 import { 
   Plus, 
   Search, 
@@ -269,10 +270,10 @@ export default function CustomerManager({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs">
         <div>
           <h1 className="text-2xl font-display font-bold text-wood-900 tracking-tight">
-            Client Directory & Installments
+            Clients/Customers
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Register clients, track commission schedules, and record payment installments with full persistence.
+            Register clients/customers, track commission schedules, and record payment installments with full persistence.
           </p>
         </div>
         
@@ -934,9 +935,34 @@ export default function CustomerManager({
                   </div>
                 </div>
 
-                {/* Footer Signature */}
-                <div className="pt-4 border-t border-gray-200 text-center text-[10px] text-gray-400 space-y-1">
-                  <p className="font-semibold text-gray-600">Authorized Signature: _______________________</p>
+                {/* Footer 300x300 Signature & Official Stamp */}
+                <div className="pt-4 border-t border-gray-200 grid grid-cols-2 gap-4 items-end text-[10px] text-gray-500">
+                  <div className="space-y-1 text-center">
+                    <p className="font-bold text-gray-700 uppercase tracking-wider text-[9px]">Authorized Signature:</p>
+                    <div className="w-24 h-24 mx-auto border border-dashed border-blue-200 rounded bg-blue-50/20 p-1 flex items-center justify-center">
+                      <img
+                        src={localStorage.getItem('swedswood_signature_300') || DEFAULT_300X300_SIGNATURE}
+                        alt="300x300 Authorized Signature"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                    <p className="text-[8px] font-mono text-gray-400">300×300 PX SIGNATURE</p>
+                  </div>
+
+                  <div className="space-y-1 text-center">
+                    <p className="font-bold text-red-800 uppercase tracking-wider text-[9px]">Official Stamp / Seal:</p>
+                    <div className="w-24 h-24 mx-auto border border-dashed border-red-200 rounded bg-red-50/20 p-1 flex items-center justify-center">
+                      <img
+                        src={localStorage.getItem('swedswood_stamp_300') || DEFAULT_300X300_STAMP}
+                        alt="300x300 Official Stamp"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                    <p className="text-[8px] font-mono text-red-700">300×300 PX STAMP</p>
+                  </div>
+                </div>
+
+                <div className="text-center text-[10px] text-gray-400 font-semibold pt-2">
                   <p>Thank you for choosing Swedswood Enterprise!</p>
                 </div>
 

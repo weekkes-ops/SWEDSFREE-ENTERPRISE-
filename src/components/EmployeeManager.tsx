@@ -200,7 +200,7 @@ export default function EmployeeManager({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs">
         <div>
           <h1 className="text-2xl font-display font-bold text-wood-900 tracking-tight">
-            Artisans & Woodworkers Registry
+            Employees Registry
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Register and manage Swedsfree craftsmen, designers, and polishing specialists.

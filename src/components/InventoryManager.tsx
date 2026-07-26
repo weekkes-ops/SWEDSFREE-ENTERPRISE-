@@ -181,7 +181,7 @@ export default function InventoryManager({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs">
         <div>
           <h1 className="text-2xl font-display font-bold text-wood-900 tracking-tight">
-            Inventory & Raw Materials
+            Inventory
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Track incoming supplies and outgoing material logs for bespoke woodwork production.

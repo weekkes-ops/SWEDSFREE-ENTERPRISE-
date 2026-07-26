@@ -449,7 +449,7 @@ export default function DashboardOverview({
                     }}
                     className="flex items-center justify-between p-3 rounded-xl bg-wood-600 hover:bg-wood-700 transition text-sm font-medium text-white shadow-xs"
                   >
-                    <span>Initiate Woodwork Job</span>
+                    <span>Initiate Job</span>
                     <Wrench className="w-4 h-4" />
                   </button>
                 </>

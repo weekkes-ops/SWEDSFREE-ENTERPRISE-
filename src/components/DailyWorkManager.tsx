@@ -388,7 +388,7 @@ export default function DailyWorkManager({
 
                 {/* Associated Job (optional) */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 block">Associated Woodwork Job (Optional)</label>
+                  <label className="text-xs font-bold text-slate-300 block">Associated Job (Optional)</label>
                   <select
                     value={jobId}
                     onChange={(e) => setJobId(e.target.value)}

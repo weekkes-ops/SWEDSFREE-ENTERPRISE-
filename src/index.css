@@ -241,7 +241,7 @@ button.bg-wood-700:hover {
 }
 
 /* ==========================================================
-   REFINE PROFESSIONAL PRINT STYLESHEET
+   REFINE PROFESSIONAL PRINT STYLESHEET (WHITE FONT ON PRINTOUT)
    ========================================================== */
 @media print {
   /* Set document size and printable margins */
@@ -250,11 +250,11 @@ button.bg-wood-700:hover {
     margin: 1.6cm !important;
   }
 
-  /* Reset layout for white printing paper */
+  /* Reset layout for invoice printout with white font */
   html, body {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
-    color: #0f172a !important;
+    background-color: #020617 !important;
+    background: #020617 !important;
+    color: #ffffff !important;
     font-size: 11pt !important;
     line-height: 1.4 !important;
     margin: 0 !important;
@@ -263,7 +263,7 @@ button.bg-wood-700:hover {
     print-color-adjust: exact !important;
   }
 
-  /* Undo dark mode glassmorphic styles for print-area content */
+  /* Ensure print-area content and containers use white font color */
   .bg-white,
   .bg-slate-950,
   .bg-slate-900,
@@ -281,26 +281,27 @@ button.bg-wood-700:hover {
   .bg-blue-50,
   .bg-red-50,
   .bg-purple-50,
+  .sweds-paper-invoice,
   #print-area {
-    background-color: #ffffff !important;
-    background: #ffffff !important;
-    color: #0f172a !important;
-    border-color: #cbd5e1 !important;
+    background-color: #020617 !important;
+    background: #020617 !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
     box-shadow: none !important;
     text-shadow: none !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
   }
 
-  /* Soft gray shading for table header or specific callouts on print */
+  /* Table headers and callouts on print */
   .bg-gray-100,
   .bg-slate-100,
   .bg-wood-100,
   thead,
   tr.bg-gray-50 {
-    background-color: #f1f5f9 !important;
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
+    background-color: #0f172a !important;
+    background: #0f172a !important;
+    color: #ffffff !important;
   }
 
   /* Clean solid borders for printing */
@@ -314,29 +315,27 @@ button.bg-wood-700:hover {
   .border-wood-100,
   .border-slate-200,
   .divide-y > * {
-    border-color: #94a3b8 !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
     border-width: 1px !important;
   }
 
-  /* Text colors for black ink */
-  h1, h2, h3, h4, h5, h6, strong, b, td, th {
-    color: #0f172a !important;
-    font-weight: bold !important;
+  /* White text colors for all headings, text, and cells */
+  h1, h2, h3, h4, h5, h6, strong, b, td, th, p, span, div, li, option, label {
+    color: #ffffff !important;
   }
 
-  p, span, div, li, option {
-    color: #334155 !important;
-  }
-
-  /* Branded color accents for print - fine elegant deep gold/amber */
+  /* Branded color accents for print - glowing golden-amber */
   .text-amber-500,
   .text-amber-400,
   .text-wood-900,
   .text-wood-800,
-  .text-wood-600,
+  .text-wood-600 {
+    color: #fbbf24 !important;
+  }
+
   .text-emerald-700,
   .text-emerald-800 {
-    color: #78350f !important; /* deep golden-brown for print legibility */
+    color: #34d399 !important;
   }
 
   /* Hide UI elements on print */
@@ -367,7 +366,7 @@ button.bg-wood-700:hover {
     display: flex !important;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 2px solid #78350f !important;
+    border-bottom: 2px solid #f59e0b !important;
     padding-bottom: 12px;
     margin-bottom: 24px;
   }
@@ -380,8 +379,8 @@ button.bg-wood-700:hover {
     right: 0;
     text-align: center;
     font-size: 8pt !important;
-    color: #64748b !important;
-    border-top: 1px solid #cbd5e1 !important;
+    color: #94a3b8 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
     padding-top: 8px;
   }
 

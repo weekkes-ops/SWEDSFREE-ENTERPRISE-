@@ -50,6 +50,24 @@ export interface CustomInvoiceItem {
   unitPrice?: number;
 }
 
+export interface UploadedDocumentItem {
+  id: string;
+  jobId: string;
+  docType: 'INVOICE' | 'RECEIPT';
+  fileName: string;
+  fileType: 'image' | 'pdf';
+  fileDataUrl: string;
+  fileSize?: string;
+  uploadedAt: string;
+  notes?: string;
+}
+
+// Default 300x300 Pixel Authorized Signature (SVG Data URL)
+export const DEFAULT_300X300_SIGNATURE = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="none"/><g transform="translate(15, 25)"><path d="M 25 150 C 55 60, 85 200, 115 90 C 130 50, 140 170, 160 130 C 175 100, 190 180, 220 120 C 235 90, 250 160, 265 110" fill="none" stroke="%231e3a8a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M 20 185 Q 140 220 270 165" fill="none" stroke="%231e3a8a" stroke-width="3" stroke-linecap="round"/><path d="M 170 175 L 255 175" fill="none" stroke="%231e3a8a" stroke-width="2.5" stroke-dasharray="6 3"/><text x="145" y="235" font-family="'Courier New', Courier, monospace" font-size="12" font-weight="bold" fill="%231e3a8a" text-anchor="middle" letter-spacing="1">AUTHENTICATED SIGNATURE</text><text x="145" y="252" font-family="sans-serif" font-size="9" font-weight="bold" fill="%2364748b" text-anchor="middle">300 x 300 PX OFFICIAL SIGNATURE</text></g></svg>`;
+
+// Default 300x300 Pixel Official Stamp / Seal (SVG Data URL)
+export const DEFAULT_300X300_STAMP = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="none"/><g transform="rotate(-10 150 150)"><circle cx="150" cy="150" r="138" fill="none" stroke="%23991b1b" stroke-width="6"/><circle cx="150" cy="150" r="126" fill="none" stroke="%23991b1b" stroke-width="2.5" stroke-dasharray="8 5"/><path id="stampTopArc" d="M 35 150 A 115 115 0 0 1 265 150" fill="none"/><text font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="900" fill="%23991b1b" letter-spacing="2.5"><textPath href="%23stampTopArc" startOffset="50%" text-anchor="middle">SWED WOOD WORK</textPath></text><path id="stampBotArc" d="M 265 150 A 115 115 0 0 1 35 150" fill="none"/><text font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="800" fill="%23991b1b" letter-spacing="1.5"><textPath href="%23stampBotArc" startOffset="50%" text-anchor="middle">FREETOWN • SIERRA LEONE</textPath></text><circle cx="150" cy="150" r="88" fill="none" stroke="%23991b1b" stroke-width="3"/><rect x="35" y="122" width="230" height="56" fill="%23991b1b" rx="6"/><text x="150" y="157" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="900" fill="%23ffffff" text-anchor="middle" letter-spacing="2">OFFICIAL STAMP</text><text x="65" y="112" font-family="sans-serif" font-size="16" fill="%23991b1b">★</text><text x="220" y="112" font-family="sans-serif" font-size="16" fill="%23991b1b">★</text><text x="150" y="206" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="800" fill="%23991b1b" text-anchor="middle" letter-spacing="1">AUDITED & CLEARED</text><text x="150" y="222" font-family="monospace" font-size="10" font-weight="bold" fill="%23991b1b" text-anchor="middle">300x300 OFFICIAL SEAL</text></g></svg>`;
+
 interface InvoiceReceiptManagerProps {
   jobs: Job[];
   customers: Customer[];
@@ -175,6 +193,224 @@ export default function InvoiceReceiptManager({
   const [newCustomItemQty, setNewCustomItemQty] = useState<number | string>(1);
   const [newCustomItemUnitPrice, setNewCustomItemUnitPrice] = useState<number | string>(0);
   const [invoiceProjectQty, setInvoiceProjectQty] = useState<number | string>(1);
+
+  // ==========================================
+  // 300x300 SIGNATURE & STAMP IMAGE STATES
+  // ==========================================
+  const [signatureImageUrl, setSignatureImageUrl] = useState<string>(() => {
+    return localStorage.getItem('swedswood_signature_300') || DEFAULT_300X300_SIGNATURE;
+  });
+  const [stampImageUrl, setStampImageUrl] = useState<string>(() => {
+    return localStorage.getItem('swedswood_stamp_300') || DEFAULT_300X300_STAMP;
+  });
+  const [showSignature, setShowSignature] = useState<boolean>(true);
+  const [showStamp, setShowStamp] = useState<boolean>(true);
+
+  // Helper to normalize any uploaded signature/stamp image file to exactly 300x300 pixels
+  const handleImageUpload300 = (e: ChangeEvent<HTMLInputElement>, type: 'signature' | 'stamp') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 300;
+        canvas.height = 300;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, 300, 300);
+          
+          const aspect = img.width / img.height;
+          let drawW = 300;
+          let drawH = 300;
+          let offsetX = 0;
+          let offsetY = 0;
+          if (aspect > 1) {
+            drawH = 300 / aspect;
+            offsetY = (300 - drawH) / 2;
+          } else {
+            drawW = 300 * aspect;
+            offsetX = (300 - drawW) / 2;
+          }
+          ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+          const dataUrl = canvas.toDataURL('image/png');
+          if (type === 'signature') {
+            setSignatureImageUrl(dataUrl);
+            localStorage.setItem('swedswood_signature_300', dataUrl);
+          } else {
+            setStampImageUrl(dataUrl);
+            localStorage.setItem('swedswood_stamp_300', dataUrl);
+          }
+        }
+      };
+      if (event.target?.result) img.src = event.target.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleReset300x300Images = () => {
+    setSignatureImageUrl(DEFAULT_300X300_SIGNATURE);
+    setStampImageUrl(DEFAULT_300X300_STAMP);
+    localStorage.removeItem('swedswood_signature_300');
+    localStorage.removeItem('swedswood_stamp_300');
+  };
+
+  // ==========================================
+  // UPLOADED INVOICE / RECEIPT DOCUMENTS STATE
+  // ==========================================
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocumentItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('swedswood_uploaded_docs');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('swedswood_uploaded_docs', JSON.stringify(uploadedDocs));
+    } catch (e) {
+      console.error("Failed to store uploaded docs", e);
+    }
+  }, [uploadedDocs]);
+
+  // Active document source in workspace modals: 'TEMPLATE' (Auto-Generated) or 'UPLOADED' (Custom Scan/PDF)
+  const [activeDocSource, setActiveDocSource] = useState<'TEMPLATE' | 'UPLOADED'>('TEMPLATE');
+
+  const handleUploadInvoiceOrReceipt = (e: ChangeEvent<HTMLInputElement>, docType: 'INVOICE' | 'RECEIPT', targetJobId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (!dataUrl) return;
+
+      const fileType = file.type.includes('pdf') ? 'pdf' : 'image';
+      const fileSizeMb = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+
+      const newDoc: UploadedDocumentItem = {
+        id: `DOC-${Date.now()}`,
+        jobId: targetJobId,
+        docType,
+        fileName: file.name,
+        fileType,
+        fileDataUrl: dataUrl,
+        fileSize: fileSizeMb,
+        uploadedAt: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        notes: `Custom uploaded ${docType.toLowerCase()} document scan for printout`
+      };
+
+      setUploadedDocs(prev => [newDoc, ...prev.filter(d => !(d.jobId === targetJobId && d.docType === docType))]);
+      setActiveDocSource('UPLOADED');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveUploadedDoc = (docId: string) => {
+    setUploadedDocs(prev => prev.filter(d => d.id !== docId));
+    setActiveDocSource('TEMPLATE');
+  };
+
+  const handlePrintUploadedDoc = (doc: UploadedDocumentItem) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("Please allow popups to open the print view for this document.");
+      return;
+    }
+    if (doc.fileType === 'image') {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Print ${doc.docType} Scan - ${doc.fileName}</title>
+            <style>
+              body { margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #ffffff; font-family: sans-serif; }
+              img { max-width: 100%; height: auto; max-height: 90vh; object-fit: contain; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 4px; }
+              .header { margin-bottom: 12px; font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+              @media print {
+                body { padding: 0; background: #fff; }
+                .header { display: none; }
+                img { max-height: 100vh; width: 100%; box-shadow: none; border-radius: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">SWEDSWOOD ENTERPRISE - OFFICIAL ${doc.docType} PRINTOUT</div>
+            <img src="${doc.fileDataUrl}" onload="window.print();" />
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } else {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Print ${doc.docType} PDF - ${doc.fileName}</title>
+            <style>
+              html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+              iframe { width: 100%; height: 100%; border: none; }
+            </style>
+          </head>
+          <body>
+            <iframe src="${doc.fileDataUrl}"></iframe>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
+  // Helper to generate or view a 100% Full Payment Clearance Receipt
+  const handleGenerateFullPaymentReceipt = (job: Job) => {
+    const totalPaid = job.payments.reduce((sum, p) => sum + p.amount, 0);
+    const fullAmount = job.quoteAmount || totalPaid || 0;
+    
+    let fullPaymentRecord: JobPayment;
+    if (job.payments.length === 0 && fullAmount > 0) {
+      fullPaymentRecord = {
+        id: `FULL-CLEAR-${Date.now().toString().slice(-6)}`,
+        amount: fullAmount,
+        date: new Date().toISOString().split('T')[0],
+        method: 'Bank Transfer',
+        note: '100% FULL PAYMENT CONTRACT CLEARANCE'
+      };
+      
+      const updatedJob: Job = {
+        ...job,
+        status: 'Completed',
+        payments: [fullPaymentRecord]
+      };
+      
+      if (onUpdateJob) {
+        onUpdateJob(updatedJob);
+      }
+      saveDocument('jobs', updatedJob);
+      
+      setActiveReceipt({
+        job: updatedJob,
+        payment: fullPaymentRecord
+      });
+    } else {
+      fullPaymentRecord = {
+        id: `FULL-REC-${job.id.toUpperCase()}`,
+        amount: Math.max(totalPaid, fullAmount),
+        date: job.payments[job.payments.length - 1]?.date || new Date().toISOString().split('T')[0],
+        method: job.payments[job.payments.length - 1]?.method || 'Bank Transfer',
+        note: 'OFFICIAL 100% FULL PAYMENT CONTRACT CLEARANCE RECEIPT'
+      };
+      
+      setActiveReceipt({
+        job: job,
+        payment: fullPaymentRecord
+      });
+    }
+    setReceiptPdfMode('VIEW');
+  };
 
   // ==========================================
   // INLINE EDITABLE STATES - RECEIPT PDF
@@ -431,8 +667,8 @@ export default function InvoiceReceiptManager({
     }, 0);
     const subtotal = baseComm + baseCustom;
     
-    const discountAmount = (subtotal * discountPercent) / 100;
-    const taxableAmount = subtotal - discountAmount;
+    const discountAmount = 0;
+    const taxableAmount = subtotal;
     const taxAmount = (taxableAmount * taxPercent) / 100;
     const finalTotal = taxableAmount + taxAmount;
     
@@ -781,7 +1017,7 @@ export default function InvoiceReceiptManager({
   return (
     <div className="space-y-6">
       
-      {/* Print styles override (Only prints print-area) */}
+      {/* Print styles override (Only prints print-area with white font) */}
       <style>{`
         @media print {
           body * {
@@ -789,28 +1025,33 @@ export default function InvoiceReceiptManager({
           }
           #print-area, #print-area * {
             visibility: visible;
+            color: #ffffff !important;
           }
           #print-area {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
-            background: white !important;
-            color: black !important;
+            background: #020617 !important;
+            color: #ffffff !important;
             padding: 1cm !important;
             box-shadow: none !important;
             border: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           #print-area input,
           #print-area textarea,
-          #print-area select {
+          #print-area select,
+          #print-area p,
+          #print-area span,
+          #print-area h1, #print-area h2, #print-area h3, #print-area h4, #print-area h5,
+          #print-area td, #print-area th, #print-area div {
             border: none !important;
             background: transparent !important;
             box-shadow: none !important;
             outline: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            color: #0f172a !important;
+            color: #ffffff !important;
             font-weight: inherit !important;
             font-size: inherit !important;
             appearance: none !important;
@@ -1314,24 +1555,10 @@ export default function InvoiceReceiptManager({
                   </div>
                   
                   <p className="text-xs text-gray-400 leading-relaxed">
-                    Set discounts and applicable sales tax values. Once configured, you can generate, print, or save the beautiful custom invoice in an official PDF layout.
+                    Set applicable sales tax values. Once configured, you can generate, print, or save the beautiful custom invoice in an official PDF layout.
                   </p>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
-                        <Percent className="w-3.5 h-3.5 text-wood-600" /> Apply Promo Discount (%)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={discountPercent}
-                        onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-xs font-bold text-gray-700"
-                      />
-                    </div>
-
+                  <div className="pt-2">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1">
                         <FileCheck className="w-3.5 h-3.5 text-wood-600" /> GST / Sales Tax (%)
@@ -1394,56 +1621,257 @@ export default function InvoiceReceiptManager({
                     <button
                       onClick={() => {
                         setActiveInvoice(selectedJob);
+                        setActiveDocSource('TEMPLATE');
                         setInvoicePdfMode('VIEW');
                       }}
-                      className="w-full py-3 px-4 bg-wood-950 hover:bg-wood-900 text-white font-black rounded-xl text-xs uppercase flex items-center justify-center gap-2 transition shadow-md"
+                      className="w-full py-3 px-4 bg-wood-950 hover:bg-wood-900 text-white font-black rounded-xl text-xs uppercase flex items-center justify-center gap-2 transition shadow-md cursor-pointer"
                     >
                       <FileText className="w-4 h-4" />
                       <span>Generate & Open PDF Invoice Desk</span>
                     </button>
                   </div>
+
+                  {/* Dedicated Upload External Invoice Document Box */}
+                  {(() => {
+                    const existingUploadedInvoice = uploadedDocs.find(d => d.jobId === selectedJob.id && d.docType === 'INVOICE');
+                    return (
+                      <div className="p-4 bg-slate-900 text-white rounded-xl border border-slate-800 space-y-3 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Upload className="w-4 h-4 text-amber-400" />
+                            <span className="font-display font-black text-xs uppercase tracking-wider text-amber-200">
+                              Upload Custom Invoice Scan (Printout)
+                            </span>
+                          </div>
+                          {existingUploadedInvoice && (
+                            <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 font-extrabold text-[10px] rounded-md uppercase">
+                              Scan Ready
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-slate-300 leading-snug">
+                          Already have a scanned paper invoice or physical file? Upload image/PDF to preview and print directly for <strong className="text-white">{selectedJob.customerName}</strong>.
+                        </p>
+
+                        {existingUploadedInvoice ? (
+                          <div className="bg-slate-800/90 p-3 rounded-lg border border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 overflow-hidden">
+                              {existingUploadedInvoice.fileType === 'image' ? (
+                                <img src={existingUploadedInvoice.fileDataUrl} alt="Uploaded Invoice Scan" className="w-10 h-10 object-cover rounded border border-slate-600 shrink-0" />
+                              ) : (
+                                <div className="w-10 h-10 bg-amber-900/60 text-amber-300 rounded flex items-center justify-center font-mono font-bold text-xs shrink-0">
+                                  PDF
+                                </div>
+                              )}
+                              <div className="min-w-0 space-y-0.5">
+                                <p className="text-xs font-bold text-white truncate">{existingUploadedInvoice.fileName}</p>
+                                <p className="text-[10px] text-slate-400">{existingUploadedInvoice.fileSize} &bull; Uploaded {existingUploadedInvoice.uploadedAt}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                onClick={() => {
+                                  setActiveInvoice(selectedJob);
+                                  setActiveDocSource('UPLOADED');
+                                }}
+                                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] uppercase rounded-lg transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Preview & Print</span>
+                              </button>
+                              <button
+                                onClick={() => handlePrintUploadedDoc(existingUploadedInvoice)}
+                                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white font-bold text-[11px] uppercase rounded-lg transition flex items-center gap-1 cursor-pointer"
+                                title="Instant 1-Click Print"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveUploadedDoc(existingUploadedInvoice.id)}
+                                className="p-1.5 text-slate-400 hover:text-red-400 transition cursor-pointer"
+                                title="Remove Scan"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-3.5 border-2 border-dashed border-slate-700 hover:border-amber-500/80 rounded-xl bg-slate-800/50 hover:bg-slate-800/80 cursor-pointer transition text-center group">
+                            <Upload className="w-5 h-5 text-amber-400 group-hover:scale-110 transition mb-1" />
+                            <span className="text-xs font-bold text-slate-200">Click or Drag & Drop Custom Invoice File</span>
+                            <span className="text-[10px] text-slate-400 mt-0.5">Supports PNG, JPG, WEBP, or PDF scans</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => handleUploadInvoiceOrReceipt(e, 'INVOICE', selectedJob.id)}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 /* RECEIPT SPACE PANEL */
-                <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
+                <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-5">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Receipt className="w-4 h-4 text-emerald-600" /> Logged Payments Receipt Desk
+                      <Receipt className="w-4 h-4 text-emerald-600" /> Logged Payments & Full Clearance Receipt Desk
                     </h4>
                     <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 font-bold uppercase px-2 py-0.5 rounded-md">
                       {selectedJob.payments.length} Payments Cleared
                     </span>
                   </div>
 
+                  {/* Dedicated Upload External Receipt Document Box */}
+                  {(() => {
+                    const existingUploadedReceipt = uploadedDocs.find(d => d.jobId === selectedJob.id && d.docType === 'RECEIPT');
+                    return (
+                      <div className="p-4 bg-emerald-950 text-white rounded-xl border border-emerald-800 space-y-3 shadow-md">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Upload className="w-4 h-4 text-emerald-300" />
+                            <span className="font-display font-black text-xs uppercase tracking-wider text-emerald-200">
+                              Upload Custom Receipt Scan (Printout)
+                            </span>
+                          </div>
+                          {existingUploadedReceipt && (
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-extrabold text-[10px] rounded-md uppercase">
+                              Receipt Ready
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-emerald-100/80 leading-snug">
+                          Upload an official signed paper receipt or external clearance voucher (PNG, JPG, or PDF) to print directly for client <strong className="text-white">{selectedJob.customerName}</strong>.
+                        </p>
+
+                        {existingUploadedReceipt ? (
+                          <div className="bg-emerald-900/80 p-3 rounded-lg border border-emerald-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 overflow-hidden">
+                              {existingUploadedReceipt.fileType === 'image' ? (
+                                <img src={existingUploadedReceipt.fileDataUrl} alt="Uploaded Receipt Scan" className="w-10 h-10 object-cover rounded border border-emerald-600 shrink-0" />
+                              ) : (
+                                <div className="w-10 h-10 bg-emerald-950 text-emerald-300 rounded flex items-center justify-center font-mono font-bold text-xs shrink-0">
+                                  PDF
+                                </div>
+                              )}
+                              <div className="min-w-0 space-y-0.5">
+                                <p className="text-xs font-bold text-white truncate">{existingUploadedReceipt.fileName}</p>
+                                <p className="text-[10px] text-emerald-300/70">{existingUploadedReceipt.fileSize} &bull; Uploaded {existingUploadedReceipt.uploadedAt}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                onClick={() => {
+                                  if (selectedJob.payments.length > 0) {
+                                    setActiveReceipt({ job: selectedJob, payment: selectedJob.payments[0] });
+                                  } else {
+                                    handleGenerateFullPaymentReceipt(selectedJob);
+                                  }
+                                  setActiveDocSource('UPLOADED');
+                                }}
+                                className="px-3 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-black text-[11px] uppercase rounded-lg transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Preview & Print</span>
+                              </button>
+                              <button
+                                onClick={() => handlePrintUploadedDoc(existingUploadedReceipt)}
+                                className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-[11px] uppercase rounded-lg transition flex items-center gap-1 cursor-pointer"
+                                title="Instant 1-Click Print"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveUploadedDoc(existingUploadedReceipt.id)}
+                                className="p-1.5 text-emerald-300 hover:text-red-300 transition cursor-pointer"
+                                title="Remove Scan"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center p-3.5 border-2 border-dashed border-emerald-700 hover:border-emerald-400 rounded-xl bg-emerald-900/40 hover:bg-emerald-900/70 cursor-pointer transition text-center group">
+                            <Upload className="w-5 h-5 text-emerald-300 group-hover:scale-110 transition mb-1" />
+                            <span className="text-xs font-bold text-emerald-100">Click or Drag & Drop Custom Receipt File</span>
+                            <span className="text-[10px] text-emerald-300/70 mt-0.5">Supports PNG, JPG, WEBP, or PDF scans</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => handleUploadInvoiceOrReceipt(e, 'RECEIPT', selectedJob.id)}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* 100% Full Payment Clearance Action Box */}
+                  <div className="p-4 bg-emerald-950 text-white rounded-xl border border-emerald-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span className="font-display font-black text-xs uppercase tracking-wider text-emerald-200">
+                          Full Payment Clearance Receipt
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-100/80 leading-snug">
+                        Generate & print an official 100% payment clearance receipt for client <strong className="text-white">{selectedJob.customerName}</strong> including 300x300 digital signature & official stamp.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => handleGenerateFullPaymentReceipt(selectedJob)}
+                      className="shrink-0 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black text-xs uppercase rounded-lg transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Receipt className="w-4 h-4" />
+                      <span>Issue 100% Full Payment Receipt</span>
+                    </button>
+                  </div>
+
                   {selectedJob.payments.length === 0 ? (
                     <div className="p-8 bg-gray-50 rounded-2xl border border-gray-100 text-center text-xs text-gray-400 font-bold leading-relaxed">
                       <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                      No payment receipts cleared yet for this woodwork order.<br />
-                      <span className="text-[11px] font-normal text-gray-400 mt-1">Please log payments in the Jobs Tracker tab first to clear client balances.</span>
+                      No individual payment installments logged yet for this woodwork order.<br />
+                      <span className="text-[11px] font-normal text-gray-500 mt-1 block">
+                        You can click "Issue 100% Full Payment Receipt" above to generate a full contract clearance receipt directly for this client.
+                      </span>
                     </div>
                   ) : (
-                    <div className="divide-y divide-gray-100">
-                      {selectedJob.payments.map((p, index) => (
-                        <div key={p.id} className="py-3.5 flex items-center justify-between text-xs">
-                          <div className="space-y-1">
-                            <p className="font-bold text-gray-800">Payment Order #{index + 1} - <span className="font-mono text-[10px] text-gray-400">{p.id}</span></p>
-                            <p className="text-gray-400 font-semibold">Cleared Date: <span className="font-mono">{p.date}</span> &bull; Mode: <strong className="text-wood-700">{p.method}</strong></p>
-                          </div>
+                    <div className="space-y-2">
+                      <h5 className="text-[10px] font-extrabold uppercase text-gray-400 tracking-wider">
+                        Individual Installment Receipts:
+                      </h5>
+                      <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                        {selectedJob.payments.map((p, index) => (
+                          <div key={p.id} className="p-3.5 flex items-center justify-between text-xs hover:bg-gray-50/80 transition">
+                            <div className="space-y-1">
+                              <p className="font-bold text-gray-800">Payment Order #{index + 1} - <span className="font-mono text-[10px] text-gray-400">{p.id}</span></p>
+                              <p className="text-gray-400 font-semibold">Cleared Date: <span className="font-mono">{p.date}</span> &bull; Mode: <strong className="text-wood-700">{p.method}</strong></p>
+                            </div>
 
-                          <div className="flex items-center gap-3">
-                            <span className="font-bold font-mono text-emerald-700">{formatCurrency(p.amount, 0)}</span>
-                            <button
-                              onClick={() => {
-                                setActiveReceipt({ job: selectedJob, payment: p });
-                                setReceiptPdfMode('VIEW');
-                              }}
-                              className="px-3 py-1.5 text-[10px] font-black uppercase text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition shadow-2xs"
-                            >
-                              Open PDF Receipt
-                            </button>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold font-mono text-emerald-700">{formatCurrency(p.amount, 0)}</span>
+                              <button
+                                onClick={() => {
+                                  setActiveReceipt({ job: selectedJob, payment: p });
+                                  setReceiptPdfMode('VIEW');
+                                }}
+                                className="px-3 py-1.5 text-[10px] font-black uppercase text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition shadow-2xs"
+                              >
+                                Open PDF Receipt
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1482,6 +1910,35 @@ export default function InvoiceReceiptManager({
 
                 {/* PDF VIEW / INTERACTIVE EDIT SWITCH */}
                 <div className="flex flex-wrap items-center gap-3">
+                  {/* Document Source Toggle */}
+                  <div className="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+                    <button
+                      onClick={() => setActiveDocSource('TEMPLATE')}
+                      className={`px-2.5 py-1.5 rounded-md text-[11px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer ${
+                        activeDocSource === 'TEMPLATE' 
+                          ? 'bg-amber-500 text-slate-950 shadow-2xs' 
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Generated Template</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveDocSource('UPLOADED')}
+                      className={`px-2.5 py-1.5 rounded-md text-[11px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer ${
+                        activeDocSource === 'UPLOADED' 
+                          ? 'bg-amber-500 text-slate-950 shadow-2xs' 
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Uploaded Scan</span>
+                      {uploadedDocs.some(d => d.jobId === activeInvoice.id && d.docType === 'INVOICE') && (
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                      )}
+                    </button>
+                  </div>
+
                   {/* Template Format Selector */}
                   <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
                     <button
@@ -1608,6 +2065,96 @@ export default function InvoiceReceiptManager({
               </div>
 
               {/* THE FLOATING PAPER (styled to look like an A4 page with high-contrast) */}
+              {activeDocSource === 'UPLOADED' ? (
+                <div className="bg-white p-6 sm:p-8 rounded-xl border border-gray-200 space-y-6">
+                  {(() => {
+                    const currentDoc = uploadedDocs.find(d => d.jobId === activeInvoice.id && d.docType === 'INVOICE');
+                    if (currentDoc) {
+                      return (
+                        <div className="space-y-4">
+                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-wrap items-center justify-between gap-3 no-print">
+                            <div className="flex items-center gap-2">
+                              <FileCheck className="w-5 h-5 text-amber-700" />
+                              <div>
+                                <h4 className="text-xs font-bold text-amber-950">
+                                  Uploaded Invoice Scan: {currentDoc.fileName}
+                                </h4>
+                                <p className="text-[10px] text-amber-800">
+                                  Size: {currentDoc.fileSize} &bull; Uploaded: {currentDoc.uploadedAt}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="px-3 py-1.5 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-2xs">
+                                <Upload className="w-3.5 h-3.5 text-amber-300" />
+                                <span>Replace Document</span>
+                                <input
+                                  type="file"
+                                  accept="image/*,application/pdf"
+                                  onChange={(e) => handleUploadInvoiceOrReceipt(e, 'INVOICE', activeInvoice.id)}
+                                  className="hidden"
+                                />
+                              </label>
+                              <button
+                                onClick={() => handlePrintUploadedDoc(currentDoc)}
+                                className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-black flex items-center gap-1 cursor-pointer shadow-2xs"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>Print Custom Document</span>
+                              </button>
+                              <button
+                                onClick={() => handleRemoveUploadedDoc(currentDoc.id)}
+                                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Remove</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {currentDoc.fileType === 'image' ? (
+                            <div className="flex flex-col items-center justify-center p-2 bg-gray-50 rounded-xl border border-gray-200">
+                              <img
+                                src={currentDoc.fileDataUrl}
+                                alt={`Uploaded Invoice Scan - ${currentDoc.fileName}`}
+                                className="max-w-full max-h-[850px] object-contain rounded shadow-md print:shadow-none print:max-h-none print:w-full"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-full h-[750px] bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-700">
+                              <iframe
+                                src={currentDoc.fileDataUrl}
+                                title="Uploaded Invoice PDF Scan Preview"
+                                className="w-full h-full border-none"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="p-12 border-2 border-dashed border-amber-300 bg-amber-50/40 rounded-2xl text-center space-y-4">
+                          <Upload className="w-12 h-12 text-amber-600 mx-auto" />
+                          <h3 className="text-sm font-black text-amber-950 uppercase">No Custom Invoice Document Uploaded Yet</h3>
+                          <p className="text-xs text-amber-800/80 max-w-md mx-auto leading-relaxed">
+                            Upload an existing paper invoice scan, PDF bill, or custom document to preview & print directly for client <strong className="text-amber-950">{activeInvoice.customerName}</strong>.
+                          </p>
+                          <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-800 hover:bg-amber-900 text-white text-xs font-black uppercase rounded-xl cursor-pointer transition shadow-md">
+                            <Upload className="w-4 h-4 text-amber-300" />
+                            <span>Upload Custom Invoice Scan (Image/PDF)</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => handleUploadInvoiceOrReceipt(e, 'INVOICE', activeInvoice.id)}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              ) : (
               <div className={`p-8 sm:p-12 border border-gray-200 rounded-xl shadow-xl space-y-6 print:p-0 print:border-none print:shadow-none print:rounded-none ${invoiceTemplate === 'SWEDS_WOOD' ? 'sweds-paper-invoice bg-white' : 'bg-white'}`}>
                 
                 {invoiceTemplate === 'SWEDS_WOOD' ? (
@@ -2106,20 +2653,60 @@ export default function InvoiceReceiptManager({
                       </div>
                     </div>
 
-                    {/* Signatures and Official Stamp */}
-                    <div className="mt-8 pt-6 border-t border-gray-200 grid grid-cols-2 gap-8 text-center text-[10px] font-bold text-[#1e3a8a] uppercase">
-                      <div className="space-y-4">
-                        <p className="text-gray-600 font-bold">Authorized Signature:</p>
-                        <div className="h-10 flex items-center justify-center">
-                          <div className="w-48 border-b border-gray-400" />
+                    {/* Signatures and Official Stamp (Horizontal Line & Compact User-Uploaded Images) */}
+                    <div className="mt-8 pt-5 border-t border-gray-200 flex flex-row items-end justify-between gap-4 sm:gap-8">
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-gray-700 font-bold text-[10px] sm:text-xs uppercase tracking-wider">
+                            Authorized Signatory:
+                          </p>
+                          <label className="text-[10px] text-blue-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 transition">
+                            <Upload className="w-3 h-3 text-blue-700" />
+                            <span>Upload Signature</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload300(e, 'signature')}
+                              className="hidden"
+                            />
+                          </label>
                         </div>
+                        {showSignature && (
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-blue-300 rounded-lg p-1 bg-blue-50/20 flex items-center justify-center relative group">
+                            <img
+                              src={signatureImageUrl}
+                              alt="Authorized Signature"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        )}
                       </div>
 
-                      <div className="space-y-4">
-                        <p className="text-gray-600 font-bold">Customer Signature:</p>
-                        <div className="h-10 flex items-center justify-center">
-                          <div className="w-48 border-b border-gray-400" />
+                      <div className="space-y-1.5 flex-1 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <p className="text-red-800 font-extrabold text-[10px] sm:text-xs uppercase tracking-wider">
+                            Official Stamp / Seal:
+                          </p>
+                          <label className="text-[10px] text-red-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition">
+                            <Upload className="w-3 h-3 text-red-700" />
+                            <span>Upload Stamp</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload300(e, 'stamp')}
+                              className="hidden"
+                            />
+                          </label>
                         </div>
+                        {showStamp && (
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-red-300 rounded-lg p-1 bg-red-50/30 flex items-center justify-center relative group ml-auto">
+                            <img
+                              src={stampImageUrl}
+                              alt="Official Stamp"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2542,11 +3129,6 @@ export default function InvoiceReceiptManager({
                           <span className="font-mono text-gray-800 font-bold">{formatCurrency(totals.subtotal)}</span>
                         </div>
 
-                        <div className="flex justify-between items-center text-amber-800 bg-amber-50/40 px-2 py-1 rounded-lg">
-                          <span className="flex items-center gap-0.5 text-[10px] uppercase font-bold">Discount ({discountPercent}%):</span>
-                          <span className="font-mono font-bold">-{formatCurrency(totals.discountAmount)}</span>
-                        </div>
-
                         <div className="flex justify-between">
                           <span>Taxable Value (Net):</span>
                           <span className="font-mono text-gray-800 font-semibold">{formatCurrency(totals.taxableAmount)}</span>
@@ -2574,26 +3156,67 @@ export default function InvoiceReceiptManager({
                       </div>
                     </div>
 
-                    {/* Bottom official Signatures line */}
-                    <div className="mt-12 pt-8 border-t border-gray-100 grid grid-cols-2 gap-8 text-center text-[10px] font-bold text-gray-400 uppercase">
-                      <div className="space-y-4">
-                        <p className="text-gray-600 font-bold">Authorized Signature:</p>
-                        <div className="h-10 flex items-center justify-center">
-                          <div className="w-48 border-b border-gray-300" />
+                    {/* Bottom official Signatures & Stamp block (Horizontal Line & Compact User-Uploaded Images) */}
+                    <div className="mt-8 pt-5 border-t border-gray-200 flex flex-row items-end justify-between gap-4 sm:gap-8">
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-gray-700 font-bold text-[10px] sm:text-xs uppercase tracking-wider">
+                            Authorized Signatory:
+                          </p>
+                          <label className="text-[10px] text-wood-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-200 transition">
+                            <Upload className="w-3 h-3 text-wood-800" />
+                            <span>Upload Signature</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload300(e, 'signature')}
+                              className="hidden"
+                            />
+                          </label>
                         </div>
+                        {showSignature && (
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-gray-300 rounded-lg p-1 bg-white flex items-center justify-center relative group">
+                            <img
+                              src={signatureImageUrl}
+                              alt="Authorized Signature"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        )}
                       </div>
 
-                      <div className="space-y-4">
-                        <p className="text-gray-600 font-bold">Customer Signature:</p>
-                        <div className="h-10 flex items-center justify-center">
-                          <div className="w-48 border-b border-gray-300" />
+                      <div className="space-y-1.5 flex-1 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <p className="text-red-800 font-extrabold text-[10px] sm:text-xs uppercase tracking-wider">
+                            Official Stamp / Seal:
+                          </p>
+                          <label className="text-[10px] text-red-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition">
+                            <Upload className="w-3 h-3 text-red-700" />
+                            <span>Upload Stamp</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload300(e, 'stamp')}
+                              className="hidden"
+                            />
+                          </label>
                         </div>
+                        {showStamp && (
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-red-300 rounded-lg p-1 bg-red-50/20 flex items-center justify-center relative group ml-auto">
+                            <img
+                              src={stampImageUrl}
+                              alt="Official Stamp"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   </>
                 )}
 
               </div>
+              )}
 
             </div>
           </div>
@@ -2621,7 +3244,36 @@ export default function InvoiceReceiptManager({
                 </div>
 
                 {/* PDF VIEW / INTERACTIVE EDIT SWITCH */}
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Document Source Toggle */}
+                  <div className="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+                    <button
+                      onClick={() => setActiveDocSource('TEMPLATE')}
+                      className={`px-2.5 py-1.5 rounded-md text-[11px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer ${
+                        activeDocSource === 'TEMPLATE' 
+                          ? 'bg-emerald-400 text-slate-950 shadow-2xs' 
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      <span>Generated Receipt</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveDocSource('UPLOADED')}
+                      className={`px-2.5 py-1.5 rounded-md text-[11px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer ${
+                        activeDocSource === 'UPLOADED' 
+                          ? 'bg-emerald-400 text-slate-950 shadow-2xs' 
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Uploaded Scan</span>
+                      {uploadedDocs.some(d => d.jobId === activeReceipt.job.id && d.docType === 'RECEIPT') && (
+                        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      )}
+                    </button>
+                  </div>
+
                   <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
                     <button
                       onClick={() => setReceiptPdfMode('VIEW')}
@@ -2665,6 +3317,96 @@ export default function InvoiceReceiptManager({
               </div>
 
               {/* THE FLOATING PAPER RECEIPT */}
+              {activeDocSource === 'UPLOADED' ? (
+                <div className="bg-white p-6 sm:p-8 rounded-xl border border-gray-200 space-y-6">
+                  {(() => {
+                    const currentDoc = uploadedDocs.find(d => d.jobId === activeReceipt.job.id && d.docType === 'RECEIPT');
+                    if (currentDoc) {
+                      return (
+                        <div className="space-y-4">
+                          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-wrap items-center justify-between gap-3 no-print">
+                            <div className="flex items-center gap-2">
+                              <FileCheck className="w-5 h-5 text-emerald-700" />
+                              <div>
+                                <h4 className="text-xs font-bold text-emerald-950">
+                                  Uploaded Receipt Scan: {currentDoc.fileName}
+                                </h4>
+                                <p className="text-[10px] text-emerald-800">
+                                  Size: {currentDoc.fileSize} &bull; Uploaded: {currentDoc.uploadedAt}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-2xs">
+                                <Upload className="w-3.5 h-3.5 text-emerald-300" />
+                                <span>Replace Scan</span>
+                                <input
+                                  type="file"
+                                  accept="image/*,application/pdf"
+                                  onChange={(e) => handleUploadInvoiceOrReceipt(e, 'RECEIPT', activeReceipt.job.id)}
+                                  className="hidden"
+                                />
+                              </label>
+                              <button
+                                onClick={() => handlePrintUploadedDoc(currentDoc)}
+                                className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-black flex items-center gap-1 cursor-pointer shadow-2xs"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>Print Custom Document</span>
+                              </button>
+                              <button
+                                onClick={() => handleRemoveUploadedDoc(currentDoc.id)}
+                                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Remove</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {currentDoc.fileType === 'image' ? (
+                            <div className="flex flex-col items-center justify-center p-2 bg-gray-50 rounded-xl border border-gray-200">
+                              <img
+                                src={currentDoc.fileDataUrl}
+                                alt={`Uploaded Receipt Scan - ${currentDoc.fileName}`}
+                                className="max-w-full max-h-[850px] object-contain rounded shadow-md print:shadow-none print:max-h-none print:w-full"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-full h-[750px] bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-700">
+                              <iframe
+                                src={currentDoc.fileDataUrl}
+                                title="Uploaded Receipt PDF Scan Preview"
+                                className="w-full h-full border-none"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="p-12 border-2 border-dashed border-emerald-300 bg-emerald-50/40 rounded-2xl text-center space-y-4">
+                          <Upload className="w-12 h-12 text-emerald-600 mx-auto" />
+                          <h3 className="text-sm font-black text-emerald-950 uppercase">No Custom Receipt Document Uploaded Yet</h3>
+                          <p className="text-xs text-emerald-800/80 max-w-md mx-auto leading-relaxed">
+                            Upload an official signed paper receipt, bank deposit voucher, or clearance file to preview & print directly for client <strong className="text-emerald-950">{activeReceipt.job.customerName}</strong>.
+                          </p>
+                          <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-black uppercase rounded-xl cursor-pointer transition shadow-md">
+                            <Upload className="w-4 h-4 text-emerald-300" />
+                            <span>Upload Custom Receipt Scan (Image/PDF)</span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => handleUploadInvoiceOrReceipt(e, 'RECEIPT', activeReceipt.job.id)}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              ) : (
               <div className="bg-white p-8 sm:p-10 border border-gray-200 rounded-xl shadow-xl space-y-6 print:p-0 print:border-none print:shadow-none print:rounded-none">
                 
                 {/* Letterhead Header */}
@@ -2811,37 +3553,75 @@ export default function InvoiceReceiptManager({
                   </p>
                 </div>
 
-                {/* Bottom Signatures stamp */}
-                <div className="mt-8 pt-6 border-t border-gray-100 grid grid-cols-2 gap-6 text-center text-[10px] font-bold text-gray-400 uppercase">
-                  <div>
-                    <p>RECEIVED BY (AUTHORIZED SIGNATORY):</p>
-                    <div className="h-10 flex items-center justify-center mt-3">
-                      {receiptPdfMode === 'EDIT' ? (
+                {/* Bottom Signatures & Official Stamp (Horizontal Line & Compact User-Uploaded Images) */}
+                <div className="mt-8 pt-5 border-t border-gray-200 flex flex-row items-end justify-between gap-4 sm:gap-8">
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-emerald-950 font-extrabold text-[10px] sm:text-xs uppercase tracking-wider">
+                        Received By (Authorized Signatory):
+                      </p>
+                      <label className="text-[10px] text-emerald-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition">
+                        <Upload className="w-3 h-3 text-emerald-800" />
+                        <span>Upload Signature</span>
                         <input
-                          type="text"
-                          value={receiptReceivedBy}
-                          onChange={(e) => setReceiptReceivedBy(e.target.value)}
-                          className="font-serif italic text-emerald-800 border-b border-gray-300 bg-amber-50/50 rounded px-2 py-0.5 text-center text-xs"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageUpload300(e, 'signature')}
+                          className="hidden"
                         />
-                      ) : (
-                        <span className="font-serif italic text-emerald-800 border-b border-gray-300 px-6 py-1 text-sm">
-                          {receiptReceivedBy}
-                        </span>
-                      )}
+                      </label>
                     </div>
-                    <p className="mt-2 text-[9px] text-gray-400">Cashier Signature</p>
+                    {receiptPdfMode === 'EDIT' && (
+                      <input
+                        type="text"
+                        value={receiptReceivedBy}
+                        onChange={(e) => setReceiptReceivedBy(e.target.value)}
+                        className="font-serif italic text-emerald-900 border-b border-gray-300 bg-amber-50/50 rounded px-2 py-0.5 text-xs w-full mb-1"
+                        placeholder="Cashier / Signatory Name"
+                      />
+                    )}
+                    {showSignature && (
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-emerald-300 rounded-lg p-1 bg-emerald-50/30 flex items-center justify-center relative group">
+                        <img
+                          src={signatureImageUrl}
+                          alt="Authorized Signature"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
+                    <p className="text-[9px] text-gray-500 font-bold uppercase">{receiptReceivedBy || 'Authorized Cashier Signature'}</p>
                   </div>
 
-                  <div>
-                    <p>CUSTOMER COPY CLEARANCE:</p>
-                    <div className="h-10 flex items-center justify-center mt-3">
-                      <div className="w-36 border-b border-gray-300" />
+                  <div className="space-y-1.5 flex-1 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <p className="text-red-800 font-extrabold text-[10px] sm:text-xs uppercase tracking-wider">
+                        Official Clearance Stamp / Seal:
+                      </p>
+                      <label className="text-[10px] text-red-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition">
+                        <Upload className="w-3 h-3 text-red-700" />
+                        <span>Upload Stamp</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageUpload300(e, 'stamp')}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
-                    <p className="mt-2 text-[9px] text-gray-400">Signature on Delivery</p>
+                    {showStamp && (
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-red-300 rounded-lg p-1 bg-red-50/30 flex items-center justify-center relative group ml-auto">
+                        <img
+                          src={stampImageUrl}
+                          alt="Official Stamp"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
               </div>
+              )}
 
             </div>
           </div>
@@ -3396,22 +4176,36 @@ export function buildInvoicePdfContent(
       doc.text(balanceStr, 191, totY + 21, { align: 'right' });
     }
 
-    // Signatures
-    const sigY = 245;
-    doc.setLineWidth(0.3);
-    doc.setDrawColor(156, 163, 175);
-    
-    doc.line(20, sigY + 15, 90, sigY + 15);
+    // Signatures and Stamp
+    const sigY = 238;
+    const sigImg = localStorage.getItem('swedswood_signature_300') || DEFAULT_300X300_SIGNATURE;
+    const stampImg = localStorage.getItem('swedswood_stamp_300') || DEFAULT_300X300_STAMP;
+
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(8);
     doc.setTextColor(15, 82, 186);
-    doc.text("Authorized Signature:", 20, sigY + 3);
-    
-    doc.line(115, sigY + 15, 185, sigY + 15);
+    doc.text("Authorized Signature:", 20, sigY);
+
+    try {
+      doc.addImage(sigImg, 'PNG', 20, sigY + 2, 28, 28);
+    } catch (err) {
+      doc.setLineWidth(0.3);
+      doc.setDrawColor(156, 163, 175);
+      doc.line(20, sigY + 22, 80, sigY + 22);
+    }
+
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(15, 82, 186);
-    doc.text("Customer Signature:", 115, sigY + 3);
+    doc.setFontSize(8);
+    doc.setTextColor(185, 28, 28);
+    doc.text("Official Stamp / Seal:", 120, sigY);
+
+    try {
+      doc.addImage(stampImg, 'PNG', 120, sigY + 2, 28, 28);
+    } catch (err) {
+      doc.setLineWidth(0.3);
+      doc.setDrawColor(185, 28, 28);
+      doc.line(120, sigY + 22, 180, sigY + 22);
+    }
     
   } else {
     // MODERN DIGITAL PROFESSIONAL TEMPLATE
@@ -3600,21 +4394,35 @@ export function buildInvoicePdfContent(
     const outStrVal = `Le ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
     doc.text(outStrVal, calcX + calcWidth - 3, botY + 20, { align: 'right' });
 
-    // Signatures
-    const sigY = 245;
-    doc.setLineWidth(0.3);
-    doc.setDrawColor(156, 163, 175);
-    
-    doc.line(20, sigY + 15, 90, sigY + 15);
+    // Signatures and Official Stamp
+    const sigY = 238;
+    const sigImg = localStorage.getItem('swedswood_signature_300') || DEFAULT_300X300_SIGNATURE;
+    const stampImg = localStorage.getItem('swedswood_stamp_300') || DEFAULT_300X300_STAMP;
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(69, 26, 3);
-    doc.text("Authorized Signature:", 20, sigY + 3);
-    
-    doc.line(115, sigY + 15, 185, sigY + 15);
+    doc.text("Authorized Signature:", 20, sigY);
+
+    try {
+      doc.addImage(sigImg, 'PNG', 20, sigY + 2, 28, 28);
+    } catch (err) {
+      doc.setLineWidth(0.3);
+      doc.setDrawColor(156, 163, 175);
+      doc.line(20, sigY + 22, 80, sigY + 22);
+    }
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(69, 26, 3);
-    doc.text("Customer Signature:", 115, sigY + 3);
+    doc.setTextColor(185, 28, 28);
+    doc.text("Official Clearance Seal:", 120, sigY);
+
+    try {
+      doc.addImage(stampImg, 'PNG', 120, sigY + 2, 28, 28);
+    } catch (err) {
+      doc.setLineWidth(0.3);
+      doc.setDrawColor(185, 28, 28);
+      doc.line(120, sigY + 22, 180, sigY + 22);
+    }
   }
 }

@@ -245,10 +245,10 @@ export default function JobManager({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs">
         <div>
           <h1 className="text-2xl font-display font-bold text-wood-900 tracking-tight">
-            Commissions & Carpentry Jobs
+            Commissions & Job Lists
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Initiate woodwork commissions, allocate artisan hours, update completion pipelines, and log materials consumed.
+            Initiate commissions, allocate artisan hours, update completion pipelines, and log materials consumed.
           </p>
         </div>
         
@@ -258,7 +258,7 @@ export default function JobManager({
             className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
-            <span>New Woodwork Job</span>
+            <span>New Job</span>
           </button>
         ) : (
           <div className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold font-mono">
@@ -591,7 +591,7 @@ export default function JobManager({
             >
               <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
                 <div>
-                  <h3 className="font-display font-bold text-lg">Initiate Woodwork Job</h3>
+                  <h3 className="font-display font-bold text-lg">Initiate Job</h3>
                   <p className="text-xs text-wood-200">Register customized carpentry specifications and quote agreements.</p>
                 </div>
                 <button 
@@ -879,7 +879,7 @@ export default function JobManager({
             >
               <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
                 <div>
-                  <h3 className="font-display font-bold text-lg">Modify Woodwork Job</h3>
+                  <h3 className="font-display font-bold text-lg">Modify Job</h3>
                   <p className="text-xs text-wood-200">Update specs, allocated artisans, dates, and pricing parameters.</p>
                 </div>
                 <button 
