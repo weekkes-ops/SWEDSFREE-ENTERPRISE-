@@ -71,6 +71,21 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [quickActionTrigger, setQuickActionTrigger] = useState<string | null>(null);
   const [invoiceJobId, setInvoiceJobId] = useState<string | null>(null);
+  const [invoiceInitialSubTab, setInvoiceInitialSubTab] = useState<'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT'>('INVOICE');
+
+  const handleTriggerInvoice = (jobId: string) => {
+    setInvoiceJobId(jobId);
+    setInvoiceInitialSubTab('INVOICE');
+    setActiveTab('invoices');
+  };
+
+  const handleTriggerReceipt = (jobId?: string) => {
+    if (jobId) {
+      setInvoiceJobId(jobId);
+    }
+    setInvoiceInitialSubTab('RECEIPT');
+    setActiveTab('invoices');
+  };
 
   // Offline network  for production infastrature status & file backup ref
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
@@ -118,7 +133,7 @@ export default function App() {
     };
   }, []);
 
-  // Offline Database Export (JSON)
+  // Offline Data Export (JSON)
   const handleExportBackup = () => {
     const localSavedInvoices = localStorage.getItem('swedswood_saved_invoices');
     const savedInvoices = localSavedInvoices ? JSON.parse(localSavedInvoices) : [];
@@ -142,14 +157,14 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `SwedsWood_Offline_Database_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `SwedsWood_Data_Backup_${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  // Offline Database Import (JSON)
+  // Offline Data Import (JSON)
   const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -170,7 +185,7 @@ export default function App() {
         if (data.savedInvoices) {
           localStorage.setItem('swedswood_saved_invoices', JSON.stringify(data.savedInvoices));
         }
-        alert('Offline database backup imported successfully! All records updated.');
+        alert('Data backup imported successfully! All records updated.');
       } catch (err) {
         alert('Failed to parse backup file. Please upload a valid JSON backup file.');
       }
@@ -1004,14 +1019,14 @@ export default function App() {
                     className="w-full py-1.5 px-2 bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     <Download className="w-3 h-3 text-amber-400" />
-                    <span>Backup Database (.JSON)</span>
+                    <span>Backup Data (.JSON)</span>
                   </button>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="w-full py-1.5 px-2 bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     <Upload className="w-3 h-3 text-sky-400" />
-                    <span>Restore Database (.JSON)</span>
+                    <span>Restore Data (.JSON)</span>
                   </button>
                   <input
                     type="file"
@@ -1107,18 +1122,18 @@ export default function App() {
             <button
               onClick={handleExportBackup}
               className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
-              title="Download local database as JSON backup file"
+              title="Download local records as JSON data backup file"
             >
               <Download className="w-3.5 h-3.5 text-amber-400" />
-              <span>Backup DB</span>
+              <span>Backup Data</span>
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
-              title="Upload JSON backup file to restore database"
+              title="Upload JSON backup file to restore data"
             >
               <Upload className="w-3.5 h-3.5 text-sky-400" />
-              <span>Restore DB</span>
+              <span>Restore Data</span>
             </button>
           </div>
         </div>
@@ -1210,10 +1225,8 @@ export default function App() {
                 showCreateModalOnLoad={quickActionTrigger === 'create-job'}
                 onCloseCreateModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
-                onTriggerInvoice={(jobId) => {
-                  setInvoiceJobId(jobId);
-                  setActiveTab('invoices');
-                }}
+                onTriggerInvoice={handleTriggerInvoice}
+                onTriggerReceipt={handleTriggerReceipt}
               />
             )}
 
@@ -1223,6 +1236,7 @@ export default function App() {
                 customers={customers}
                 currentUser={currentUser}
                 invoiceJobId={invoiceJobId}
+                initialSubTab={invoiceInitialSubTab}
                 onClearInvoiceJobId={() => setInvoiceJobId(null)}
                 onUpdateJob={handleUpdateJob}
               />
@@ -1245,6 +1259,7 @@ export default function App() {
                 onUpdateTransaction={handleUpdateFinancialTransaction}
                 onDeleteTransaction={handleDeleteFinancialTransaction}
                 currentUser={currentUser}
+                onTriggerReceipt={handleTriggerReceipt}
               />
             )}
 

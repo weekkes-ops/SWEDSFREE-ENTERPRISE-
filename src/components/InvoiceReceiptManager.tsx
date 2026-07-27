@@ -73,6 +73,7 @@ interface InvoiceReceiptManagerProps {
   customers: Customer[];
   currentUser: Employee | null;
   invoiceJobId?: string | null;
+  initialSubTab?: 'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT';
   onClearInvoiceJobId?: () => void;
   onUpdateJob?: (updatedJob: Job) => void;
 }
@@ -82,6 +83,7 @@ export default function InvoiceReceiptManager({
   customers,
   currentUser,
   invoiceJobId,
+  initialSubTab = 'INVOICE',
   onClearInvoiceJobId,
   onUpdateJob
 }: InvoiceReceiptManagerProps) {
@@ -426,21 +428,80 @@ export default function InvoiceReceiptManager({
   const [receiptAcknowledge, setReceiptAcknowledge] = useState("");
   const [receiptReceivedBy, setReceiptReceivedBy] = useState("");
 
-  // Sync to outer invoice creation request (e.g. from Jobs tracker)
+  // States for Quick Custom Payment Receipt Issuance
+  const [customReceiptAmount, setCustomReceiptAmount] = useState<number>(1000);
+  const [customReceiptMethod, setCustomReceiptMethod] = useState<'Cash' | 'Bank Transfer' | 'Check' | 'Mobile Money'>('Bank Transfer');
+  const [customReceiptNote, setCustomReceiptNote] = useState<string>('Payment Clearance Installment');
+
+  const handleIssueCustomReceipt = (
+    job: Job,
+    amount: number,
+    method: 'Cash' | 'Bank Transfer' | 'Check' | 'Mobile Money',
+    note: string
+  ) => {
+    if (amount <= 0) {
+      alert("Please enter a valid payment amount greater than zero.");
+      return;
+    }
+    const newPayment: JobPayment = {
+      id: `REC-${Date.now().toString().slice(-6)}`,
+      amount: amount,
+      date: new Date().toISOString().split('T')[0],
+      method: method,
+      note: note || 'Payment Clearance Installment'
+    };
+
+    const updatedPayments = [...job.payments, newPayment];
+    const totalPaid = updatedPayments.reduce((s, p) => s + p.amount, 0);
+    const updatedJob: Job = {
+      ...job,
+      payments: updatedPayments,
+      status: totalPaid >= job.quoteAmount ? 'Completed' : job.status
+    };
+
+    if (onUpdateJob) {
+      onUpdateJob(updatedJob);
+    }
+    saveDocument('jobs', updatedJob);
+
+    setActiveReceipt({
+      job: updatedJob,
+      payment: newPayment
+    });
+    setReceiptPdfMode('VIEW');
+    setSaveToast(`Receipt ${newPayment.id} Issued & Cleared Successfully!`);
+    setTimeout(() => setSaveToast(null), 3500);
+  };
+
+  // Sync to outer invoice / receipt creation request (e.g. from Jobs tracker)
   useEffect(() => {
     if (invoiceJobId) {
-      setSubTab('INVOICE');
       setSelectedJobId(invoiceJobId);
       const job = jobs.find(j => j.id === invoiceJobId);
       if (job) {
-        setActiveInvoice(job);
-        setInvoicePdfMode('VIEW');
+        if (initialSubTab === 'RECEIPT') {
+          setSubTab('RECEIPT');
+          if (job.payments.length > 0) {
+            setActiveReceipt({ job, payment: job.payments[job.payments.length - 1] });
+            setReceiptPdfMode('VIEW');
+          } else {
+            handleGenerateFullPaymentReceipt(job);
+          }
+        } else {
+          setSubTab('INVOICE');
+          setActiveInvoice(job);
+          setInvoicePdfMode('VIEW');
+        }
+      } else if (initialSubTab) {
+        setSubTab(initialSubTab);
       }
       if (onClearInvoiceJobId) {
         onClearInvoiceJobId();
       }
+    } else if (initialSubTab) {
+      setSubTab(initialSubTab);
     }
-  }, [invoiceJobId, jobs, onClearInvoiceJobId]);
+  }, [invoiceJobId, jobs, initialSubTab, onClearInvoiceJobId]);
 
   // Sync Invoice local editable states when an activeInvoice is selected/opened
   useEffect(() => {
@@ -1048,7 +1109,7 @@ export default function InvoiceReceiptManager({
       {/* Top Section Header with SubTab buttons */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-5 rounded-2xl border border-wood-100 shadow-xs no-print">
         <div className="flex items-center gap-3">
-          <img src="/logo.svg" alt="Swedswood Enterprise Logo" className="w-12 h-12 object-contain" />
+          <img src={invoiceLogoUrl || '/logo.svg'} alt="Swedswood Enterprise Logo" className="w-12 h-12 object-contain" />
           <div>
             <h1 className="text-xl font-display font-black text-wood-900 tracking-tight flex items-center gap-2">
               Swedswood Enterprise Billing Desk
@@ -1560,7 +1621,7 @@ export default function InvoiceReceiptManager({
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase text-amber-900 tracking-wider flex items-center gap-1.5">
                         <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
-                        Invoice Sunburst Logo (Editable)
+                        Official Company Logo (Invoices & Receipts)
                       </span>
                       {invoiceLogoUrl !== '/logo.svg' && (
                         <button
@@ -1794,6 +1855,68 @@ export default function InvoiceReceiptManager({
                     );
                   })()}
 
+                  {/* Quick Issue Custom Payment Receipt Form */}
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-xs font-black text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                        <Receipt className="w-4 h-4 text-emerald-600" /> Issue Custom Payment Receipt
+                      </h5>
+                      <span className="text-[10px] text-emerald-800 font-bold font-mono">
+                        Outstanding Balance: {formatCurrency(Math.max(0, selectedJob.quoteAmount - selectedJob.payments.reduce((s, p) => s + p.amount, 0)), 0)}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-[10px] font-extrabold uppercase text-gray-500 block mb-1">Amount (Le)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={customReceiptAmount || ''}
+                          onChange={(e) => setCustomReceiptAmount(Number(e.target.value))}
+                          placeholder="e.g. 2500"
+                          className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-gray-800 outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-extrabold uppercase text-gray-500 block mb-1">Payment Method</label>
+                        <select
+                          value={customReceiptMethod}
+                          onChange={(e) => setCustomReceiptMethod(e.target.value as any)}
+                          className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-bold text-gray-800 outline-none focus:border-emerald-500"
+                        >
+                          <option value="Bank Transfer">Bank Transfer</option>
+                          <option value="Cash">Cash</option>
+                          <option value="Mobile Money">Mobile Money</option>
+                          <option value="Check">Check</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-extrabold uppercase text-gray-500 block mb-1">Receipt Note / Purpose</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Deposit / Part Payment"
+                          value={customReceiptNote}
+                          onChange={(e) => setCustomReceiptNote(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-medium text-gray-800 outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleIssueCustomReceipt(selectedJob, customReceiptAmount, customReceiptMethod, customReceiptNote);
+                      }}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Receipt className="w-4 h-4 text-emerald-200" />
+                      <span>Issue & Open PDF Receipt ({formatCurrency(customReceiptAmount, 0)})</span>
+                    </button>
+                  </div>
+
                   {/* 100% Full Payment Clearance Action Box */}
                   <div className="p-4 bg-emerald-950 text-white rounded-xl border border-emerald-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
                     <div className="space-y-1">
@@ -1891,70 +2014,6 @@ export default function InvoiceReceiptManager({
 
                 {/* PDF VIEW / INTERACTIVE EDIT SWITCH */}
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* Document Source Toggle */}
-                  <div className="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700">
-                    <button
-                      onClick={() => setActiveDocSource('TEMPLATE')}
-                      className={`px-2.5 py-1.5 rounded-md text-[11px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer ${
-                        activeDocSource === 'TEMPLATE' 
-                          ? 'bg-amber-500 text-slate-950 shadow-2xs' 
-                          : 'text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Generated Template</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveDocSource('UPLOADED')}
-                      className={`px-2.5 py-1.5 rounded-md text-[11px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer ${
-                        activeDocSource === 'UPLOADED' 
-                          ? 'bg-amber-500 text-slate-950 shadow-2xs' 
-                          : 'text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Uploaded Scan</span>
-                      {uploadedDocs.some(d => d.jobId === activeInvoice.id && d.docType === 'INVOICE') && (
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Template Format Selector */}
-                  <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
-                    <button
-                      onClick={() => setInvoiceTemplate('SWEDS_WOOD')}
-                      className={`px-3 py-1.5 rounded-md text-[11px] font-black uppercase transition-all ${
-                        invoiceTemplate === 'SWEDS_WOOD' 
-                          ? 'bg-[#0f52ba] text-white shadow-2xs' 
-                          : 'text-gray-600 hover:text-gray-950'
-                      }`}
-                    >
-                      Sweds Wood Paper Style
-                    </button>
-                    <button
-                      onClick={() => setInvoiceTemplate('MODERN')}
-                      className={`px-3 py-1.5 rounded-md text-[11px] font-black uppercase transition-all ${
-                        invoiceTemplate === 'MODERN' 
-                          ? 'bg-wood-950 text-white shadow-2xs' 
-                          : 'text-gray-600 hover:text-gray-950'
-                      }`}
-                    >
-                      Modern Digital
-                    </button>
-                  </div>
-
-                  {invoiceTemplate === 'SWEDS_WOOD' && (
-                    <button
-                      onClick={handleLoadScannedSample}
-                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1 transition shadow-2xs cursor-pointer"
-                      title="Load exact items and pricing from the physical paper scan"
-                    >
-                      <span>Load Scanned Image Sample</span>
-                    </button>
-                  )}
-
-
                   <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
                     <button
                       onClick={() => setInvoicePdfMode('VIEW')}
@@ -3234,34 +3293,6 @@ export default function InvoiceReceiptManager({
 
                 {/* PDF VIEW / INTERACTIVE EDIT SWITCH */}
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* Document Source Toggle */}
-                  <div className="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700">
-                    <button
-                      onClick={() => setActiveDocSource('TEMPLATE')}
-                      className={`px-2.5 py-1.5 rounded-md text-[11px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer ${
-                        activeDocSource === 'TEMPLATE' 
-                          ? 'bg-emerald-400 text-slate-950 shadow-2xs' 
-                          : 'text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      <Receipt className="w-3.5 h-3.5" />
-                      <span>Generated Receipt</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveDocSource('UPLOADED')}
-                      className={`px-2.5 py-1.5 rounded-md text-[11px] font-black uppercase transition-all flex items-center gap-1 cursor-pointer ${
-                        activeDocSource === 'UPLOADED' 
-                          ? 'bg-emerald-400 text-slate-950 shadow-2xs' 
-                          : 'text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Uploaded Scan</span>
-                      {uploadedDocs.some(d => d.jobId === activeReceipt.job.id && d.docType === 'RECEIPT') && (
-                        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                      )}
-                    </button>
-                  </div>
 
                   <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
                     <button
@@ -3400,25 +3431,44 @@ export default function InvoiceReceiptManager({
                 
                 {/* Letterhead Header */}
                 <div className="flex flex-col items-center text-center pb-6 border-b border-gray-200 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="p-2 bg-emerald-900 text-white rounded-xl">
-                      <Receipt className="w-4 h-4" />
-                    </span>
-                    {receiptPdfMode === 'EDIT' ? (
-                      <input
-                        type="text"
-                        value={receiptCompany}
-                        onChange={(e) => setReceiptCompany(e.target.value)}
-                        className="font-display font-black text-base uppercase tracking-wider text-emerald-950 bg-amber-50/50 border border-amber-200 rounded px-2 py-0.5 text-center"
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="relative group shrink-0">
+                      <img
+                        src={invoiceLogoUrl || '/logo.svg'}
+                        alt="Swedswood Enterprise Official Logo"
+                        className="w-14 h-14 object-contain shrink-0"
                       />
-                    ) : (
-                      <span className="font-display font-black text-base uppercase tracking-wider text-emerald-950">
-                        {receiptCompany}
-                      </span>
-                    )}
+                      <label
+                        className="absolute -bottom-1 -right-1 bg-emerald-950 text-white p-1 rounded-full text-[9px] cursor-pointer shadow-md hover:bg-emerald-600 transition no-print"
+                        title="Click to replace company logo image for both Invoices & Receipts"
+                      >
+                        <Upload className="w-3 h-3 text-emerald-300" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleInvoiceLogoFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex flex-col text-left sm:text-center">
+                      {receiptPdfMode === 'EDIT' ? (
+                        <input
+                          type="text"
+                          value={receiptCompany}
+                          onChange={(e) => setReceiptCompany(e.target.value)}
+                          className="font-display font-black text-lg uppercase tracking-wider text-emerald-950 bg-amber-50/50 border border-amber-200 rounded px-2 py-0.5 text-center"
+                        />
+                      ) : (
+                        <span className="font-display font-black text-lg uppercase tracking-wider text-emerald-950">
+                          {receiptCompany}
+                        </span>
+                      )}
+                      <div className="w-full h-[2.5px] bg-emerald-800 my-0.5" />
+                    </div>
                   </div>
 
-                  <h2 className="text-lg font-black text-gray-800 font-display uppercase tracking-wider">OFFICIAL CLEARANCE RECEIPT</h2>
+                  <h2 className="text-sm font-black text-gray-700 font-display uppercase tracking-wider">OFFICIAL CLEARANCE RECEIPT</h2>
                   
                   {receiptPdfMode === 'EDIT' ? (
                     <input
@@ -3677,24 +3727,9 @@ export default function InvoiceReceiptManager({
                       <button
                         type="button"
                         onClick={() => setBulkTemplate('SWEDS_WOOD')}
-                        className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${
-                          bulkTemplate === 'SWEDS_WOOD'
-                            ? 'bg-white text-wood-950 shadow-2xs border border-wood-200'
-                            : 'text-gray-500 hover:text-gray-800'
-                        }`}
+                        className="flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg bg-white text-wood-950 shadow-2xs border border-wood-200"
                       >
-                        Sweds Wood Style
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBulkTemplate('MODERN')}
-                        className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${
-                          bulkTemplate === 'MODERN'
-                            ? 'bg-wood-950 text-white shadow-2xs'
-                            : 'text-gray-500 hover:text-gray-800'
-                        }`}
-                      >
-                        Modern Digital
+                        Official Sweds Wood Invoice Format
                       </button>
                     </div>
                   </div>

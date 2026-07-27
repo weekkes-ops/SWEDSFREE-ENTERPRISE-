@@ -12,7 +12,8 @@ import {
   BarChart as BarIcon,
   ShieldAlert,
   Edit2,
-  Trash2
+  Trash2,
+  Receipt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -35,6 +36,7 @@ interface FinancialLedgerProps {
   onUpdateTransaction?: (transaction: FinancialTransaction) => void;
   onDeleteTransaction?: (id: string) => void;
   currentUser?: Employee | null;
+  onTriggerReceipt?: (jobId?: string) => void;
 }
 
 export default function FinancialLedger({
@@ -42,7 +44,8 @@ export default function FinancialLedger({
   onAddTransaction,
   onUpdateTransaction,
   onDeleteTransaction,
-  currentUser
+  currentUser,
+  onTriggerReceipt
 }: FinancialLedgerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [showAddModal, setShowAddModal] = useState(false);
@@ -334,6 +337,16 @@ export default function FinancialLedger({
                       {!isAuditor && (
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
                           <div className="inline-flex items-center justify-center gap-1.5">
+                            {(isInc || t.referenceId) && onTriggerReceipt && (
+                              <button
+                                onClick={() => onTriggerReceipt(t.referenceId)}
+                                className="px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition flex items-center gap-1 cursor-pointer"
+                                title="Open Receipt Desk"
+                              >
+                                <Receipt className="w-3 h-3 text-emerald-600" />
+                                <span>Receipt</span>
+                              </button>
+                            )}
                             <button
                               onClick={() => handleStartEdit(t)}
                               className="p-1 text-slate-400 hover:text-wood-700 rounded-lg hover:bg-slate-100 transition"

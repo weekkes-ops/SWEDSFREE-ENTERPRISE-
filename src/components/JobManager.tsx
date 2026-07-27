@@ -17,7 +17,8 @@ import {
   CreditCard,
   ShieldAlert,
   FileText,
-  Trash2
+  Trash2,
+  Receipt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -36,6 +37,7 @@ interface JobManagerProps {
   onCloseCreateModal?: () => void;
   currentUser?: Employee | null;
   onTriggerInvoice?: (jobId: string) => void;
+  onTriggerReceipt?: (jobId: string) => void;
 }
 
 export default function JobManager({
@@ -52,7 +54,8 @@ export default function JobManager({
   showCreateModalOnLoad = false,
   onCloseCreateModal,
   currentUser,
-  onTriggerInvoice
+  onTriggerInvoice,
+  onTriggerReceipt
 }: JobManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [searchTerm, setSearchTerm] = useState('');
@@ -199,22 +202,23 @@ export default function JobManager({
     if (updatedJob) setSelectedJob(updatedJob);
   };
 
-  const handleRecordPaymentSubmit = (e: FormEvent) => {
+  const handleRecordPaymentSubmit = (e: FormEvent, shouldTriggerReceipt: boolean = false) => {
     e.preventDefault();
     if (!selectedJob) return;
 
     const paid = selectedJob.payments.reduce((sum, p) => sum + p.amount, 0);
     const remaining = selectedJob.quoteAmount - paid;
+    const targetJobId = selectedJob.id;
 
     if (paymentAmount > remaining) {
       alert(`Overpayment warning: Remaining outstanding is only ${formatCurrency(remaining)}. Adjusting payment amount to match exactly.`);
-      onRecordJobPayment(selectedJob.id, {
+      onRecordJobPayment(targetJobId, {
         amount: remaining,
         date: new Date().toISOString().split('T')[0],
         method: paymentMethod
       });
     } else {
-      onRecordJobPayment(selectedJob.id, {
+      onRecordJobPayment(targetJobId, {
         amount: paymentAmount,
         date: new Date().toISOString().split('T')[0],
         method: paymentMethod
@@ -223,8 +227,12 @@ export default function JobManager({
 
     setShowPaymentModal(false);
     // Refresh context
-    const updatedJob = jobs.find(j => j.id === selectedJob.id);
+    const updatedJob = jobs.find(j => j.id === targetJobId);
     if (updatedJob) setSelectedJob(updatedJob);
+
+    if (shouldTriggerReceipt && onTriggerReceipt) {
+      onTriggerReceipt(targetJobId);
+    }
   };
 
   const toggleStaffAssignment = (staffId: string) => {
@@ -370,10 +378,19 @@ export default function JobManager({
                       {onTriggerInvoice && (
                         <button
                           onClick={() => onTriggerInvoice(activeSelectedJob.id)}
-                          className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition flex items-center gap-1 shadow-xs"
+                          className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
                         >
                           <FileText className="w-3 h-3 text-amber-700" />
                           <span>Create Invoice</span>
+                        </button>
+                      )}
+                      {onTriggerReceipt && (
+                        <button
+                          onClick={() => onTriggerReceipt(activeSelectedJob.id)}
+                          className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
+                        >
+                          <Receipt className="w-3 h-3 text-emerald-700" />
+                          <span>Issue / View Receipt</span>
                         </button>
                       )}
                       {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager') && onDeleteJob && (
@@ -474,16 +491,27 @@ export default function JobManager({
 
                 {/* Payments Overview Card */}
                 <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] text-gray-400 font-bold uppercase">Payments Clearing</span>
-                    {!isAuditor && (
-                      <button 
-                        onClick={() => setShowPaymentModal(true)}
-                        className="text-[10px] text-emerald-700 font-extrabold hover:underline"
-                      >
-                        Receive Payment
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {onTriggerReceipt && (
+                        <button 
+                          onClick={() => onTriggerReceipt(activeSelectedJob.id)}
+                          className="text-[10px] text-emerald-700 font-extrabold hover:underline flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <Receipt className="w-3 h-3 text-emerald-600" />
+                          <span>Receipt Desk</span>
+                        </button>
+                      )}
+                      {!isAuditor && (
+                        <button 
+                          onClick={() => setShowPaymentModal(true)}
+                          className="text-[10px] text-emerald-700 font-extrabold hover:underline cursor-pointer"
+                        >
+                          Receive Payment
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-2">
                     <p className="text-lg font-bold font-mono text-gray-800">
@@ -580,8 +608,20 @@ export default function JobManager({
                           <span className="font-mono text-gray-500">{p.date}</span>
                           <span className="mx-2 text-gray-300">|</span>
                           <span className="font-bold text-gray-800">{p.method} Clear</span>
+                          {p.note && <span className="block text-[10px] text-gray-400 font-medium">{p.note}</span>}
                         </div>
-                        <span className="font-mono font-bold text-emerald-800">+{formatCurrency(p.amount)}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-emerald-800">+{formatCurrency(p.amount)}</span>
+                          {onTriggerReceipt && (
+                            <button
+                              onClick={() => onTriggerReceipt(activeSelectedJob.id)}
+                              className="px-2.5 py-1 text-[10px] font-extrabold uppercase text-emerald-900 bg-emerald-100 hover:bg-emerald-200 border border-emerald-200 rounded-lg transition shadow-2xs flex items-center gap-1 cursor-pointer"
+                            >
+                              <Receipt className="w-3 h-3 text-emerald-700" />
+                              <span>Receipt</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -721,7 +761,7 @@ export default function JobManager({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Quote Amount (Le) *</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Unit Cost (Le) *</label>
                     <input
                       type="number"
                       required
@@ -879,20 +919,30 @@ export default function JobManager({
                   </select>
                 </div>
 
-                <div className="flex gap-2 pt-4">
+                <div className="flex flex-col sm:flex-row gap-2 pt-4">
                   <button 
                     type="button" 
                     onClick={() => setShowPaymentModal(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
+                    className="py-2.5 px-3 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-bold transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition shadow-xs"
+                    className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
                   >
                     Clear Payment
                   </button>
+                  {onTriggerReceipt && (
+                    <button 
+                      type="button"
+                      onClick={(e) => handleRecordPaymentSubmit(e as any, true)}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-100 text-xs font-black uppercase transition shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Receipt className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Clear & Open Receipt</span>
+                    </button>
+                  )}
                 </div>
               </form>
             </motion.div>
@@ -1024,7 +1074,7 @@ export default function JobManager({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Client Quote (Le) *</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Unit Cost (Le) *</label>
                     <input
                       type="number"
                       required
