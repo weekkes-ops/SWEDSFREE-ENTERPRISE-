@@ -24,7 +24,7 @@ import {
 
 import { motion, AnimatePresence } from 'motion/react';
 
-// Child components
+// Childs components
 import DashboardOverview from './components/DashboardOverview';
 import InventoryManager from './components/InventoryManager';
 import CustomerManager from './components/CustomerManager';
@@ -72,7 +72,7 @@ export default function App() {
   const [quickActionTrigger, setQuickActionTrigger] = useState<string | null>(null);
   const [invoiceJobId, setInvoiceJobId] = useState<string | null>(null);
 
-  // Offline network status & file backup ref
+  // Offline network  for production infastrature status & file backup ref
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>(navigator.onLine ? 'synced' : 'offline');
   const [syncBannerMessage, setSyncBannerMessage] = useState<string | null>(null);
@@ -179,20 +179,20 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  // Helper to load stored data from local cache without forced seed fallback
-  const getStoredData = <T,>(key: string): T[] => {
+  // Helper to load stored data from local cache with fallback
+  const getStoredData = <T,>(key: string, fallback: T[] = []): T[] => {
     try {
       const raw = localStorage.getItem(key);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
     } catch (e) {
       console.error(`Error loading stored data for ${key}:`, e);
     }
-    return [];
+    return fallback;
   };
 
   // Core workshop state modules
@@ -206,30 +206,25 @@ export default function App() {
     }
   });
 
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => getStoredData('swedsfree_inventory'));
-  const [customers, setCustomers] = useState<Customer[]>(() => getStoredData('swedsfree_customers'));
-  const [employees, setEmployees] = useState<Employee[]>(() => getStoredData('swedsfree_employees'));
-  const [jobs, setJobs] = useState<Job[]>(() => getStoredData('swedsfree_jobs'));
-  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>(() => getStoredData('swedsfree_inv_transactions'));
-  const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>(() => getStoredData('swedsfree_fin_transactions'));
-  const [dailyWorkLogs, setDailyWorkLogs] = useState<DailyWorkLog[]>(() => getStoredData('swedsfree_daily_work_logs'));
-  const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>(() => getStoredData('swedsfree_registration_requests'));
-  const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters'));
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => getStoredData('swedsfree_inventory', INITIAL_INVENTORY));
+  const [customers, setCustomers] = useState<Customer[]>(() => getStoredData('swedsfree_customers', INITIAL_CUSTOMERS));
+  const [employees, setEmployees] = useState<Employee[]>(() => getStoredData('swedsfree_employees', INITIAL_EMPLOYEES));
+  const [jobs, setJobs] = useState<Job[]>(() => getStoredData('swedsfree_jobs', INITIAL_JOBS));
+  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>(() => getStoredData('swedsfree_inv_transactions', INITIAL_INVENTORY_TRANSACTIONS));
+  const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>(() => getStoredData('swedsfree_fin_transactions', INITIAL_FINANCIALS));
+  const [dailyWorkLogs, setDailyWorkLogs] = useState<DailyWorkLog[]>(() => getStoredData('swedsfree_daily_work_logs', INITIAL_DAILY_WORK_LOGS));
+  const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>(() => getStoredData('swedsfree_registration_requests', []));
+  const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters', []));
 
-  // List of initial mock seed IDs to purge from database
-  const MOCK_SEED_IDS = {
-    inventory: ['inv-01', 'inv-02', 'inv-03', 'inv-04', 'inv-05', 'inv-06', 'inv-07'],
-    customers: ['cust-01', 'cust-02', 'cust-03', 'cust-04'],
-    employees: ['emp-01', 'emp-02', 'emp-03', 'emp-04', 'emp-05', 'emp-06', 'emp-07'],
-    jobs: ['JOB-2026-001', 'JOB-2026-002', 'JOB-2026-003'],
-    inventoryTransactions: ['itx-01', 'itx-02'],
-    financialTransactions: ['fin-01', 'fin-02', 'fin-03', 'fin-04', 'fin-05', 'fin-06'],
-    dailyWorkLogs: ['log-101', 'log-102']
-  };
-
-  // Helper function to remove generated sample records from Firestore and local storage
+  // Helper function to remove sample records from Firestore and local storage on explicit user request
   const purgeGeneratedSampleData = async () => {
-    for (const [colName, ids] of Object.entries(MOCK_SEED_IDS)) {
+    const SAMPLE_IDS = {
+      inventory: ['inv-01', 'inv-02', 'inv-03'],
+      customers: ['cust-01', 'cust-02'],
+      jobs: ['JOB-2026-001']
+    };
+
+    for (const [colName, ids] of Object.entries(SAMPLE_IDS)) {
       for (const id of ids) {
         try {
           await deleteDocument(colName, id);
@@ -239,21 +234,9 @@ export default function App() {
       }
     }
 
-    setInventory(prev => prev.filter(i => !MOCK_SEED_IDS.inventory.includes(i.id)));
-    setCustomers(prev => prev.filter(c => !MOCK_SEED_IDS.customers.includes(c.id)));
-    setEmployees(prev => prev.filter(e => !MOCK_SEED_IDS.employees.includes(e.id)));
-    setJobs(prev => prev.filter(j => !MOCK_SEED_IDS.jobs.includes(j.id)));
-    setInventoryTransactions(prev => prev.filter(t => !MOCK_SEED_IDS.inventoryTransactions.includes(t.id)));
-    setFinancialTransactions(prev => prev.filter(f => !MOCK_SEED_IDS.financialTransactions.includes(f.id)));
-    setDailyWorkLogs(prev => prev.filter(l => !MOCK_SEED_IDS.dailyWorkLogs.includes(l.id)));
-
-    localStorage.removeItem('swedsfree_inventory');
-    localStorage.removeItem('swedsfree_customers');
-    localStorage.removeItem('swedsfree_employees');
-    localStorage.removeItem('swedsfree_jobs');
-    localStorage.removeItem('swedsfree_inv_transactions');
-    localStorage.removeItem('swedsfree_fin_transactions');
-    localStorage.removeItem('swedsfree_daily_work_logs');
+    setInventory(prev => prev.filter(i => !SAMPLE_IDS.inventory.includes(i.id)));
+    setCustomers(prev => prev.filter(c => !SAMPLE_IDS.customers.includes(c.id)));
+    setJobs(prev => prev.filter(j => !SAMPLE_IDS.jobs.includes(j.id)));
   };
 
   // 1. Initial Load & Real-Time Sync from Firestore Database
@@ -264,31 +247,48 @@ export default function App() {
     const syncCollection = <T extends { id: string }>(
       collectionName: string,
       setter: React.Dispatch<React.SetStateAction<T[]>>,
-      localKey: string
+      localKey: string,
+      initialFallback: T[] = []
     ) => {
       const unsub = subscribeToCollection<T>(collectionName, (items) => {
-        // Filter out any leftover mock seed documents
-        const mockIds = (MOCK_SEED_IDS as Record<string, string[]>)[collectionName] || [];
-        const cleanItems = (items || []).filter(item => !mockIds.includes(item.id));
-        
-        setter(cleanItems);
-        localStorage.setItem(localKey, JSON.stringify(cleanItems));
+        if (!items || items.length === 0) {
+          // If Firestore collection is empty, automatically seed initial dataset permanently
+          if (initialFallback && initialFallback.length > 0) {
+            saveBatchDocuments(collectionName, initialFallback);
+            setter(initialFallback);
+            localStorage.setItem(localKey, JSON.stringify(initialFallback));
+            return;
+          }
+        }
+
+        // Ensure key customer/job records (such as Shalomville and Mr Mohamed Salia) are permanently present in Firestore
+        if (initialFallback && initialFallback.length > 0) {
+          const existingIds = new Set((items || []).map(i => i.id));
+          const missingItems = initialFallback.filter(fb => !existingIds.has(fb.id));
+          if (missingItems.length > 0) {
+            saveBatchDocuments(collectionName, missingItems);
+            const combined = [...(items || []), ...missingItems];
+            setter(combined);
+            localStorage.setItem(localKey, JSON.stringify(combined));
+            return;
+          }
+        }
+
+        setter(items || []);
+        localStorage.setItem(localKey, JSON.stringify(items || []));
       });
       unsubs.push(unsub);
     };
 
-    syncCollection('inventory', setInventory, 'swedsfree_inventory');
-    syncCollection('customers', setCustomers, 'swedsfree_customers');
-    syncCollection('employees', setEmployees, 'swedsfree_employees');
-    syncCollection('jobs', setJobs, 'swedsfree_jobs');
-    syncCollection('inventoryTransactions', setInventoryTransactions, 'swedsfree_inv_transactions');
-    syncCollection('financialTransactions', setFinancialTransactions, 'swedsfree_fin_transactions');
-    syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs');
-    syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests');
-    syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters');
-
-    // Run one-time purge of pre-existing mock documents from Firestore
-    purgeGeneratedSampleData();
+    syncCollection('inventory', setInventory, 'swedsfree_inventory', INITIAL_INVENTORY);
+    syncCollection('customers', setCustomers, 'swedsfree_customers', INITIAL_CUSTOMERS);
+    syncCollection('employees', setEmployees, 'swedsfree_employees', INITIAL_EMPLOYEES);
+    syncCollection('jobs', setJobs, 'swedsfree_jobs', INITIAL_JOBS);
+    syncCollection('inventoryTransactions', setInventoryTransactions, 'swedsfree_inv_transactions', INITIAL_INVENTORY_TRANSACTIONS);
+    syncCollection('financialTransactions', setFinancialTransactions, 'swedsfree_fin_transactions', INITIAL_FINANCIALS);
+    syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs', INITIAL_DAILY_WORK_LOGS);
+    syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests', []);
+    syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters', []);
 
     return () => {
       unsubs.forEach(unsub => unsub());

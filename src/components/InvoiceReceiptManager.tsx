@@ -471,29 +471,10 @@ export default function InvoiceReceiptManager({
       setInvoiceProjectTitle(activeInvoice.title);
       setInvoiceProjectDescription(activeInvoice.description || 'Custom hand-crafted carpentry order.');
       setInvoiceTimeline(`${activeInvoice.startDate} to ${activeInvoice.dueDate}`);
-      setInvoiceProjectQty(1);
+      setInvoiceProjectQty(activeInvoice.quantity || 1);
 
-      if (activeInvoice.materialsUsed && activeInvoice.materialsUsed.length > 0) {
-        const matsTotal = activeInvoice.materialsUsed.reduce(
-          (sum, m) => sum + (m.totalCost || (m.quantity * (m.unitCost || 0))),
-          0
-        );
-        const netComm = Math.max(0, activeInvoice.quoteAmount - matsTotal);
-        setInvoiceCommissionAmount(netComm);
-
-        const matItems: CustomInvoiceItem[] = activeInvoice.materialsUsed.map((m, idx) => ({
-          id: `mat-${m.itemId || idx}-${idx}`,
-          description: `Allocated Lumber: ${m.name}`,
-          quantity: m.quantity,
-          unitRate: String(m.quantity),
-          unitPrice: m.unitCost || 0,
-          amount: m.totalCost || (m.quantity * (m.unitCost || 0))
-        }));
-        setCustomInvoiceItems(matItems);
-      } else {
-        setInvoiceCommissionAmount(activeInvoice.quoteAmount);
-        setCustomInvoiceItems([]);
-      }
+      setInvoiceCommissionAmount(activeInvoice.quoteAmount);
+      setCustomInvoiceItems([]);
       
       setInvoicePreparedBy("");
     }
@@ -1973,16 +1954,6 @@ export default function InvoiceReceiptManager({
                     </button>
                   )}
 
-                  {activeInvoice?.materialsUsed && activeInvoice.materialsUsed.length > 0 && (
-                    <button
-                      onClick={handleImportJobMaterials}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
-                      title="Import consumed job materials as itemized invoice line items"
-                    >
-                      <Wrench className="w-3.5 h-3.5" />
-                      <span>Import Job Materials ({activeInvoice.materialsUsed.length})</span>
-                    </button>
-                  )}
 
                   <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-300">
                     <button
@@ -2358,10 +2329,10 @@ export default function InvoiceReceiptManager({
                       <table className="w-full border-collapse text-xs">
                         <thead>
                           <tr className="bg-[#38bdf8] border-b border-gray-400 text-white font-black uppercase text-[10px] tracking-wider">
-                            <th className="py-2 px-3 border-r border-gray-400 text-left w-7/12">Description</th>
-                            <th className="py-2 px-3 border-r border-gray-400 text-center w-1/12">Qty</th>
-                            <th className="py-2 px-3 border-r border-gray-400 text-right w-2/12">Price</th>
-                            <th className="py-2 px-3 text-right w-2/12">Total</th>
+                            <th className="py-2 px-3 border-r border-gray-400 text-left w-7/12 font-black text-white">Description</th>
+                            <th className="py-2 px-3 border-r border-gray-400 text-center w-1/12 font-black text-white bg-[#0f52ba]">Qty</th>
+                            <th className="py-2 px-3 border-r border-gray-400 text-right w-2/12 font-black text-white">Price</th>
+                            <th className="py-2 px-3 text-right w-2/12 font-black text-white">Total</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -2402,18 +2373,22 @@ export default function InvoiceReceiptManager({
                               <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">
                                 {invoicePdfMode === 'EDIT' ? (
                                   <>
-                                    <span className="hidden print:inline font-mono font-bold">{invoiceProjectQty || 1}</span>
+                                    <span className="qty-data inline-block font-mono font-black text-white bg-[#0f52ba] px-2.5 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                      {invoiceProjectQty || 1}
+                                    </span>
                                     <input
                                       type="number"
                                       min="0"
                                       step="any"
                                       value={invoiceProjectQty === 0 ? '' : invoiceProjectQty}
                                       onChange={(e) => setInvoiceProjectQty(e.target.value === '' ? '' : e.target.value)}
-                                      className="w-14 text-center font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white print:hidden"
+                                      className="w-14 text-center font-mono font-black text-xs border border-blue-400 rounded px-1 py-0.5 bg-[#0f52ba] text-white print:hidden font-bold"
                                     />
                                   </>
                                 ) : (
-                                  invoiceProjectQty || 1
+                                  <span className="qty-data inline-block font-mono font-black text-white bg-[#0f52ba] px-2.5 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                    {invoiceProjectQty || 1}
+                                  </span>
                                 )}
                               </td>
                               <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
@@ -2477,18 +2452,22 @@ export default function InvoiceReceiptManager({
                                 <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">
                                   {invoicePdfMode === 'EDIT' ? (
                                     <>
-                                      <span className="hidden print:inline font-mono font-bold">{qty}</span>
+                                      <span className="qty-data inline-block font-mono font-black text-white bg-[#0f52ba] px-2.5 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                        {qty}
+                                      </span>
                                       <input
                                         type="number"
                                         min="0"
                                         step="any"
                                         value={item.quantity === 0 ? '' : (item.quantity ?? qty)}
                                         onChange={(e) => handleUpdateCustomItem(item.id, 'quantity', e.target.value)}
-                                        className="w-14 text-center font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white print:hidden"
+                                        className="w-14 text-center font-mono font-black text-xs border border-blue-400 rounded px-1 py-0.5 bg-[#0f52ba] text-white print:hidden font-bold"
                                       />
                                     </>
                                   ) : (
-                                    qty
+                                    <span className="qty-data inline-block font-mono font-black text-white bg-[#0f52ba] px-2.5 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                      {qty}
+                                    </span>
                                   )}
                                 </td>
                                 <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
@@ -2963,7 +2942,12 @@ export default function InvoiceReceiptManager({
                                     />
                                   </div>
                                 ) : (
-                                  `${invoiceProjectQty || 1} Set(s) × ${formatCurrency(invoiceCommissionAmount, 0)}`
+                                  <span className="inline-flex items-center gap-1.5 justify-end">
+                                    <span className="qty-data inline-block bg-wood-950 text-white font-black px-2 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                      {invoiceProjectQty || 1} Set(s)
+                                    </span>
+                                    <span className="text-gray-600 font-bold">× {formatCurrency(invoiceCommissionAmount, 0)}</span>
+                                  </span>
                                 )}
                               </td>
                               <td className="py-3 px-3 text-right font-mono font-bold text-gray-800">
@@ -3026,7 +3010,12 @@ export default function InvoiceReceiptManager({
                                       />
                                     </div>
                                   ) : (
-                                    `${qty} × ${formatCurrency(unitPrice, 0)}`
+                                    <span className="inline-flex items-center gap-1.5 justify-end">
+                                      <span className="qty-data inline-block bg-wood-950 text-white font-black px-2 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                        Qty: {qty}
+                                      </span>
+                                      <span className="text-gray-600 font-bold">× {formatCurrency(unitPrice, 0)}</span>
+                                    </span>
                                   )}
                                 </td>
                                 <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-800">
@@ -4047,32 +4036,6 @@ export function buildInvoicePdfContent(
           total: commissionAmount * projQtyNum
         });
       }
-    } else if (job.materialsUsed && job.materialsUsed.length > 0) {
-      const matsTotal = job.materialsUsed.reduce((s, m) => s + (m.totalCost || (m.quantity * (m.unitCost || 0))), 0);
-      const effectiveComm = commissionAmountOverride !== undefined ? commissionAmountOverride : Math.max(0, job.quoteAmount - matsTotal);
-      const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
-
-      itemsToRender = [];
-      if (effectiveComm > 0) {
-        itemsToRender.push({
-          desc: projectTitle,
-          qty: String(projQtyNum),
-          price: effectiveComm,
-          total: effectiveComm * projQtyNum
-        });
-      }
-
-      job.materialsUsed.forEach(m => {
-        const qtyNum = m.quantity || 1;
-        const unitPrice = m.unitCost || 0;
-        const lineTotal = m.totalCost || (qtyNum * unitPrice);
-        itemsToRender.push({
-          desc: `Allocated Lumber: ${m.name}`,
-          qty: String(qtyNum),
-          price: unitPrice,
-          total: lineTotal
-        });
-      });
     } else {
       const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
       itemsToRender = [{
@@ -4093,8 +4056,14 @@ export function buildInvoicePdfContent(
       doc.setTextColor(31, 41, 55);
       doc.text(it.desc, 19, currentY + 5.5);
       
-      doc.setFont('helvetica', 'normal');
-      doc.text(it.qty, 15 + ledCol1 + (ledCol2 / 2), currentY + 5.5, { align: 'center' });
+      // Draw solid blue badge box for Qty data
+      doc.setFillColor(15, 82, 186); // #0f52ba
+      doc.roundedRect(15 + ledCol1 + 2, currentY + 1.2, ledCol2 - 4, 5.5, 1, 1, 'F');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(255, 255, 255); // Solid Bold White
+      doc.text(it.qty, 15 + ledCol1 + (ledCol2 / 2), currentY + 5.2, { align: 'center' });
       
       doc.setFont('helvetica', 'bold');
       const pStr = `SLL ${it.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;

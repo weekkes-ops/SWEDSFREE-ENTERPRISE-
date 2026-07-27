@@ -324,6 +324,18 @@ button.bg-wood-700:hover {
     color: #ffffff !important;
   }
 
+  /* Force Qty data to be crisp bold white on invoice printout */
+  .qty-data,
+  .qty-badge,
+  span.qty-data {
+    color: #ffffff !important;
+    font-weight: 900 !important;
+    opacity: 1 !important;
+    background-color: #0f52ba !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   /* Branded color accents for print - glowing golden-amber */
   .text-amber-500,
   .text-amber-400,

@@ -75,6 +75,26 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
 
 export const INITIAL_CUSTOMERS: Customer[] = [
   {
+    id: 'cust-shalomville',
+    name: 'Shalomville',
+    company: 'Shalomville Estates & Development',
+    phone: '+232 78 555 999',
+    email: 'info@shalomville.sl',
+    address: 'Shalomville Estate, Regent-Grafton Highway, Freetown, Sierra Leone',
+    notes: 'Key estate developer. Custom mahogany entrance doors, fitted teak kitchen cabinetry, and luxury wardrobe suites.',
+    registrationDate: '2026-07-24'
+  },
+  {
+    id: 'cust-salia',
+    name: 'Mr Mohamed Salia',
+    company: 'Salia Enterprises & Investments',
+    phone: '+232 77 888 222',
+    email: 'm.salia@saliaenterprises.sl',
+    address: '14 Wilkinson Road, Freetown, Sierra Leone',
+    notes: 'Executive residential account. Solid red mahogany dining set, executive office pedestal desk, and credenza.',
+    registrationDate: '2026-07-24'
+  },
+  {
     id: 'cust-01',
     name: 'Paramount Hotel Freetown',
     company: 'Paramount Hospitality Group',
@@ -205,11 +225,58 @@ export const INITIAL_EMPLOYEES: Employee[] = [
 
 export const INITIAL_JOBS: Job[] = [
   {
+    id: 'JOB-2026-004',
+    customerId: 'cust-shalomville',
+    customerName: 'Shalomville',
+    title: 'Shalomville Estate Teak Kitchen Cabinets & Doors',
+    description: 'Design, fabrication, and installation of 12 sets of solid Sierra Leone teak kitchen cabinets, fitted wardrobes, and hand-carved mahogany entrance doors for Shalomville Estate residences.',
+    quantity: 12,
+    assignedEmployees: ['emp-03', 'emp-04', 'emp-05'],
+    status: 'In Progress',
+    startDate: '2026-07-24',
+    dueDate: '2026-08-30',
+    quoteAmount: 145000,
+    laborCost: 22000,
+    otherCosts: 4500,
+    materialsUsed: [
+      { itemId: 'inv-02', name: 'Teak Hardwood Boards', quantity: 150, unitCost: 65, totalCost: 9750 },
+      { itemId: 'inv-03', name: 'High-Grade Birch Plywood 18mm', quantity: 20, unitCost: 180, totalCost: 3600 },
+      { itemId: 'inv-05', name: 'Polyurethane Wood Varnish - Gloss', quantity: 10, unitCost: 85, totalCost: 850 }
+    ],
+    payments: [
+      { id: 'pay-sv-01', amount: 72500, date: '2026-07-24', method: 'Bank Transfer', note: '50% Commitment Advance Deposit' }
+    ]
+  },
+  {
+    id: 'JOB-2026-005',
+    customerId: 'cust-salia',
+    customerName: 'Mr Mohamed Salia',
+    title: 'Executive Mahogany Office Desk & Dining Suite',
+    description: 'Hand-finished executive red mahogany pedestal desk with leather inlay top, matching credenza, and 8-seater solid mahogany dining table with carved chairs.',
+    quantity: 1,
+    assignedEmployees: ['emp-03', 'emp-06'],
+    status: 'Ready for Polishing',
+    startDate: '2026-07-24',
+    dueDate: '2026-08-20',
+    quoteAmount: 98000,
+    laborCost: 14000,
+    otherCosts: 2800,
+    materialsUsed: [
+      { itemId: 'inv-01', name: 'Sierra Leone Red Mahogany Planks', quantity: 110, unitCost: 45, totalCost: 4950 },
+      { itemId: 'inv-04', name: 'Heavy Duty Brass Cabinet Hinges', quantity: 24, unitCost: 12, totalCost: 288 }
+    ],
+    payments: [
+      { id: 'pay-salia-01', amount: 49000, date: '2026-07-24', method: 'Bank Transfer', note: '50% Advance Commitment Deposit' },
+      { id: 'pay-salia-02', amount: 25000, date: '2026-07-25', method: 'Cash', note: 'Milestone Progress Payment' }
+    ]
+  },
+  {
     id: 'JOB-2026-001',
     customerId: 'cust-01',
     customerName: 'Paramount Hotel Freetown',
     title: 'Custom Mahogany Boardroom Table & 12 Chairs',
     description: 'Hand-carved 14ft solid Sierra Leone mahogany executive boardroom table with matching brass-inlaid leather chairs.',
+    quantity: 1,
     assignedEmployees: ['emp-03', 'emp-04', 'emp-05'],
     status: 'In Progress',
     startDate: '2026-07-01',
@@ -302,6 +369,33 @@ export const INITIAL_INVENTORY_TRANSACTIONS: InventoryTransaction[] = [
 
 export const INITIAL_FINANCIALS: FinancialTransaction[] = [
   {
+    id: 'fin-sv-01',
+    type: 'INCOME',
+    category: 'Job Payment',
+    amount: 72500,
+    date: '2026-07-24',
+    description: 'Deposit for Shalomville Estate Teak Kitchen Cabinets & Doors (JOB-2026-004)',
+    referenceId: 'JOB-2026-004'
+  },
+  {
+    id: 'fin-salia-01',
+    type: 'INCOME',
+    category: 'Job Payment',
+    amount: 49000,
+    date: '2026-07-24',
+    description: 'Advance Deposit for Executive Mahogany Office Desk & Dining Suite (JOB-2026-005)',
+    referenceId: 'JOB-2026-005'
+  },
+  {
+    id: 'fin-salia-02',
+    type: 'INCOME',
+    category: 'Job Payment',
+    amount: 25000,
+    date: '2026-07-25',
+    description: 'Milestone Progress Payment received from Mr Mohamed Salia (JOB-2026-005)',
+    referenceId: 'JOB-2026-005'
+  },
+  {
     id: 'fin-01',
     type: 'INCOME',
     category: 'Job Payment',
@@ -358,6 +452,30 @@ export const INITIAL_FINANCIALS: FinancialTransaction[] = [
 ];
 
 export const INITIAL_DAILY_WORK_LOGS: DailyWorkLog[] = [
+  {
+    id: 'log-103',
+    employeeId: 'emp-03',
+    employeeName: 'Augustine Sesay',
+    jobId: 'JOB-2026-004',
+    jobTitle: 'Shalomville Estate Teak Kitchen Cabinets & Doors',
+    date: '2026-07-24',
+    timeStarted: '08:00',
+    timeEnd: '17:30',
+    location: 'Shalomville Estate Site Bay 2',
+    comment: 'Started frame assembling for Shalomville teak kitchen cabinet units and mahogany entrance doors.'
+  },
+  {
+    id: 'log-104',
+    employeeId: 'emp-06',
+    employeeName: 'Sahr Conteh',
+    jobId: 'JOB-2026-005',
+    jobTitle: 'Executive Mahogany Office Desk & Dining Suite',
+    date: '2026-07-25',
+    timeStarted: '08:15',
+    timeEnd: '16:45',
+    location: 'Main Workshop Polishing Section',
+    comment: 'Sanding and surface smoothing completed for Mr Mohamed Salia executive mahogany desk top.'
+  },
   {
     id: 'log-101',
     employeeId: 'emp-03',

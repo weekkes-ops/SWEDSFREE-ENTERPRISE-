@@ -67,6 +67,7 @@ export default function JobManager({
   const [title, setTitle] = useState('');
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [description, setDescription] = useState('');
+  const [quantity, setQuantity] = useState<number>(1);
   const [assignedStaff, setAssignedStaff] = useState<string[]>([]);
   const [startDate, setStartDate] = useState('2026-07-20');
   const [dueDate, setDueDate] = useState('2026-08-20');
@@ -76,6 +77,7 @@ export default function JobManager({
   const [editJobTitle, setEditJobTitle] = useState('');
   const [editJobCustomerId, setEditJobCustomerId] = useState('');
   const [editJobDescription, setEditJobDescription] = useState('');
+  const [editJobQuantity, setEditJobQuantity] = useState<number>(1);
   const [editJobAssignedStaff, setEditJobAssignedStaff] = useState<string[]>([]);
   const [editJobStartDate, setEditJobStartDate] = useState('');
   const [editJobDueDate, setEditJobDueDate] = useState('');
@@ -100,6 +102,7 @@ export default function JobManager({
     setEditJobTitle(job.title);
     setEditJobCustomerId(job.customerId);
     setEditJobDescription(job.description);
+    setEditJobQuantity(job.quantity || 1);
     setEditJobAssignedStaff(job.assignedEmployees);
     setEditJobStartDate(job.startDate);
     setEditJobDueDate(job.dueDate);
@@ -121,6 +124,7 @@ export default function JobManager({
       customerId: editJobCustomerId,
       customerName: customer.name,
       description: editJobDescription,
+      quantity: editJobQuantity || 1,
       assignedEmployees: editJobAssignedStaff,
       startDate: editJobStartDate,
       dueDate: editJobDueDate,
@@ -148,6 +152,7 @@ export default function JobManager({
       customerName: customer.name,
       title,
       description,
+      quantity: quantity || 1,
       assignedEmployees: assignedStaff,
       status: 'Quote',
       startDate,
@@ -160,6 +165,7 @@ export default function JobManager({
     // Reset Form
     setTitle('');
     setDescription('');
+    setQuantity(1);
     setAssignedStaff([]);
     setQuoteAmount(5000);
     
@@ -324,7 +330,12 @@ export default function JobManager({
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-gray-400 font-bold">Client: {job.customerName}</p>
+                    <div className="flex justify-between items-center text-[11px] font-bold text-gray-400">
+                      <span>Client: {job.customerName}</span>
+                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-wood-100/70 text-wood-900 rounded font-mono">
+                        Qty: {job.quantity || 1}
+                      </span>
+                    </div>
                     
                     <div className="flex items-center justify-between mt-1 text-[10px] text-gray-400 font-semibold w-full font-mono">
                       <span>Val: {formatCurrency(job.quoteAmount, 0)}</span>
@@ -381,7 +392,15 @@ export default function JobManager({
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">Comm ID: {activeSelectedJob.id} &bull; Client: {activeSelectedJob.customerName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2 flex-wrap font-medium">
+                      <span>Comm ID: {activeSelectedJob.id}</span>
+                      <span>&bull;</span>
+                      <span>Client: {activeSelectedJob.customerName}</span>
+                      <span>&bull;</span>
+                      <span className="font-bold text-wood-900 bg-wood-100/80 px-2 py-0.5 rounded text-[11px]">
+                        Qty: {activeSelectedJob.quantity || 1} {activeSelectedJob.quantity && activeSelectedJob.quantity > 1 ? 'units' : 'unit'}
+                      </span>
+                    </p>
                   </div>
 
                   {/* Status Progression Trigger */}
@@ -688,16 +707,30 @@ export default function JobManager({
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Quote Amount (Le) *</label>
-                  <input
-                    type="number"
-                    required
-                    min={100}
-                    value={quoteAmount}
-                    onChange={(e) => setQuoteAmount(Number(e.target.value))}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity (Qty) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Quote Amount (Le) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={100}
+                      value={quoteAmount}
+                      onChange={(e) => setQuoteAmount(Number(e.target.value))}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-4">
@@ -977,16 +1010,30 @@ export default function JobManager({
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Client Quote (Le) *</label>
-                  <input
-                    type="number"
-                    required
-                    min={100}
-                    value={editJobQuoteAmount}
-                    onChange={(e) => setEditJobQuoteAmount(Number(e.target.value))}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity (Qty) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={editJobQuantity}
+                      onChange={(e) => setEditJobQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Client Quote (Le) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={100}
+                      value={editJobQuoteAmount}
+                      onChange={(e) => setEditJobQuoteAmount(Number(e.target.value))}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-4">

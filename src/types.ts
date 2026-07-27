@@ -76,6 +76,7 @@ export interface Job {
   customerName: string;
   title: string;
   description: string;
+  quantity?: number; // Job quantity / units count (e.g. 12 sets, 1 desk)
   assignedEmployees: string[]; // Employee IDs
   status: JobStatus;
   startDate: string;
