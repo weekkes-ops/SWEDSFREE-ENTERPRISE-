@@ -231,6 +231,11 @@ export const INITIAL_JOBS: Job[] = [
     title: 'Shalomville Estate Teak Kitchen Cabinets & Doors',
     description: 'Design, fabrication, and installation of 12 sets of solid Sierra Leone teak kitchen cabinets, fitted wardrobes, and hand-carved mahogany entrance doors for Shalomville Estate residences.',
     quantity: 12,
+    items: [
+      { id: 'item-sv-01', description: 'Solid Sierra Leone Teak Kitchen Cabinet Units', quantity: 12, unitCost: 8000, totalCost: 96000 },
+      { id: 'item-sv-02', description: 'Fitted Double-Door Wardrobes with Teak Veneer Finish', quantity: 6, unitCost: 5000, totalCost: 30000 },
+      { id: 'item-sv-03', description: 'Hand-Carved Solid Mahogany Entrance Doors', quantity: 4, unitCost: 4750, totalCost: 19000 }
+    ],
     assignedEmployees: ['emp-03', 'emp-04', 'emp-05'],
     status: 'In Progress',
     startDate: '2026-07-24',
@@ -254,6 +259,11 @@ export const INITIAL_JOBS: Job[] = [
     title: 'Executive Mahogany Office Desk & Dining Suite',
     description: 'Hand-finished executive red mahogany pedestal desk with leather inlay top, matching credenza, and 8-seater solid mahogany dining table with carved chairs.',
     quantity: 1,
+    items: [
+      { id: 'item-ms-01', description: 'Executive Red Mahogany Pedestal Desk with Leather Inlay Top', quantity: 1, unitCost: 45000, totalCost: 45000 },
+      { id: 'item-ms-02', description: 'Matching Mahogany Credenza & 3-Drawer Filing Cabinet Unit', quantity: 1, unitCost: 23000, totalCost: 23000 },
+      { id: 'item-ms-03', description: '8-Seater Solid Mahogany Dining Table with Carved Chairs', quantity: 1, unitCost: 30000, totalCost: 30000 }
+    ],
     assignedEmployees: ['emp-03', 'emp-06'],
     status: 'Ready for Polishing',
     startDate: '2026-07-24',
@@ -277,6 +287,11 @@ export const INITIAL_JOBS: Job[] = [
     title: 'Custom Mahogany Boardroom Table & 12 Chairs',
     description: 'Hand-carved 14ft solid Sierra Leone mahogany executive boardroom table with matching brass-inlaid leather chairs.',
     quantity: 1,
+    items: [
+      { id: 'item-ph-01', description: '14ft Solid Sierra Leone Mahogany Executive Boardroom Table', quantity: 1, unitCost: 65000, totalCost: 65000 },
+      { id: 'item-ph-02', description: 'Matching Executive Leather Boardroom Chairs with Carved Mahogany Legs', quantity: 12, unitCost: 3500, totalCost: 42000 },
+      { id: 'item-ph-03', description: 'Matching Wall-Mounted Mahogany Presentation Screen Frame & Credenza', quantity: 1, unitCost: 18000, totalCost: 18000 }
+    ],
     assignedEmployees: ['emp-03', 'emp-04', 'emp-05'],
     status: 'In Progress',
     startDate: '2026-07-01',

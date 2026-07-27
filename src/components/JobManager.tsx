@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { Job, JobStatus, Customer, Employee, InventoryItem, JobMaterial, JobPayment, formatCurrency } from '../types';
+import { Job, JobItem, JobStatus, Customer, Employee, InventoryItem, JobMaterial, JobPayment, formatCurrency } from '../types';
 import { 
   Plus, 
   Search, 
@@ -18,7 +18,8 @@ import {
   ShieldAlert,
   FileText,
   Trash2,
-  Receipt
+  Receipt,
+  ListOrdered
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -75,6 +76,9 @@ export default function JobManager({
   const [startDate, setStartDate] = useState('2026-07-20');
   const [dueDate, setDueDate] = useState('2026-08-20');
   const [quoteAmount, setQuoteAmount] = useState(5000);
+  const [items, setItems] = useState<JobItem[]>([
+    { id: '1', description: 'Item 1 - Primary Woodwork Unit', quantity: 1, unitCost: 5000, totalCost: 5000 }
+  ]);
 
   // Form states - Edit Job
   const [editJobTitle, setEditJobTitle] = useState('');
@@ -85,6 +89,7 @@ export default function JobManager({
   const [editJobStartDate, setEditJobStartDate] = useState('');
   const [editJobDueDate, setEditJobDueDate] = useState('');
   const [editJobQuoteAmount, setEditJobQuoteAmount] = useState(5000);
+  const [editJobItems, setEditJobItems] = useState<JobItem[]>([]);
 
   // Form states - Log Material
   const [materialItemId, setMaterialItemId] = useState(inventory[0]?.id || '');
@@ -93,6 +98,84 @@ export default function JobManager({
   // Form states - Record Payment
   const [paymentAmount, setPaymentAmount] = useState(2500);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Check' | 'Mobile Money'>('Bank Transfer');
+
+  // Multi-item helper handlers for Create Job
+  const handleAddItem = () => {
+    setItems(prev => [
+      ...prev,
+      { id: Date.now().toString(), description: `Item ${prev.length + 1} - `, quantity: 1, unitCost: 0, totalCost: 0 }
+    ]);
+  };
+
+  const handleUpdateItem = (index: number, field: keyof JobItem, value: any) => {
+    setItems(prev => {
+      const updated = [...prev];
+      const item = { ...updated[index] };
+      if (field === 'description') {
+        item.description = String(value);
+      } else if (field === 'quantity') {
+        item.quantity = Math.max(1, parseInt(value) || 1);
+        item.totalCost = item.quantity * item.unitCost;
+      } else if (field === 'unitCost') {
+        item.unitCost = Math.max(0, Number(value) || 0);
+        item.totalCost = item.quantity * item.unitCost;
+      }
+      updated[index] = item;
+      
+      const total = updated.reduce((sum, it) => sum + (it.totalCost || 0), 0);
+      setQuoteAmount(total);
+      return updated;
+    });
+  };
+
+  const handleRemoveItem = (index: number) => {
+    if (items.length <= 1) return;
+    setItems(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      const total = updated.reduce((sum, it) => sum + (it.totalCost || 0), 0);
+      setQuoteAmount(total);
+      return updated;
+    });
+  };
+
+  // Multi-item helper handlers for Edit Job
+  const handleEditAddItem = () => {
+    setEditJobItems(prev => [
+      ...prev,
+      { id: Date.now().toString(), description: `Item ${prev.length + 1} - `, quantity: 1, unitCost: 0, totalCost: 0 }
+    ]);
+  };
+
+  const handleEditUpdateItem = (index: number, field: keyof JobItem, value: any) => {
+    setEditJobItems(prev => {
+      const updated = [...prev];
+      const item = { ...updated[index] };
+      if (field === 'description') {
+        item.description = String(value);
+      } else if (field === 'quantity') {
+        item.quantity = Math.max(1, parseInt(value) || 1);
+        item.totalCost = item.quantity * item.unitCost;
+      } else if (field === 'unitCost') {
+        item.unitCost = Math.max(0, Number(value) || 0);
+        item.totalCost = item.quantity * item.unitCost;
+      }
+      updated[index] = item;
+      
+      const total = updated.reduce((sum, it) => sum + (it.totalCost || 0), 0);
+      setEditJobQuoteAmount(total);
+      return updated;
+    });
+  };
+
+  const handleEditRemoveItem = (index: number) => {
+    if (editJobItems.length <= 1) return;
+    setEditJobItems(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      const total = updated.reduce((sum, it) => sum + (it.totalCost || 0), 0);
+      setEditJobQuoteAmount(total);
+      return updated;
+    });
+  };
 
   // Handle auto modal trigger
   useState(() => {
@@ -110,6 +193,13 @@ export default function JobManager({
     setEditJobStartDate(job.startDate);
     setEditJobDueDate(job.dueDate);
     setEditJobQuoteAmount(job.quoteAmount);
+    if (job.items && job.items.length > 0) {
+      setEditJobItems(job.items);
+    } else {
+      setEditJobItems([
+        { id: '1', description: job.title || 'Woodwork Item 1', quantity: job.quantity || 1, unitCost: job.quoteAmount, totalCost: job.quoteAmount }
+      ]);
+    }
     setShowEditJobModal(true);
   };
 
@@ -121,17 +211,22 @@ export default function JobManager({
     const customer = customers.find(c => c.id === editJobCustomerId);
     if (!customer) return;
 
+    const validItems = editJobItems.filter(i => i.description.trim().length > 0);
+    const calculatedQuote = editJobItems.reduce((sum, i) => sum + (i.totalCost || (i.quantity * i.unitCost) || 0), 0) || editJobQuoteAmount;
+    const totalQty = editJobItems.reduce((sum, i) => sum + (i.quantity || 1), 0) || editJobQuantity || 1;
+
     const updated: Job = {
       ...activeSelectedJob,
       title: editJobTitle,
       customerId: editJobCustomerId,
       customerName: customer.name,
       description: editJobDescription,
-      quantity: editJobQuantity || 1,
+      quantity: totalQty,
+      items: validItems.length > 0 ? validItems : activeSelectedJob.items,
       assignedEmployees: editJobAssignedStaff,
       startDate: editJobStartDate,
       dueDate: editJobDueDate,
-      quoteAmount: editJobQuoteAmount,
+      quoteAmount: calculatedQuote,
       laborCost: activeSelectedJob.laborCost || 0,
       otherCosts: activeSelectedJob.otherCosts || 0
     };
@@ -150,17 +245,24 @@ export default function JobManager({
     const customer = customers.find(c => c.id === customerId);
     if (!customer) return;
 
+    const validItems = items.filter(i => i.description.trim().length > 0);
+    const calculatedQuote = items.reduce((sum, i) => sum + (i.totalCost || (i.quantity * i.unitCost) || 0), 0) || quoteAmount;
+    const totalQty = items.reduce((sum, i) => sum + (i.quantity || 1), 0) || quantity || 1;
+
     onCreateJob({
       customerId,
       customerName: customer.name,
       title,
       description,
-      quantity: quantity || 1,
+      quantity: totalQty,
+      items: validItems.length > 0 ? validItems : [
+        { id: '1', description: title, quantity: quantity || 1, unitCost: quoteAmount, totalCost: quoteAmount }
+      ],
       assignedEmployees: assignedStaff,
       status: 'Quote',
       startDate,
       dueDate,
-      quoteAmount,
+      quoteAmount: calculatedQuote,
       laborCost: 0,
       otherCosts: 0
     });
@@ -171,6 +273,7 @@ export default function JobManager({
     setQuantity(1);
     setAssignedStaff([]);
     setQuoteAmount(5000);
+    setItems([{ id: '1', description: 'Item 1 - Primary Woodwork Unit', quantity: 1, unitCost: 5000, totalCost: 5000 }]);
     
     setShowCreateModal(false);
     if (onCloseCreateModal) onCloseCreateModal();
@@ -341,7 +444,7 @@ export default function JobManager({
                     <div className="flex justify-between items-center text-[11px] font-bold text-gray-400">
                       <span>Client: {job.customerName}</span>
                       <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-wood-100/70 text-wood-900 rounded font-mono">
-                        Qty: {job.quantity || 1}
+                        {job.items && job.items.length > 0 ? `${job.items.length} Line Items` : `Qty: ${job.quantity || 1}`}
                       </span>
                     </div>
                     
@@ -524,6 +627,97 @@ export default function JobManager({
                       </strong>
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Itemized Production Scope & Line Items Card (Recorded for Invoice Printout) */}
+              <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="font-display font-bold text-gray-900 flex items-center gap-1.5 text-sm">
+                      <ListOrdered className="w-4 h-4 text-wood-600" />
+                      Recorded Job Line Items ({activeSelectedJob.items?.length || 1}) — Appears on Invoice Printout
+                    </h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Items recorded here will automatically print as separate itemized lines on the official invoice and receipt printout.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!isAuditor && (
+                      <button
+                        onClick={() => handleOpenEditModal(activeSelectedJob)}
+                        className="flex items-center gap-1 text-[10px] font-bold text-wood-700 bg-wood-50 px-2.5 py-1.5 rounded-lg border border-wood-200 hover:bg-wood-100 transition cursor-pointer"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        <span>Edit / Add Items</span>
+                      </button>
+                    )}
+                    {onTriggerInvoice && (
+                      <button
+                        onClick={() => onTriggerInvoice(activeSelectedJob.id)}
+                        className="flex items-center gap-1 text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Print Invoice</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px] border-b border-gray-100">
+                        <th className="py-2.5 px-3">Item # & Description</th>
+                        <th className="py-2.5 px-3 text-center">Qty</th>
+                        <th className="py-2.5 px-3 text-right">Unit Cost (Le)</th>
+                        <th className="py-2.5 px-3 text-right">Total Line Cost (Le)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 text-gray-700">
+                      {(!activeSelectedJob.items || activeSelectedJob.items.length === 0) ? (
+                        <tr>
+                          <td className="py-3 px-3 font-bold text-gray-800">
+                            {activeSelectedJob.title}
+                            {activeSelectedJob.description && (
+                              <span className="block text-[10px] text-gray-400 font-normal italic">{activeSelectedJob.description}</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold">{activeSelectedJob.quantity || 1}</td>
+                          <td className="py-3 px-3 text-right font-mono">{formatCurrency(activeSelectedJob.quoteAmount, 0)}</td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-gray-900">{formatCurrency(activeSelectedJob.quoteAmount, 0)}</td>
+                        </tr>
+                      ) : (
+                        activeSelectedJob.items.map((item, idx) => (
+                          <tr key={item.id || idx} className="hover:bg-wood-50/20">
+                            <td className="py-2.5 px-3 font-bold text-gray-800">
+                              <span className="text-wood-600 font-mono mr-1.5 font-black">#{idx + 1}</span>
+                              {item.description}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono font-bold bg-wood-50/50 rounded">
+                              {item.quantity}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-medium text-gray-600">
+                              {formatCurrency(item.unitCost, 0)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-900">
+                              {formatCurrency(item.totalCost || (item.quantity * item.unitCost), 0)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-wood-50/70 font-bold border-t border-wood-100 text-gray-900">
+                        <td colSpan={3} className="py-2.5 px-3 uppercase text-[10px] text-wood-900 font-black">
+                          Total Quote Amount ({activeSelectedJob.items?.length || 1} line item{(activeSelectedJob.items?.length || 1) > 1 ? 's' : ''}):
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-sm text-wood-900 font-extrabold">
+                          {formatCurrency(activeSelectedJob.quoteAmount, 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               </div>
 
@@ -747,29 +941,88 @@ export default function JobManager({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity (Qty) *</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      value={quantity}
-                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
+                {/* Itemized Job Line Items (Provision for 2+ items for invoice printouts) */}
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-700 uppercase flex items-center gap-1.5">
+                      <ListOrdered className="w-4 h-4 text-wood-600" />
+                      Job Line Items (Recorded for Invoice Printout) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="text-xs font-bold text-wood-800 hover:text-wood-950 bg-wood-50 px-2.5 py-1 rounded-lg border border-wood-200 flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Another Item</span>
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {items.map((item, idx) => (
+                      <div key={item.id || idx} className="bg-gray-50 p-2.5 rounded-xl border border-gray-200 flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                        <div className="flex-1 min-w-[140px] space-y-0.5">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block">Item #{idx + 1} Description</span>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. 10-Seat Mahogany Table"
+                            value={item.description}
+                            onChange={(e) => handleUpdateItem(idx, 'description', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg focus:border-wood-300 outline-hidden"
+                          />
+                        </div>
+                        
+                        <div className="w-20 space-y-0.5">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block text-center">Qty</span>
+                          <input
+                            type="number"
+                            required
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) => handleUpdateItem(idx, 'quantity', e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs font-bold font-mono text-gray-800 bg-white border border-gray-200 rounded-lg text-center focus:border-wood-300 outline-hidden"
+                          />
+                        </div>
+                        
+                        <div className="w-28 space-y-0.5">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block text-right">Unit Cost (Le)</span>
+                          <input
+                            type="number"
+                            required
+                            min={0}
+                            value={item.unitCost}
+                            onChange={(e) => handleUpdateItem(idx, 'unitCost', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-bold font-mono text-gray-800 bg-white border border-gray-200 rounded-lg text-right focus:border-wood-300 outline-hidden"
+                          />
+                        </div>
+                        
+                        <div className="w-28 space-y-0.5 text-right">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block">Total Line (Le)</span>
+                          <div className="px-2.5 py-1.5 text-xs font-extrabold font-mono text-wood-900 bg-wood-100/70 rounded-lg border border-wood-200/50">
+                            {formatCurrency(item.totalCost || (item.quantity * item.unitCost), 0)}
+                          </div>
+                        </div>
+
+                        {items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(idx)}
+                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition self-center sm:self-end mb-0.5 cursor-pointer"
+                            title="Remove Item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Unit Cost (Le) *</label>
-                    <input
-                      type="number"
-                      required
-                      min={100}
-                      value={quoteAmount}
-                      onChange={(e) => setQuoteAmount(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
+                  <div className="flex items-center justify-between px-3 py-2 bg-wood-50 rounded-xl border border-wood-200">
+                    <span className="text-xs font-bold text-wood-900">Total Calculated Quote Amount ({items.length} {items.length === 1 ? 'item' : 'items'}):</span>
+                    <span className="text-sm font-extrabold font-mono text-wood-900">
+                      {formatCurrency(quoteAmount, 0)}
+                    </span>
                   </div>
                 </div>
 
@@ -1060,29 +1313,88 @@ export default function JobManager({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity (Qty) *</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      value={editJobQuantity}
-                      onChange={(e) => setEditJobQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700"
-                    />
+                {/* Itemized Job Line Items (Provision for 2+ items for invoice printouts) */}
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-700 uppercase flex items-center gap-1.5">
+                      <ListOrdered className="w-4 h-4 text-wood-600" />
+                      Job Line Items (Recorded for Invoice Printout) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleEditAddItem}
+                      className="text-xs font-bold text-wood-800 hover:text-wood-950 bg-wood-50 px-2.5 py-1 rounded-lg border border-wood-200 flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Another Item</span>
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {editJobItems.map((item, idx) => (
+                      <div key={item.id || idx} className="bg-gray-50 p-2.5 rounded-xl border border-gray-200 flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                        <div className="flex-1 min-w-[140px] space-y-0.5">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block">Item #{idx + 1} Description</span>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Executive Desk"
+                            value={item.description}
+                            onChange={(e) => handleEditUpdateItem(idx, 'description', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg focus:border-wood-300 outline-hidden"
+                          />
+                        </div>
+                        
+                        <div className="w-20 space-y-0.5">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block text-center">Qty</span>
+                          <input
+                            type="number"
+                            required
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) => handleEditUpdateItem(idx, 'quantity', e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs font-bold font-mono text-gray-800 bg-white border border-gray-200 rounded-lg text-center focus:border-wood-300 outline-hidden"
+                          />
+                        </div>
+                        
+                        <div className="w-28 space-y-0.5">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block text-right">Unit Cost (Le)</span>
+                          <input
+                            type="number"
+                            required
+                            min={0}
+                            value={item.unitCost}
+                            onChange={(e) => handleEditUpdateItem(idx, 'unitCost', e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-bold font-mono text-gray-800 bg-white border border-gray-200 rounded-lg text-right focus:border-wood-300 outline-hidden"
+                          />
+                        </div>
+                        
+                        <div className="w-28 space-y-0.5 text-right">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block">Total Line (Le)</span>
+                          <div className="px-2.5 py-1.5 text-xs font-extrabold font-mono text-wood-900 bg-wood-100/70 rounded-lg border border-wood-200/50">
+                            {formatCurrency(item.totalCost || (item.quantity * item.unitCost), 0)}
+                          </div>
+                        </div>
+
+                        {editJobItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleEditRemoveItem(idx)}
+                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition self-center sm:self-end mb-0.5 cursor-pointer"
+                            title="Remove Item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Unit Cost (Le) *</label>
-                    <input
-                      type="number"
-                      required
-                      min={100}
-                      value={editJobQuoteAmount}
-                      onChange={(e) => setEditJobQuoteAmount(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold font-mono text-gray-700"
-                    />
+                  <div className="flex items-center justify-between px-3 py-2 bg-wood-50 rounded-xl border border-wood-200">
+                    <span className="text-xs font-bold text-wood-900">Total Calculated Quote Amount ({editJobItems.length} {editJobItems.length === 1 ? 'item' : 'items'}):</span>
+                    <span className="text-sm font-extrabold font-mono text-wood-900">
+                      {formatCurrency(editJobQuoteAmount, 0)}
+                    </span>
                   </div>
                 </div>
 

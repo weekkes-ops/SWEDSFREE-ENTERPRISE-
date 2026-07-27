@@ -62,12 +62,21 @@ export interface JobMaterial {
   totalCost: number;
 }
 
+export interface JobItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+}
+
 export interface JobPayment {
   id: string;
   amount: number;
   date: string;
   method: 'Cash' | 'Bank Transfer' | 'Check' | 'Mobile Money';
   note?: string;
+  referenceId?: string;
 }
 
 export interface Job {
@@ -77,6 +86,7 @@ export interface Job {
   title: string;
   description: string;
   quantity?: number; // Job quantity / units count (e.g. 12 sets, 1 desk)
+  items?: JobItem[]; // Provision for 2+ line items recorded for invoice printouts
   assignedEmployees: string[]; // Employee IDs
   status: JobStatus;
   startDate: string;

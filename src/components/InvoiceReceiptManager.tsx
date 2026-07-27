@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent, ChangeEvent, KeyboardEvent } from 'react';
 import { Job, Customer, Employee, formatCurrency, JobPayment, FinancialCategory, SavedInvoice, SavedInvoiceItem } from '../types';
 import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments } from '../lib/firestoreService';
 import { 
@@ -67,6 +67,23 @@ export const DEFAULT_300X300_SIGNATURE = `data:image/svg+xml;utf8,<svg xmlns="ht
 
 // Default 300x300 Pixel Official Stamp / Seal (SVG Data URL)
 export const DEFAULT_300X300_STAMP = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="none"/><g transform="rotate(-10 150 150)"><circle cx="150" cy="150" r="138" fill="none" stroke="%23991b1b" stroke-width="6"/><circle cx="150" cy="150" r="126" fill="none" stroke="%23991b1b" stroke-width="2.5" stroke-dasharray="8 5"/><path id="stampTopArc" d="M 35 150 A 115 115 0 0 1 265 150" fill="none"/><text font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="900" fill="%23991b1b" letter-spacing="2.5"><textPath href="%23stampTopArc" startOffset="50%" text-anchor="middle">SWED WOOD WORK</textPath></text><path id="stampBotArc" d="M 265 150 A 115 115 0 0 1 35 150" fill="none"/><text font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="800" fill="%23991b1b" letter-spacing="1.5"><textPath href="%23stampBotArc" startOffset="50%" text-anchor="middle">FREETOWN • SIERRA LEONE</textPath></text><circle cx="150" cy="150" r="88" fill="none" stroke="%23991b1b" stroke-width="3"/><rect x="35" y="122" width="230" height="56" fill="%23991b1b" rx="6"/><text x="150" y="157" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="900" fill="%23ffffff" text-anchor="middle" letter-spacing="2">OFFICIAL STAMP</text><text x="65" y="112" font-family="sans-serif" font-size="16" fill="%23991b1b">★</text><text x="220" y="112" font-family="sans-serif" font-size="16" fill="%23991b1b">★</text><text x="150" y="206" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="800" fill="%23991b1b" text-anchor="middle" letter-spacing="1">AUDITED & CLEARED</text><text x="150" y="222" font-family="monospace" font-size="10" font-weight="bold" fill="%23991b1b" text-anchor="middle">300x300 OFFICIAL SEAL</text></g></svg>`;
+
+export interface IntelliSenseResult {
+  id: string;
+  type: 'INVOICE' | 'RECEIPT' | 'ORDER' | 'LINE_ITEM' | 'CUSTOMER';
+  title: string;
+  subtitle: string;
+  details?: string;
+  badgeText: string;
+  badgeColor: string;
+  score: number;
+  payload: {
+    targetSubTab: 'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT';
+    jobId?: string;
+    savedInvoice?: SavedInvoice;
+    receipt?: { job: Job; payment: JobPayment };
+  };
+}
 
 interface InvoiceReceiptManagerProps {
   jobs: Job[];
@@ -142,6 +159,209 @@ export default function InvoiceReceiptManager({
   useEffect(() => {
     localStorage.setItem('swedswood_saved_invoices', JSON.stringify(savedInvoices));
   }, [savedInvoices]);
+
+  // ==========================================
+  // INTELLISENSE SEARCH ENGINE FOR INVOICES & RECEIPTS
+  // ==========================================
+  const [intelliQuery, setIntelliQuery] = useState('');
+  const [showIntelliDropdown, setShowIntelliDropdown] = useState(false);
+  const [focusedIntelliIndex, setFocusedIntelliIndex] = useState(0);
+  const intelliSenseRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (intelliSenseRef.current && !intelliSenseRef.current.contains(e.target as Node)) {
+        setShowIntelliDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const totalReceiptsCount = jobs.reduce((acc, j) => acc + (j.payments ? j.payments.length : 0), 0);
+
+  const getIntelliSuggestions = (query: string): IntelliSenseResult[] => {
+    if (!query || query.trim().length === 0) return [];
+    const q = query.trim().toLowerCase();
+    const results: IntelliSenseResult[] = [];
+
+    // 1. Scan Saved Invoices
+    savedInvoices.forEach(inv => {
+      const matchesNo = inv.invoiceNo.toLowerCase().includes(q);
+      const matchesCust = inv.customerName.toLowerCase().includes(q) || (inv.customerPhone && inv.customerPhone.toLowerCase().includes(q)) || (inv.customerEmail && inv.customerEmail.toLowerCase().includes(q));
+      const matchesItem = inv.items.some(it => it.description.toLowerCase().includes(q));
+      const matchesStatus = inv.status.toLowerCase().includes(q);
+      const matchesTotal = inv.subtotal.toString().includes(q);
+
+      if (matchesNo || matchesCust || matchesItem || matchesStatus || matchesTotal) {
+        let score = 0;
+        if (inv.invoiceNo.toLowerCase() === q) score += 100;
+        else if (inv.invoiceNo.toLowerCase().startsWith(q)) score += 80;
+        else if (inv.customerName.toLowerCase().startsWith(q)) score += 70;
+        else score += 40;
+
+        const matchedLineItem = inv.items.find(it => it.description.toLowerCase().includes(q));
+
+        results.push({
+          id: inv.id,
+          type: 'INVOICE',
+          title: `Invoice ${inv.invoiceNo} — ${inv.customerName}`,
+          subtitle: matchedLineItem ? `Line Item: ${matchedLineItem.description}` : `Date: ${inv.date} • Terms: ${inv.terms}`,
+          details: `Le ${inv.subtotal.toLocaleString()} (${inv.status})`,
+          badgeText: `INVOICE • ${inv.status.toUpperCase()}`,
+          badgeColor: inv.status === 'Paid' ? 'bg-emerald-900/90 text-emerald-300 border border-emerald-700' : 'bg-blue-900/90 text-blue-300 border border-blue-700',
+          score,
+          payload: {
+            targetSubTab: 'SAVED_INVOICES',
+            savedInvoice: inv
+          }
+        });
+      }
+    });
+
+    // 2. Scan Woodwork Commission Orders / Draft Invoices
+    jobs.forEach(job => {
+      const matchesId = job.id.toLowerCase().includes(q);
+      const matchesTitle = job.title.toLowerCase().includes(q);
+      const matchesDesc = job.description.toLowerCase().includes(q);
+      const matchesCust = job.customerName.toLowerCase().includes(q);
+      const matchesQuote = job.quoteAmount.toString().includes(q);
+      const matchedItem = job.items?.find(it => it.description.toLowerCase().includes(q));
+
+      if (matchesId || matchesTitle || matchesDesc || matchesCust || matchesQuote || matchedItem) {
+        let score = 0;
+        if (job.id.toLowerCase() === q) score += 95;
+        else if (job.title.toLowerCase().startsWith(q)) score += 75;
+        else score += 35;
+
+        results.push({
+          id: job.id,
+          type: matchedItem ? 'LINE_ITEM' : 'ORDER',
+          title: matchedItem ? `Item: ${matchedItem.description}` : `Order ${job.id}: ${job.title}`,
+          subtitle: `Client: ${job.customerName} • Status: ${job.status}`,
+          details: `Quote: Le ${job.quoteAmount.toLocaleString()}`,
+          badgeText: matchedItem ? 'LINE ITEM' : 'WOODWORK ORDER',
+          badgeColor: matchedItem ? 'bg-purple-900/90 text-purple-300 border border-purple-700' : 'bg-amber-900/90 text-amber-300 border border-amber-700',
+          score,
+          payload: {
+            targetSubTab: 'INVOICE',
+            jobId: job.id
+          }
+        });
+      }
+
+      // 3. Scan Receipts / Clearance Payments
+      if (job.payments && job.payments.length > 0) {
+        job.payments.forEach(p => {
+          const receiptNo = `REC-${job.id}-${p.id.toUpperCase()}`;
+          const matchesRecNo = receiptNo.toLowerCase().includes(q) || p.id.toLowerCase().includes(q);
+          const matchesMethod = p.method.toLowerCase().includes(q);
+          const matchesRef = p.referenceId && p.referenceId.toLowerCase().includes(q);
+          const matchesAmount = p.amount.toString().includes(q);
+          const matchesDate = p.date.includes(q);
+          const matchesJobCust = job.customerName.toLowerCase().includes(q) || job.title.toLowerCase().includes(q);
+
+          if (matchesRecNo || matchesMethod || matchesRef || matchesAmount || matchesDate || matchesJobCust) {
+            let score = 0;
+            if (receiptNo.toLowerCase() === q) score += 100;
+            else if (p.method.toLowerCase().startsWith(q)) score += 60;
+            else score += 30;
+
+            results.push({
+              id: `${job.id}-${p.id}`,
+              type: 'RECEIPT',
+              title: `Clearance Receipt ${receiptNo}`,
+              subtitle: `Client: ${job.customerName} • Method: ${p.method} ${p.referenceId ? `(${p.referenceId})` : ''}`,
+              details: `Le ${p.amount.toLocaleString()} on ${p.date}`,
+              badgeText: 'RECEIPT',
+              badgeColor: 'bg-emerald-900/90 text-emerald-300 border border-emerald-700',
+              score,
+              payload: {
+                targetSubTab: 'RECEIPT',
+                jobId: job.id,
+                receipt: { job, payment: p }
+              }
+            });
+          }
+        });
+      }
+    });
+
+    return results.sort((a, b) => b.score - a.score).slice(0, 10);
+  };
+
+  const intelliSuggestions = getIntelliSuggestions(intelliQuery);
+
+  const handleSelectIntelliSuggestion = (item: IntelliSenseResult) => {
+    const { targetSubTab, jobId, savedInvoice, receipt } = item.payload;
+
+    if (targetSubTab === 'SAVED_INVOICES' && savedInvoice) {
+      setSubTab('SAVED_INVOICES');
+      setSavedInvoiceSearch(savedInvoice.invoiceNo);
+      handleLoadSavedInvoice(savedInvoice);
+      setSaveToast(`Loaded Invoice ${savedInvoice.invoiceNo}`);
+      setTimeout(() => setSaveToast(null), 3000);
+    } else if (targetSubTab === 'RECEIPT' && receipt) {
+      setSubTab('RECEIPT');
+      if (receipt.job.id) setSelectedJobId(receipt.job.id);
+      setActiveReceipt(receipt);
+      setSaveToast(`Loaded Receipt REC-${receipt.payment.id.toUpperCase()}`);
+      setTimeout(() => setSaveToast(null), 3000);
+    } else if (targetSubTab === 'INVOICE' && jobId) {
+      setSubTab('INVOICE');
+      setSelectedJobId(jobId);
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        setActiveInvoice(job);
+        setSaveToast(`Loaded Order ${job.id}`);
+        setTimeout(() => setSaveToast(null), 3000);
+      }
+    }
+
+    setShowIntelliDropdown(false);
+  };
+
+  const handleIntelliKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (!showIntelliDropdown || intelliSuggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedIntelliIndex(prev => (prev + 1) % intelliSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedIntelliIndex(prev => (prev - 1 + intelliSuggestions.length) % intelliSuggestions.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = intelliSuggestions[focusedIntelliIndex];
+      if (item) {
+        handleSelectIntelliSuggestion(item);
+      }
+    } else if (e.key === 'Escape') {
+      setShowIntelliDropdown(false);
+    }
+  };
+
+  const highlightMatch = (text: string, query: string) => {
+    if (!query || !query.trim() || !text) return text;
+    const q = query.trim();
+    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapeRegExp(q)})`, 'gi');
+    const parts = text.split(regex);
+    return (
+      <>
+        {parts.map((part, i) =>
+          part.toLowerCase() === q.toLowerCase() ? (
+            <mark key={i} className="bg-amber-300 text-slate-950 font-black px-0.5 rounded shadow-2xs">
+              {part}
+            </mark>
+          ) : (
+            part
+          )
+        )}
+      </>
+    );
+  };
 
   // Template format selection: 'SWEDS_WOOD' (scanned paper style) or 'MODERN' (original template)
   const [invoiceTemplate, setInvoiceTemplate] = useState<'SWEDS_WOOD' | 'MODERN'>('SWEDS_WOOD');
@@ -534,8 +754,20 @@ export default function InvoiceReceiptManager({
       setInvoiceTimeline(`${activeInvoice.startDate} to ${activeInvoice.dueDate}`);
       setInvoiceProjectQty(activeInvoice.quantity || 1);
 
-      setInvoiceCommissionAmount(activeInvoice.quoteAmount);
-      setCustomInvoiceItems([]);
+      if (activeInvoice.items && activeInvoice.items.length > 0) {
+        setCustomInvoiceItems(activeInvoice.items.map((it, idx) => ({
+          id: it.id || `item-${idx + 1}`,
+          description: it.description,
+          unitRate: String(it.quantity || 1),
+          amount: it.unitCost,
+          quantity: it.quantity || 1,
+          unitPrice: it.unitCost
+        })));
+        setInvoiceCommissionAmount(0);
+      } else {
+        setInvoiceCommissionAmount(activeInvoice.quoteAmount);
+        setCustomInvoiceItems([]);
+      }
       
       setInvoicePreparedBy("");
     }
@@ -1191,6 +1423,169 @@ export default function InvoiceReceiptManager({
             <FolderArchive className="w-4 h-4 text-amber-500" />
             <span>Bulk PDF Export</span>
           </button>
+        </div>
+      </div>
+
+      {/* INTELLISENSE AUTO-SUGGEST SEARCH BAR */}
+      <div className="bg-gradient-to-r from-wood-950 via-slate-900 to-wood-900 p-4 sm:p-5 rounded-2xl shadow-md border border-amber-500/30 text-white relative no-print space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/40 shrink-0">
+              <Sparkles className="w-5 h-5 animate-pulse text-amber-400" />
+            </div>
+            <div>
+              <h2 className="text-xs sm:text-sm font-black font-display uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                IntelliSense Billing & Clearance Search Engine
+              </h2>
+              <p className="text-[11px] text-slate-300 font-medium">
+                Type any invoice #, clearance receipt #, client name, woodwork line item, or payment reference for auto-complete suggestions.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick stats pill */}
+          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-300 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 shrink-0 self-start md:self-auto">
+            <span className="text-amber-400 font-mono font-black">{savedInvoices.length}</span> Saved Invoices • 
+            <span className="text-emerald-400 font-mono font-black">{totalReceiptsCount}</span> Clearance Receipts • 
+            <span className="text-blue-400 font-mono font-black">{jobs.length}</span> Active Orders
+          </div>
+        </div>
+
+        {/* Smart Search Input with Floating Auto-Suggest Dropdown */}
+        <div className="relative z-30" ref={intelliSenseRef}>
+          <div className="relative flex items-center">
+            <Search className="w-5 h-5 text-amber-400 absolute left-4 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search invoice # (e.g. INV-2026-004), receipt # (e.g. REC-JOB-2026-001), client (e.g. Shalomville), item (e.g. Teak), or amount..."
+              value={intelliQuery}
+              onChange={(e) => {
+                const val = e.target.value;
+                setIntelliQuery(val);
+                setSavedInvoiceSearch(val);
+                setSearchTerm(val);
+                setShowIntelliDropdown(true);
+                setFocusedIntelliIndex(0);
+              }}
+              onFocus={() => setShowIntelliDropdown(true)}
+              onKeyDown={handleIntelliKeyDown}
+              className="w-full pl-12 pr-28 py-3 text-xs sm:text-sm bg-slate-900/90 text-white placeholder-slate-400 border-2 border-amber-500/40 rounded-xl focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/20 font-medium transition-all shadow-inner"
+            />
+            
+            {intelliQuery && (
+              <button
+                onClick={() => {
+                  setIntelliQuery('');
+                  setSavedInvoiceSearch('');
+                  setSearchTerm('');
+                  setShowIntelliDropdown(false);
+                }}
+                className="absolute right-20 p-1 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
+                title="Clear Search Query"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+
+            <div className="absolute right-3 px-2 py-1 bg-amber-500/20 text-amber-300 rounded-lg text-[10px] font-extrabold uppercase font-mono border border-amber-500/30 shrink-0">
+              IntelliSense
+            </div>
+          </div>
+
+          {/* IntelliSense Auto-Suggest Floating Dropdown */}
+          <AnimatePresence>
+            {showIntelliDropdown && intelliQuery.trim().length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                className="absolute left-0 right-0 top-full mt-2 bg-slate-900 text-slate-100 rounded-2xl shadow-2xl border border-amber-500/30 overflow-hidden z-50 divide-y divide-slate-800/80 max-h-[420px] overflow-y-auto"
+              >
+                {intelliSuggestions.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs space-y-1">
+                    <Search className="w-8 h-8 text-slate-600 mx-auto" />
+                    <p className="font-bold text-slate-300">No matching billing or receipt records for "{intelliQuery}"</p>
+                    <p className="text-[11px] text-slate-500">
+                      Try searching by client name (e.g. Shalomville), invoice number (e.g. INV-2026-004), or wood item (e.g. Mahogany).
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-4 py-2 bg-slate-950/80 text-[10px] font-black uppercase tracking-wider text-amber-400 flex justify-between items-center">
+                      <span>IntelliSense Suggestions ({intelliSuggestions.length} matches found)</span>
+                      <span className="text-slate-400 font-normal hidden sm:inline">Use ↑↓ arrows to navigate, Enter to select</span>
+                    </div>
+                    
+                    <div className="divide-y divide-slate-800/60">
+                      {intelliSuggestions.map((item, idx) => {
+                        const isFocused = idx === focusedIntelliIndex;
+                        return (
+                          <button
+                            key={`${item.type}-${item.id}-${idx}`}
+                            onClick={() => handleSelectIntelliSuggestion(item)}
+                            onMouseEnter={() => setFocusedIntelliIndex(idx)}
+                            className={`w-full text-left px-4 py-3 transition flex items-center justify-between gap-3 cursor-pointer ${
+                              isFocused ? 'bg-amber-500/20 text-white border-l-4 border-amber-400' : 'hover:bg-slate-800/60 text-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3 min-w-0 flex-1">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase shrink-0 font-mono mt-0.5 ${item.badgeColor}`}>
+                                {item.badgeText}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold truncate text-slate-100">
+                                  {highlightMatch(item.title, intelliQuery)}
+                                </div>
+                                <div className="text-[11px] text-slate-400 truncate flex items-center gap-2 mt-0.5">
+                                  <span>{highlightMatch(item.subtitle, intelliQuery)}</span>
+                                  {item.details && (
+                                    <span className="text-slate-500 font-mono text-[10px]">• {highlightMatch(item.details, intelliQuery)}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0 text-amber-400 text-xs font-bold">
+                              <span className="hidden sm:inline text-[10px] text-slate-400 font-normal">Load Record</span>
+                              <ChevronRight className="w-4 h-4" />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Quick IntelliSense Filter Chips */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <span className="text-[10px] text-amber-400/80 font-black uppercase tracking-wider mr-1">Suggested Searches:</span>
+          {[
+            { label: 'INV-2026-004', query: 'INV-2026-004' },
+            { label: 'REC-JOB-2026-004', query: 'REC-JOB-2026-004' },
+            { label: 'Shalomville', query: 'Shalomville' },
+            { label: 'Sierra Leone Teak', query: 'Teak' },
+            { label: 'Red Mahogany', query: 'Mahogany' },
+            { label: 'Bank Transfer', query: 'Bank Transfer' },
+            { label: 'Paid Invoices', query: 'Paid' },
+            { label: 'Issued Invoices', query: 'Issued' },
+          ].map(chip => (
+            <button
+              key={chip.label}
+              onClick={() => {
+                setIntelliQuery(chip.query);
+                setSavedInvoiceSearch(chip.query);
+                setSearchTerm(chip.query);
+                setShowIntelliDropdown(true);
+              }}
+              className="px-2.5 py-1 text-[10px] font-bold bg-slate-900/80 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 rounded-lg border border-white/10 hover:border-amber-500/40 transition cursor-pointer flex items-center gap-1"
+            >
+              <span>{chip.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
