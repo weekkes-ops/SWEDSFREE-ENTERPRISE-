@@ -46,59 +46,19 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
       return;
     }
 
-    // Match by full name, email, or simple bypass keywords (e.g., typing 'admin')
+    // Match by full name, email, or role credential
+    const trimmedUser = username.trim().toLowerCase();
     let emp = employees.find(emp => 
-      emp.name.toLowerCase() === username.trim().toLowerCase() ||
-      emp.email.toLowerCase() === username.trim().toLowerCase()
+      emp.name.toLowerCase() === trimmedUser ||
+      emp.email.toLowerCase() === trimmedUser
     );
 
-    if (!emp && username.trim().toLowerCase() === 'admin') {
-      emp = employees.find(e => e.role === 'Admin') || {
-        id: 'emp-01',
-        name: 'Mohamed Kamara',
-        role: 'Admin',
-        phone: '+232 76 111 2222',
-        email: 'mohamed.kamara@swedsfree.com',
-        status: 'Active',
-        baseSalary: 9500,
-        dailyRate: 350,
-        hireDate: '2024-01-10',
-        password: 'admin',
-      };
-    }
-
-    if (!emp && username.trim().toLowerCase() === 'manager') {
-      emp = employees.find(e => e.role === 'Manager') || {
-        id: 'emp-manager-bypass',
-        name: 'Amadu Sesay',
-        role: 'Manager',
-        phone: '+232 76 333 4444',
-        email: 'amadu.sesay@swedsfree.com',
-        status: 'Active',
-        baseSalary: 7200,
-        dailyRate: 250,
-        hireDate: '2024-05-15',
-        password: 'manager',
-      };
-    }
-
-    if (!emp && username.trim().toLowerCase() === 'auditor') {
-      emp = employees.find(e => e.role === 'Auditor') || {
-        id: 'emp-auditor-bypass',
-        name: 'Kadiatu Bangura',
-        role: 'Auditor',
-        phone: '+232 77 555 6666',
-        email: 'kadiatu.b@swedsfree.com',
-        status: 'Active',
-        baseSalary: 6800,
-        dailyRate: 230,
-        hireDate: '2024-06-01',
-        password: 'audit',
-      };
+    if (!emp && trimmedUser === 'admin') {
+      emp = employees.find(e => e.role === 'Admin');
     }
 
     if (!emp) {
-      setError('Username or email not found. (Hint: Try "Mohamed Kamara" or "James Weekes")');
+      setError('Username or email address not found in system records. Please verify credentials or request access.');
       return;
     }
 
@@ -111,7 +71,7 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
     if (password === expectedPassword) {
       onLogin(emp);
     } else {
-      setError('Incorrect password or PIN. (Hint: Use "admin" for Admin or "1234" for standard workers).');
+      setError('Incorrect password or PIN code. Please check your credentials.');
     }
   };
 
@@ -121,23 +81,6 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
 
     if (!regName.trim()) {
       setRegError('Please provide your name.');
-      return;
-    }
-
-    // Sierra Leonean name suggestions checklist/warning
-    const lowerName = regName.toLowerCase();
-    const commonSierraLeoneSurnames = [
-      'kamara', 'sesay', 'bangura', 'kargbo', 'jalloh', 'fofanah', 'conteh', 
-      'tarawallie', 'mansaray', 'turay', 'cole', 'macauley', 'koroma', 'sankoh', 
-      'bio', 'barrie', 'massaquoi', 'lamin', 'kallon', 'tengbeh', 'kanu', 'sillah'
-    ];
-    
-    const hasSLSurname = commonSierraLeoneSurnames.some(surname => lowerName.includes(surname));
-    
-    if (!hasSLSurname) {
-      // Gentle reminder but let it proceed, or mandate a Sierra Leonean style name to strictly satisfy user intent.
-      // Let's guide them clearly with a prompt/reminder!
-      setRegError('To keep Swedsfree records aligned, please register with a standard Sierra Leonean name (e.g., using Kamara, Sesay, Bangura, Kargbo, Jalloh, Fofanah, Conteh, Tarawallie, Mansaray, Turay, Cole, Koroma, or Kallon).');
       return;
     }
 
@@ -160,66 +103,6 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
     });
 
     setSuccessMsg(true);
-  };
-
-  const handleQuickBypass = (roleType: 'Admin' | 'Manager' | 'Employee' | 'Auditor') => {
-    let emp = employees.find(e => e.role === roleType);
-    if (!emp) {
-      if (roleType === 'Admin') {
-        emp = employees.find(e => e.role === 'Admin') || {
-          id: 'emp-admin-bypass',
-          name: 'Mohamed Kamara',
-          role: 'Admin',
-          phone: '+232 76 111 2222',
-          email: 'mohamed.kamara@swedsfree.com',
-          status: 'Active',
-          baseSalary: 9500,
-          dailyRate: 350,
-          hireDate: '2024-01-10',
-          password: 'admin',
-        };
-      } else if (roleType === 'Manager') {
-        emp = employees.find(e => e.role === 'Manager') || {
-          id: 'emp-manager-bypass',
-          name: 'Amadu Sesay',
-          role: 'Manager',
-          phone: '+232 76 333 4444',
-          email: 'amadu.sesay@swedsfree.com',
-          status: 'Active',
-          baseSalary: 7200,
-          dailyRate: 250,
-          hireDate: '2024-05-15',
-          password: 'manager',
-        };
-      } else if (roleType === 'Auditor') {
-        emp = employees.find(e => e.role === 'Auditor') || {
-          id: 'emp-auditor-bypass',
-          name: 'Kadiatu Bangura',
-          role: 'Auditor',
-          phone: '+232 77 555 6666',
-          email: 'kadiatu.b@swedsfree.com',
-          status: 'Active',
-          baseSalary: 6800,
-          dailyRate: 230,
-          hireDate: '2024-06-01',
-          password: 'audit',
-        };
-      } else {
-        emp = employees.find(e => e.role === 'Employee') || {
-          id: 'emp-worker-bypass',
-          name: 'James Weekes',
-          role: 'Employee',
-          phone: '+232 76 333 4444',
-          email: 'james.weekes@swedsfree.com',
-          status: 'Active',
-          baseSalary: 5200,
-          dailyRate: 190,
-          hireDate: '2025-02-15',
-          password: '1234',
-        };
-      }
-    }
-    if (emp) onLogin(emp);
   };
 
   return (
@@ -517,56 +400,6 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                     </button>
                   </div>
                 </form>
-
-                {/* Quick Testing Controls */}
-                <div className="mt-6 pt-5 border-t border-white/5 space-y-3">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Developer Quick Testing Bypass:</span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickBypass('Admin')}
-                      className="py-2 px-2.5 bg-white/5 hover:bg-amber-500/15 border border-white/5 hover:border-amber-500/20 rounded-xl text-[10px] font-bold text-slate-300 hover:text-amber-400 transition flex flex-col items-center justify-center gap-0.5"
-                    >
-                      <span>Bypass as Admin</span>
-                      <span className="text-[8px] text-slate-500 font-normal font-mono">(Emmanuel Cole)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleQuickBypass('Manager')}
-                      className="py-2 px-2.5 bg-white/5 hover:bg-amber-500/15 border border-white/5 hover:border-amber-500/20 rounded-xl text-[10px] font-bold text-slate-300 hover:text-amber-400 transition flex flex-col items-center justify-center gap-0.5"
-                    >
-                      <span>Bypass as Manager</span>
-                      <span className="text-[8px] text-slate-500 font-normal font-mono">(Amadu Sesay)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleQuickBypass('Employee')}
-                      className="py-2 px-2.5 bg-white/5 hover:bg-amber-500/15 border border-white/5 hover:border-amber-500/20 rounded-xl text-[10px] font-bold text-slate-300 hover:text-amber-400 transition flex flex-col items-center justify-center gap-0.5"
-                    >
-                      <span>Bypass as Employee</span>
-                      <span className="text-[8px] text-slate-500 font-normal font-mono">(Artisan view)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleQuickBypass('Auditor')}
-                      className="py-2 px-2.5 bg-white/5 hover:bg-amber-500/15 border border-white/5 hover:border-amber-500/20 rounded-xl text-[10px] font-bold text-slate-300 hover:text-amber-400 transition flex flex-col items-center justify-center gap-0.5"
-                    >
-                      <span>Bypass as Auditor</span>
-                      <span className="text-[8px] text-slate-500 font-normal font-mono">(Kadiatu Bangura)</span>
-                    </button>
-                  </div>
-                  
-                  <p className="text-[8.5px] text-center text-slate-500 font-medium">
-                    🔑 PIN: Admin: <code className="text-amber-500/80 font-mono font-bold">admin</code>, Manager: <code className="text-amber-500/80 font-mono font-bold">manager</code>, Auditor: <code className="text-amber-500/80 font-mono font-bold">audit</code>, Employees: <code className="text-amber-500/80 font-mono font-bold">1234</code>.
-                  </p>
-                </div>
               </motion.div>
             )}
           </AnimatePresence>

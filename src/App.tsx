@@ -38,7 +38,7 @@ import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
 
 // Seed data & types
-import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments, deleteBatchDocuments } from './lib/firestoreService';
+import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments, deleteBatchDocuments, clearEntireCollection } from './lib/firestoreService';
 import { 
   INITIAL_INVENTORY, 
   INITIAL_CUSTOMERS, 
@@ -51,10 +51,10 @@ import {
 
 const LIVE_ADMIN_EMPLOYEE: Employee = {
   id: 'emp-01',
-  name: 'Mohamed Kamara',
+  name: 'Mr Paul Bindi',
   role: 'Admin',
   phone: '+232 76 111 2222',
-  email: 'mohamed.kamara@swedsfree.com',
+  email: 'paul.bindi@swedsfree.com',
   status: 'Active',
   baseSalary: 9500,
   dailyRate: 350,
@@ -240,13 +240,13 @@ export default function App() {
     }
   });
 
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => getStoredData('swedsfree_inventory', INITIAL_INVENTORY));
-  const [customers, setCustomers] = useState<Customer[]>(() => getStoredData('swedsfree_customers', INITIAL_CUSTOMERS));
-  const [employees, setEmployees] = useState<Employee[]>(() => getStoredData('swedsfree_employees', INITIAL_EMPLOYEES));
-  const [jobs, setJobs] = useState<Job[]>(() => getStoredData('swedsfree_jobs', INITIAL_JOBS));
-  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>(() => getStoredData('swedsfree_inv_transactions', INITIAL_INVENTORY_TRANSACTIONS));
-  const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>(() => getStoredData('swedsfree_fin_transactions', INITIAL_FINANCIALS));
-  const [dailyWorkLogs, setDailyWorkLogs] = useState<DailyWorkLog[]>(() => getStoredData('swedsfree_daily_work_logs', INITIAL_DAILY_WORK_LOGS));
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => getStoredData('swedsfree_inventory', []));
+  const [customers, setCustomers] = useState<Customer[]>(() => getStoredData('swedsfree_customers', []));
+  const [employees, setEmployees] = useState<Employee[]>(() => getStoredData('swedsfree_employees', [LIVE_ADMIN_EMPLOYEE]));
+  const [jobs, setJobs] = useState<Job[]>(() => getStoredData('swedsfree_jobs', []));
+  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>(() => getStoredData('swedsfree_inv_transactions', []));
+  const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>(() => getStoredData('swedsfree_fin_transactions', []));
+  const [dailyWorkLogs, setDailyWorkLogs] = useState<DailyWorkLog[]>(() => getStoredData('swedsfree_daily_work_logs', []));
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>(() => getStoredData('swedsfree_registration_requests', []));
   const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters', []));
 
@@ -259,17 +259,15 @@ export default function App() {
     localStorage.setItem('swedsfree_seed_disabled', 'true');
 
     try {
-      await deleteBatchDocuments('inventory', inventory.map(i => i.id));
-      await deleteBatchDocuments('customers', customers.map(c => c.id));
-      await deleteBatchDocuments('jobs', jobs.map(j => j.id));
-      await deleteBatchDocuments('inventoryTransactions', inventoryTransactions.map(t => t.id));
-      await deleteBatchDocuments('financialTransactions', financialTransactions.map(f => f.id));
-      await deleteBatchDocuments('dailyWorkLogs', dailyWorkLogs.map(l => l.id));
-      await deleteBatchDocuments('registrationRequests', registrationRequests.map(r => r.id));
-      await deleteBatchDocuments('warningLetters', warningLetters.map(w => w.id));
-
-      const nonAdminEmployees = employees.filter(e => e.role !== 'Admin').map(e => e.id);
-      await deleteBatchDocuments('employees', nonAdminEmployees);
+      await clearEntireCollection('inventory');
+      await clearEntireCollection('customers');
+      await clearEntireCollection('jobs');
+      await clearEntireCollection('inventoryTransactions');
+      await clearEntireCollection('financialTransactions');
+      await clearEntireCollection('dailyWorkLogs');
+      await clearEntireCollection('registrationRequests');
+      await clearEntireCollection('warningLetters');
+      await clearEntireCollection('employees');
 
       await saveDocument('employees', LIVE_ADMIN_EMPLOYEE);
     } catch (err) {
@@ -300,7 +298,7 @@ export default function App() {
     setActiveTab('dashboard');
 
     if (!silent) {
-      alert('SUCCESS: All system data has been completely cleared. The system is now 100% clean and ready for live production use!');
+      alert('SUCCESS: All system data has been completely cleared from Firestore database and local storage. The system is now 100% clean and ready for live production use!');
     }
   };
 
@@ -352,19 +350,20 @@ export default function App() {
       unsubs.push(unsub);
     };
 
-    syncCollection('inventory', setInventory, 'swedsfree_inventory', INITIAL_INVENTORY);
-    syncCollection('customers', setCustomers, 'swedsfree_customers', INITIAL_CUSTOMERS);
-    syncCollection('employees', setEmployees, 'swedsfree_employees', INITIAL_EMPLOYEES);
-    syncCollection('jobs', setJobs, 'swedsfree_jobs', INITIAL_JOBS);
-    syncCollection('inventoryTransactions', setInventoryTransactions, 'swedsfree_inv_transactions', INITIAL_INVENTORY_TRANSACTIONS);
-    syncCollection('financialTransactions', setFinancialTransactions, 'swedsfree_fin_transactions', INITIAL_FINANCIALS);
-    syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs', INITIAL_DAILY_WORK_LOGS);
+    syncCollection('inventory', setInventory, 'swedsfree_inventory', []);
+    syncCollection('customers', setCustomers, 'swedsfree_customers', []);
+    syncCollection('employees', setEmployees, 'swedsfree_employees', [LIVE_ADMIN_EMPLOYEE]);
+    syncCollection('jobs', setJobs, 'swedsfree_jobs', []);
+    syncCollection('inventoryTransactions', setInventoryTransactions, 'swedsfree_inv_transactions', []);
+    syncCollection('financialTransactions', setFinancialTransactions, 'swedsfree_fin_transactions', []);
+    syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs', []);
     syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests', []);
     syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters', []);
 
-    // Perform immediate data clear if go-live request was issued
-    if (localStorage.getItem('swedsfree_seed_disabled') !== 'true') {
+    // Perform immediate data clear if go-live request was issued or initial purge not done
+    if (localStorage.getItem('swedsfree_initial_purge_done') !== 'true') {
       handleClearAllSystemDataForGoLive(true);
+      localStorage.setItem('swedsfree_initial_purge_done', 'true');
     }
 
     return () => {
@@ -420,11 +419,7 @@ export default function App() {
 
   // PURGE SAMPLE GENERATED DATA ACTION
   const handleResetDatabase = async () => {
-    if (window.confirm('Are you sure you want to remove all generated sample data? This will clear hardcoded sample items and load only the data present in your live Firestore database.')) {
-      await purgeGeneratedSampleData();
-      setActiveTab('dashboard');
-      alert('Generated sample data has been removed. The application is now using only your live Firestore database data.');
-    }
+    await handleClearAllSystemDataForGoLive(false);
   };
 
   // ==========================================
@@ -1101,10 +1096,11 @@ export default function App() {
               </div>
 
               <button 
-                onClick={handleResetDatabase}
+                onClick={() => handleClearAllSystemDataForGoLive(false)}
                 className="w-full text-center text-[11px] font-bold text-red-300 hover:text-white py-1.5 bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 rounded-lg transition"
+                id="btn-purge-database"
               >
-                Purge Sample Data & Sync DB
+                Clear System Data (Fresh Start)
               </button>
             </div>
           )}

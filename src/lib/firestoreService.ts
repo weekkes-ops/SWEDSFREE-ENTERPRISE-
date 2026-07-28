@@ -4,7 +4,8 @@ import {
   setDoc, 
   deleteDoc, 
   onSnapshot, 
-  writeBatch 
+  writeBatch,
+  getDocs
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -120,5 +121,21 @@ export async function deleteBatchDocuments(
     for (const id of ids) {
       await deleteDocument(collectionName, id);
     }
+  }
+}
+
+// Clear all documents from a collection directly in Firestore
+export async function clearEntireCollection(collectionName: string): Promise<void> {
+  try {
+    const colRef = collection(db, collectionName);
+    const snapshot = await getDocs(colRef);
+    if (snapshot.empty) return;
+    const batch = writeBatch(db);
+    snapshot.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error(`Error clearing entire collection ${collectionName}:`, err);
   }
 }
