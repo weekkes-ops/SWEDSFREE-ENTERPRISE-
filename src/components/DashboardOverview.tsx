@@ -1,4 +1,4 @@
-import { InventoryItem, Job, Customer, Employee, formatCurrency, RegistrationRequest } from '../types';
+import { InventoryItem, Job, Customer, Employee, formatCurrency, RegistrationRequest, FinancialTransaction } from '../types';
 import { 
   Wrench, 
   Users, 
@@ -23,6 +23,7 @@ interface DashboardOverviewProps {
   jobs: Job[];
   customers: Customer[];
   employees: Employee[];
+  financialTransactions?: FinancialTransaction[];
   setActiveTab: (tab: string) => void;
   onOpenQuickAction: (action: string) => void;
   currentUser?: Employee | null;
@@ -36,6 +37,7 @@ export default function DashboardOverview({
   jobs,
   customers,
   employees,
+  financialTransactions = [],
   setActiveTab,
   onOpenQuickAction,
   currentUser,
@@ -45,6 +47,22 @@ export default function DashboardOverview({
 }: DashboardOverviewProps) {
   
   const isManager = !currentUser || currentUser.role === 'Manager';
+
+  // Calculate Month-to-Date (MTD) financial statistics
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const monthName = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  const mtdTransactions = financialTransactions.filter(tx => {
+    if (!tx.date) return false;
+    const d = new Date(tx.date);
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+  });
+
+  const mtdIncome = mtdTransactions.filter(t => t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
+  const mtdExpenditure = mtdTransactions.filter(t => t.type === 'EXPENDITURE').reduce((sum, t) => sum + t.amount, 0);
+  const mtdNet = mtdIncome - mtdExpenditure;
 
   // Calculate analytics
   const activeJobs = isManager 
@@ -222,6 +240,122 @@ export default function DashboardOverview({
                 </div>
               </div>
             ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Low Inventory Stock Alert Notification Banner */}
+      {lowStockItems.length > 0 && (
+        <motion.div 
+          variants={itemVariants}
+          className="bg-red-50 border border-red-200 rounded-2xl p-5 shadow-xs space-y-3.5 relative overflow-hidden"
+          id="low-stock-notification-banner"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl">
+                <AlertTriangle className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="space-y-0.5">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  Low Inventory Stock Alert Indicator
+                  <span className="bg-red-100 border border-red-300 text-red-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {lowStockItems.length} Item(s) Below Minimum
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-600">
+                  The following timber/hardware stock items have fallen below their defined minimum threshold. Restock recommended.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('inventory')}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-xs transition"
+            >
+              Restock Inventory
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1 relative z-10">
+            {lowStockItems.map(item => (
+              <div 
+                key={item.id}
+                className="bg-white/90 p-3 rounded-xl border border-red-200 flex items-center justify-between gap-3 text-xs shadow-xs"
+              >
+                <div className="space-y-0.5 min-w-0">
+                  <p className="font-bold text-gray-800 truncate">{item.name}</p>
+                  <p className="text-[10px] text-gray-500">Min Threshold: <span className="font-mono font-bold text-gray-700">{item.minStockThreshold} {item.unit}</span></p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="bg-red-100 text-red-800 text-[11px] font-black font-mono px-2 py-0.5 rounded-md border border-red-200">
+                    {item.currentStock} {item.unit}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Month-to-Date (MTD) Financial Snapshot Card */}
+      {isManager && (
+        <motion.div 
+          variants={itemVariants}
+          className="bg-slate-900 text-white p-6 rounded-2xl border border-amber-500/20 shadow-md relative overflow-hidden"
+          id="mtd-financial-snapshot-card"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg border border-amber-500/30">
+                  <TrendingUp className="w-4 h-4" />
+                </span>
+                <h3 className="text-base font-bold tracking-tight text-white">Month-to-Date (MTD) Financial Snapshot</h3>
+                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase">
+                  {monthName}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">Derived in real time from workshop financial transactions state ledger.</p>
+            </div>
+
+            <button
+              onClick={() => setActiveTab('finance')}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition shadow-xs self-start md:self-auto cursor-pointer"
+            >
+              View Financial Ledger
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 relative z-10">
+            <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                <ArrowUpRight className="w-3.5 h-3.5" /> Total Income (MTD)
+              </span>
+              <p className="text-2xl font-mono font-bold text-white mt-1">
+                {formatCurrency(mtdIncome)}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">Customer deposits & sales</p>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1">
+                <ArrowDownRight className="w-3.5 h-3.5" /> Total Expenditure (MTD)
+              </span>
+              <p className="text-2xl font-mono font-bold text-white mt-1">
+                {formatCurrency(mtdExpenditure)}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">Materials, wages & ops</p>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                Net MTD Profit / Margin
+              </span>
+              <p className={`text-2xl font-mono font-bold mt-1 ${mtdNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {mtdNet >= 0 ? '+' : ''}{formatCurrency(mtdNet)}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">Net earnings retainment</p>
+            </div>
           </div>
         </motion.div>
       )}

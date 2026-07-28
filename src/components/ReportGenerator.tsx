@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { jsPDF } from 'jspdf';
 import { 
   Employee, 
   Customer, 
@@ -120,6 +121,131 @@ export default function ReportGenerator({
     alert("Drafting Excel CSV Summary for SWED WOOD WORK. Export compiled successfully!");
   };
 
+  const handleDownloadPDFReport = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header Title
+    doc.setFillColor(30, 27, 22);
+    doc.rect(0, 0, pageWidth, 28, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(255, 255, 255);
+    doc.text('SWED WOOD WORK - MONTHLY SUMMARY REPORT', 14, 15);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(200, 200, 200);
+    doc.text(`Report Period: ${selectedPeriod} | Pivot Date: 2026-07-20 | Downloaded: ${new Date().toLocaleDateString('en-US')}`, 14, 22);
+
+    let startY = 36;
+
+    // 1. Executive Financial Summary Section
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 27, 22);
+    doc.text('1. FINANCIAL TRANSACTIONS SUMMARY', 14, startY);
+
+    startY += 6;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Total Income: SLE ${totalIncome.toLocaleString()}`, 14, startY);
+    doc.text(`Total Expenditure: SLE ${totalExpense.toLocaleString()}`, 80, startY);
+    doc.text(`Net Earnings: SLE ${netEarnings.toLocaleString()}`, 150, startY);
+
+    startY += 8;
+
+    // Table Header for Financials
+    doc.setFillColor(240, 238, 233);
+    doc.rect(14, startY, pageWidth - 28, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(50, 50, 50);
+    doc.text('DATE', 16, startY + 5);
+    doc.text('TYPE', 40, startY + 5);
+    doc.text('CATEGORY', 65, startY + 5);
+    doc.text('DESCRIPTION', 110, startY + 5);
+    doc.text('AMOUNT', pageWidth - 16, startY + 5, { align: 'right' });
+
+    startY += 9;
+
+    doc.setFont('helvetica', 'normal');
+    const recentTx = periodFinTx.slice(0, 10);
+    if (recentTx.length === 0) {
+      doc.text('No financial transactions recorded for this period.', 16, startY);
+      startY += 8;
+    } else {
+      recentTx.forEach((tx) => {
+        if (startY > 270) {
+          doc.addPage();
+          startY = 20;
+        }
+        doc.text(tx.date || '-', 16, startY);
+        doc.text(tx.type, 40, startY);
+        doc.text(tx.category || '-', 65, startY);
+        const desc = (tx.description || '').substring(0, 30);
+        doc.text(desc, 110, startY);
+        const prefix = tx.type === 'INCOME' ? '+' : '-';
+        doc.text(`${prefix}SLE ${tx.amount.toLocaleString()}`, pageWidth - 16, startY, { align: 'right' });
+        startY += 6;
+      });
+    }
+
+    startY += 6;
+
+    // 2. Job Status Summary Section
+    if (startY > 220) {
+      doc.addPage();
+      startY = 20;
+    }
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 27, 22);
+    doc.text('2. JOB COMMISSIONS & STATUS SUMMARY', 14, startY);
+
+    startY += 8;
+
+    doc.setFillColor(240, 238, 233);
+    doc.rect(14, startY, pageWidth - 28, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(50, 50, 50);
+    doc.text('JOB ID / TITLE', 16, startY + 5);
+    doc.text('CUSTOMER', 75, startY + 5);
+    doc.text('STATUS', 130, startY + 5);
+    doc.text('QUOTE AMOUNT', pageWidth - 16, startY + 5, { align: 'right' });
+
+    startY += 9;
+
+    doc.setFont('helvetica', 'normal');
+    const recentJobs = periodJobs.slice(0, 10);
+    if (recentJobs.length === 0) {
+      doc.text('No job commissions found for this period.', 16, startY);
+      startY += 8;
+    } else {
+      recentJobs.forEach((job) => {
+        if (startY > 270) {
+          doc.addPage();
+          startY = 20;
+        }
+        doc.text(`${job.id}: ${(job.title || '').substring(0, 24)}`, 16, startY);
+        doc.text((job.customerName || '').substring(0, 24), 75, startY);
+        doc.text(job.status || '-', 130, startY);
+        doc.text(`SLE ${job.quoteAmount.toLocaleString()}`, pageWidth - 16, startY, { align: 'right' });
+        startY += 6;
+      });
+    }
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text('SWED WOOD WORK MANAGEMENT SYSTEM — OFFICIAL AUDIT SUMMARY REPORT', pageWidth / 2, 288, { align: 'center' });
+
+    doc.save(`SWED_Monthly_Report_${selectedPeriod}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <div className="space-y-6 print:space-y-4 print:p-0">
       
@@ -134,13 +260,21 @@ export default function ReportGenerator({
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isAuditor && (
             <div className="flex items-center gap-1 px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-[11px] font-black tracking-wide font-mono">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
               <span>Auditor Active</span>
             </div>
           )}
+          <button 
+            onClick={handleDownloadPDFReport}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition shadow-xs cursor-pointer"
+            id="btn-download-pdf-report"
+          >
+            <FileText className="w-4 h-4 text-amber-200" />
+            <span>Download PDF</span>
+          </button>
           <button 
             onClick={handlePrint}
             className="flex items-center gap-1.5 px-4 py-2.5 bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100 rounded-xl text-xs font-semibold transition"

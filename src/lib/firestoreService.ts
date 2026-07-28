@@ -101,3 +101,24 @@ export async function saveBatchDocuments<T extends { id: string }>(
     }
   }
 }
+
+// Batch delete multiple documents from Firestore permanently
+export async function deleteBatchDocuments(
+  collectionName: string,
+  ids: string[]
+): Promise<void> {
+  if (!ids || ids.length === 0) return;
+  try {
+    const batch = writeBatch(db);
+    ids.forEach((id) => {
+      const docRef = doc(db, collectionName, String(id));
+      batch.delete(docRef);
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error(`Error deleting batch from ${collectionName}:`, err);
+    for (const id of ids) {
+      await deleteDocument(collectionName, id);
+    }
+  }
+}

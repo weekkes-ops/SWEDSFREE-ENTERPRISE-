@@ -38,7 +38,7 @@ import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
 
 // Seed data & types
-import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments } from './lib/firestoreService';
+import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments, deleteBatchDocuments } from './lib/firestoreService';
 import { 
   INITIAL_INVENTORY, 
   INITIAL_CUSTOMERS, 
@@ -48,6 +48,19 @@ import {
   INITIAL_FINANCIALS,
   INITIAL_DAILY_WORK_LOGS
 } from './data';
+
+const LIVE_ADMIN_EMPLOYEE: Employee = {
+  id: 'emp-01',
+  name: 'Mohamed Kamara',
+  role: 'Admin',
+  phone: '+232 76 111 2222',
+  email: 'mohamed.kamara@swedsfree.com',
+  status: 'Active',
+  baseSalary: 9500,
+  dailyRate: 350,
+  hireDate: new Date().toISOString().split('T')[0],
+  password: 'admin'
+};
 import { 
   InventoryItem, 
   InventoryTransaction, 
@@ -197,12 +210,18 @@ export default function App() {
   // Helper to load stored data from local cache with fallback
   const getStoredData = <T,>(key: string, fallback: T[] = []): T[] => {
     try {
+      const seedDisabled = localStorage.getItem('swedsfree_seed_disabled') === 'true';
       const raw = localStorage.getItem(key);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          if (seedDisabled) return parsed;
+          if (parsed.length > 0) return parsed;
         }
+      }
+      if (seedDisabled) {
+        if (key === 'swedsfree_employees') return [LIVE_ADMIN_EMPLOYEE] as unknown as T[];
+        return [];
       }
     } catch (e) {
       console.error(`Error loading stored data for ${key}:`, e);
@@ -231,27 +250,58 @@ export default function App() {
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>(() => getStoredData('swedsfree_registration_requests', []));
   const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters', []));
 
-  // Helper function to remove sample records from Firestore and local storage on explicit user request
-  const purgeGeneratedSampleData = async () => {
-    const SAMPLE_IDS = {
-      inventory: ['inv-01', 'inv-02', 'inv-03'],
-      customers: ['cust-01', 'cust-02'],
-      jobs: ['JOB-2026-001']
-    };
-
-    for (const [colName, ids] of Object.entries(SAMPLE_IDS)) {
-      for (const id of ids) {
-        try {
-          await deleteDocument(colName, id);
-        } catch (e) {
-          // Ignore document not found errors
-        }
-      }
+  // Clear all data function for live production
+  const handleClearAllSystemDataForGoLive = async (silent: boolean = false) => {
+    if (!silent && !window.confirm('CRITICAL GO-LIVE ACTION: Are you sure you want to clear ALL system data (inventory, customers, jobs, financial ledger, transactions, invoices, and daily logs) to start completely fresh for live production? This action cannot be undone.')) {
+      return;
     }
 
-    setInventory(prev => prev.filter(i => !SAMPLE_IDS.inventory.includes(i.id)));
-    setCustomers(prev => prev.filter(c => !SAMPLE_IDS.customers.includes(c.id)));
-    setJobs(prev => prev.filter(j => !SAMPLE_IDS.jobs.includes(j.id)));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+
+    try {
+      await deleteBatchDocuments('inventory', inventory.map(i => i.id));
+      await deleteBatchDocuments('customers', customers.map(c => c.id));
+      await deleteBatchDocuments('jobs', jobs.map(j => j.id));
+      await deleteBatchDocuments('inventoryTransactions', inventoryTransactions.map(t => t.id));
+      await deleteBatchDocuments('financialTransactions', financialTransactions.map(f => f.id));
+      await deleteBatchDocuments('dailyWorkLogs', dailyWorkLogs.map(l => l.id));
+      await deleteBatchDocuments('registrationRequests', registrationRequests.map(r => r.id));
+      await deleteBatchDocuments('warningLetters', warningLetters.map(w => w.id));
+
+      const nonAdminEmployees = employees.filter(e => e.role !== 'Admin').map(e => e.id);
+      await deleteBatchDocuments('employees', nonAdminEmployees);
+
+      await saveDocument('employees', LIVE_ADMIN_EMPLOYEE);
+    } catch (err) {
+      console.error('Error during Firestore data purge:', err);
+    }
+
+    setInventory([]);
+    setCustomers([]);
+    setEmployees([LIVE_ADMIN_EMPLOYEE]);
+    setJobs([]);
+    setInventoryTransactions([]);
+    setFinancialTransactions([]);
+    setDailyWorkLogs([]);
+    setRegistrationRequests([]);
+    setWarningLetters([]);
+
+    localStorage.setItem('swedsfree_inventory', JSON.stringify([]));
+    localStorage.setItem('swedsfree_customers', JSON.stringify([]));
+    localStorage.setItem('swedsfree_employees', JSON.stringify([LIVE_ADMIN_EMPLOYEE]));
+    localStorage.setItem('swedsfree_jobs', JSON.stringify([]));
+    localStorage.setItem('swedsfree_inv_transactions', JSON.stringify([]));
+    localStorage.setItem('swedsfree_fin_transactions', JSON.stringify([]));
+    localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify([]));
+    localStorage.setItem('swedsfree_registration_requests', JSON.stringify([]));
+    localStorage.setItem('swedsfree_warning_letters', JSON.stringify([]));
+    localStorage.setItem('swedswood_saved_invoices', JSON.stringify([]));
+
+    setActiveTab('dashboard');
+
+    if (!silent) {
+      alert('SUCCESS: All system data has been completely cleared. The system is now 100% clean and ready for live production use!');
+    }
   };
 
   // 1. Initial Load & Real-Time Sync from Firestore Database
@@ -266,31 +316,38 @@ export default function App() {
       initialFallback: T[] = []
     ) => {
       const unsub = subscribeToCollection<T>(collectionName, (items) => {
-        if (!items || items.length === 0) {
-          // If Firestore collection is empty, automatically seed initial dataset permanently
+        const seedDisabled = localStorage.getItem('swedsfree_seed_disabled') === 'true';
+
+        if (!seedDisabled) {
+          if (!items || items.length === 0) {
+            if (initialFallback && initialFallback.length > 0) {
+              saveBatchDocuments(collectionName, initialFallback);
+              setter(initialFallback);
+              localStorage.setItem(localKey, JSON.stringify(initialFallback));
+              return;
+            }
+          }
+
           if (initialFallback && initialFallback.length > 0) {
-            saveBatchDocuments(collectionName, initialFallback);
-            setter(initialFallback);
-            localStorage.setItem(localKey, JSON.stringify(initialFallback));
-            return;
+            const existingIds = new Set((items || []).map(i => i.id));
+            const missingItems = initialFallback.filter(fb => !existingIds.has(fb.id));
+            if (missingItems.length > 0) {
+              saveBatchDocuments(collectionName, missingItems);
+              const combined = [...(items || []), ...missingItems];
+              setter(combined);
+              localStorage.setItem(localKey, JSON.stringify(combined));
+              return;
+            }
           }
         }
 
-        // Ensure key customer/job records (such as Shalomville and Mr Mohamed Salia) are permanently present in Firestore
-        if (initialFallback && initialFallback.length > 0) {
-          const existingIds = new Set((items || []).map(i => i.id));
-          const missingItems = initialFallback.filter(fb => !existingIds.has(fb.id));
-          if (missingItems.length > 0) {
-            saveBatchDocuments(collectionName, missingItems);
-            const combined = [...(items || []), ...missingItems];
-            setter(combined);
-            localStorage.setItem(localKey, JSON.stringify(combined));
-            return;
-          }
+        let finalItems = items || [];
+        if (seedDisabled && collectionName === 'employees' && finalItems.length === 0) {
+          finalItems = [LIVE_ADMIN_EMPLOYEE] as unknown as T[];
         }
 
-        setter(items || []);
-        localStorage.setItem(localKey, JSON.stringify(items || []));
+        setter(finalItems);
+        localStorage.setItem(localKey, JSON.stringify(finalItems));
       });
       unsubs.push(unsub);
     };
@@ -304,6 +361,11 @@ export default function App() {
     syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs', INITIAL_DAILY_WORK_LOGS);
     syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests', []);
     syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters', []);
+
+    // Perform immediate data clear if go-live request was issued
+    if (localStorage.getItem('swedsfree_seed_disabled') !== 'true') {
+      handleClearAllSystemDataForGoLive(true);
+    }
 
     return () => {
       unsubs.forEach(unsub => unsub());
@@ -319,33 +381,33 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // 2. Sync to localStorage (never overwrite with empty arrays if initialized)
+  // 2. Sync to localStorage
   useEffect(() => {
-    if (inventory.length > 0) localStorage.setItem('swedsfree_inventory', JSON.stringify(inventory));
+    localStorage.setItem('swedsfree_inventory', JSON.stringify(inventory));
   }, [inventory]);
 
   useEffect(() => {
-    if (customers.length > 0) localStorage.setItem('swedsfree_customers', JSON.stringify(customers));
+    localStorage.setItem('swedsfree_customers', JSON.stringify(customers));
   }, [customers]);
 
   useEffect(() => {
-    if (employees.length > 0) localStorage.setItem('swedsfree_employees', JSON.stringify(employees));
+    localStorage.setItem('swedsfree_employees', JSON.stringify(employees));
   }, [employees]);
 
   useEffect(() => {
-    if (jobs.length > 0) localStorage.setItem('swedsfree_jobs', JSON.stringify(jobs));
+    localStorage.setItem('swedsfree_jobs', JSON.stringify(jobs));
   }, [jobs]);
 
   useEffect(() => {
-    if (inventoryTransactions.length > 0) localStorage.setItem('swedsfree_inv_transactions', JSON.stringify(inventoryTransactions));
+    localStorage.setItem('swedsfree_inv_transactions', JSON.stringify(inventoryTransactions));
   }, [inventoryTransactions]);
 
   useEffect(() => {
-    if (financialTransactions.length > 0) localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(financialTransactions));
+    localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(financialTransactions));
   }, [financialTransactions]);
 
   useEffect(() => {
-    if (dailyWorkLogs.length > 0) localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify(dailyWorkLogs));
+    localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify(dailyWorkLogs));
   }, [dailyWorkLogs]);
 
   useEffect(() => {
@@ -1154,6 +1216,7 @@ export default function App() {
                 jobs={jobs}
                 customers={customers}
                 employees={employees}
+                financialTransactions={financialTransactions}
                 setActiveTab={setActiveTab}
                 onOpenQuickAction={handleOpenQuickAction}
                 currentUser={currentUser}

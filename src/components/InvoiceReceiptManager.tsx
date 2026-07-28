@@ -755,14 +755,18 @@ export default function InvoiceReceiptManager({
       setInvoiceProjectQty(activeInvoice.quantity || 1);
 
       if (activeInvoice.items && activeInvoice.items.length > 0) {
-        setCustomInvoiceItems(activeInvoice.items.map((it, idx) => ({
-          id: it.id || `item-${idx + 1}`,
-          description: it.description,
-          unitRate: String(it.quantity || 1),
-          amount: it.unitCost,
-          quantity: it.quantity || 1,
-          unitPrice: it.unitCost
-        })));
+        setCustomInvoiceItems(activeInvoice.items.map((it, idx) => {
+          const q = it.quantity || 1;
+          const uCost = it.unitCost || 0;
+          return {
+            id: it.id || `item-${idx + 1}`,
+            description: it.description,
+            unitRate: String(q),
+            amount: it.totalCost || (q * uCost),
+            quantity: q,
+            unitPrice: uCost
+          };
+        }));
         setInvoiceCommissionAmount(0);
       } else {
         setInvoiceCommissionAmount(activeInvoice.quoteAmount);
@@ -1291,7 +1295,7 @@ export default function InvoiceReceiptManager({
   return (
     <div className="space-y-6">
       
-      {/* Print styles override (Only prints print-area with white font) */}
+      {/* Print styles override (Prints print-area on clean white paper with crisp dark text) */}
       <style>{`
         @media print {
           body * {
@@ -1299,16 +1303,15 @@ export default function InvoiceReceiptManager({
           }
           #print-area, #print-area * {
             visibility: visible;
-            color: #ffffff !important;
           }
           #print-area {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
-            background: #020617 !important;
-            color: #ffffff !important;
-            padding: 1cm !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            padding: 0.5cm !important;
             box-shadow: none !important;
             border: none !important;
             -webkit-print-color-adjust: exact !important;
@@ -1316,18 +1319,13 @@ export default function InvoiceReceiptManager({
           }
           #print-area input,
           #print-area textarea,
-          #print-area select,
-          #print-area p,
-          #print-area span,
-          #print-area h1, #print-area h2, #print-area h3, #print-area h4, #print-area h5,
-          #print-area td, #print-area th, #print-area div {
+          #print-area select {
             border: none !important;
             background: transparent !important;
             box-shadow: none !important;
             outline: none !important;
-            color: #ffffff !important;
-            font-weight: inherit !important;
-            font-size: inherit !important;
+            color: #0f172a !important;
+            font-weight: bold !important;
             appearance: none !important;
             -webkit-appearance: none !important;
             resize: none !important;
@@ -3967,6 +3965,68 @@ export default function InvoiceReceiptManager({
                       )}
                     </div>
                   </div>
+
+                  {/* Itemized Order Line Items Cleared on Receipt */}
+                  {activeReceipt && (
+                    <div className="border-t border-dashed border-emerald-200 pt-3 space-y-2">
+                      <span className="text-[9px] text-emerald-900 uppercase font-black tracking-wider block">
+                        Itemized Production Scope Cleared:
+                      </span>
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-emerald-200 text-emerald-950 font-bold uppercase text-[9px] bg-emerald-100/50">
+                            <th className="py-1.5 px-2">Item Description</th>
+                            <th className="py-1.5 px-2 text-center">Qty</th>
+                            <th className="py-1.5 px-2 text-right">Unit Rate</th>
+                            <th className="py-1.5 px-2 text-right">Total Value</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-emerald-100/60">
+                          {(() => {
+                            let rItems: { id: string; desc: string; qty: number; unitPrice: number; total: number }[] = [];
+                            if (customInvoiceItems && customInvoiceItems.length > 0 && activeInvoice?.id === activeReceipt.job.id) {
+                              rItems = customInvoiceItems.map(it => {
+                                const q = it.quantity !== undefined ? it.quantity : (parseFloat(it.unitRate) || 1);
+                                const p = it.unitPrice !== undefined ? it.unitPrice : it.amount;
+                                return {
+                                  id: it.id,
+                                  desc: it.description,
+                                  qty: q,
+                                  unitPrice: p,
+                                  total: q * p
+                                };
+                              });
+                            } else if (activeReceipt.job.items && activeReceipt.job.items.length > 0) {
+                              rItems = activeReceipt.job.items.map((it, idx) => ({
+                                id: it.id || `ritem-${idx}`,
+                                desc: it.description,
+                                qty: it.quantity || 1,
+                                unitPrice: it.unitCost,
+                                total: it.totalCost || ((it.quantity || 1) * it.unitCost)
+                              }));
+                            }
+                            if (rItems.length === 0) {
+                              rItems = [{
+                                id: 'main-1',
+                                desc: receiptProject || activeReceipt.job.title,
+                                qty: 1,
+                                unitPrice: receiptAmount || activeReceipt.job.quoteAmount,
+                                total: receiptAmount || activeReceipt.job.quoteAmount
+                              }];
+                            }
+                            return rItems.map((item) => (
+                              <tr key={item.id} className="text-[11px]">
+                                <td className="py-1.5 px-2 font-semibold text-gray-800">{item.desc}</td>
+                                <td className="py-1.5 px-2 text-center font-mono font-bold text-emerald-900">{item.qty}</td>
+                                <td className="py-1.5 px-2 text-right font-mono text-gray-600">{formatCurrency(item.unitPrice, 0)}</td>
+                                <td className="py-1.5 px-2 text-right font-mono font-bold text-emerald-900">{formatCurrency(item.total, 0)}</td>
+                              </tr>
+                            ));
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
                 {/* Acknowledgment block */}
@@ -4439,10 +4499,6 @@ export function buildInvoicePdfContent(
     doc.text("Price", 15 + ledCol1 + ledCol2 + ledCol3 - 4, ledY + 5.5, { align: 'right' });
     doc.text("Total", 15 + ledCol1 + ledCol2 + ledCol3 + ledCol4 - 4, ledY + 5.5, { align: 'right' });
     
-    const tableBottomY = 195;
-    const tableRowHeight = 8;
-    const totalRowsCount = 10;
-    
     // Items rendering
     let itemsToRender: { desc: string; qty: string; price: number; total: number }[] = [];
     if (customItems && customItems.length > 0) {
@@ -4466,6 +4522,22 @@ export function buildInvoicePdfContent(
           total: commissionAmount * projQtyNum
         });
       }
+    } else if (job.items && job.items.length > 0) {
+      itemsToRender = job.items.map(item => ({
+        desc: item.description,
+        qty: String(item.quantity || 1),
+        price: item.unitCost,
+        total: item.totalCost || ((item.quantity || 1) * item.unitCost)
+      }));
+      if (commissionAmount > 0 && !itemsToRender.some(i => i.desc.includes(projectTitle))) {
+        const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
+        itemsToRender.unshift({
+          desc: projectTitle,
+          qty: String(projQtyNum),
+          price: commissionAmount,
+          total: commissionAmount * projQtyNum
+        });
+      }
     } else {
       const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
       itemsToRender = [{
@@ -4476,6 +4548,10 @@ export function buildInvoicePdfContent(
       }];
     }
 
+    const tableRowHeight = 8;
+    const actualRowsCount = Math.max(itemsToRender.length, 6);
+    const tableBottomY = ledY + 8 + actualRowsCount * tableRowHeight;
+
     let subtotalVal = 0;
     itemsToRender.forEach((it, idx) => {
       subtotalVal += it.total;
@@ -4484,7 +4560,8 @@ export function buildInvoicePdfContent(
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(31, 41, 55);
-      doc.text(it.desc, 19, currentY + 5.5);
+      const cleanDesc = doc.splitTextToSize(it.desc, ledCol1 - 6)[0];
+      doc.text(cleanDesc, 19, currentY + 5.5);
       
       // Draw solid blue badge box for Qty data
       doc.setFillColor(15, 82, 186); // #0f52ba
@@ -4504,7 +4581,7 @@ export function buildInvoicePdfContent(
     
     doc.setDrawColor(209, 213, 219);
     doc.setLineWidth(0.15);
-    for (let r = 0; r <= totalRowsCount; r++) {
+    for (let r = 0; r <= actualRowsCount; r++) {
       const currentY = ledY + 8 + r * tableRowHeight;
       doc.line(15, currentY, 195, currentY);
     }
@@ -4518,7 +4595,7 @@ export function buildInvoicePdfContent(
     doc.line(195, ledY, 195, tableBottomY);
 
     // Footer Totals Section
-    const totY = 202;
+    const totY = Math.min(tableBottomY + 7, 215);
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
@@ -4710,6 +4787,53 @@ export function buildInvoicePdfContent(
     doc.text(`Workshop Timeline: ${job.startDate} to ${job.dueDate}`, 111, 75);
 
     // Items Table
+    let itemsToRender: { desc: string; qty: string; price: number; total: number }[] = [];
+    if (customItems && customItems.length > 0) {
+      itemsToRender = customItems.map(item => {
+        const q = item.quantity !== undefined ? item.quantity : (parseFloat(item.unitRate) || 1);
+        const p = item.unitPrice !== undefined ? item.unitPrice : item.amount;
+        return {
+          desc: item.description,
+          qty: String(q),
+          price: p,
+          total: q * p
+        };
+      });
+      if (commissionAmount > 0 && !itemsToRender.some(i => i.desc.includes(projectTitle))) {
+        const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
+        itemsToRender.unshift({
+          desc: projectTitle,
+          qty: String(projQtyNum),
+          price: commissionAmount,
+          total: commissionAmount * projQtyNum
+        });
+      }
+    } else if (job.items && job.items.length > 0) {
+      itemsToRender = job.items.map(item => ({
+        desc: item.description,
+        qty: String(item.quantity || 1),
+        price: item.unitCost,
+        total: item.totalCost || ((item.quantity || 1) * item.unitCost)
+      }));
+      if (commissionAmount > 0 && !itemsToRender.some(i => i.desc.includes(projectTitle))) {
+        const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
+        itemsToRender.unshift({
+          desc: projectTitle,
+          qty: String(projQtyNum),
+          price: commissionAmount,
+          total: commissionAmount * projQtyNum
+        });
+      }
+    } else {
+      const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
+      itemsToRender = [{
+        desc: projectTitle,
+        qty: String(projQtyNum),
+        price: commissionAmount,
+        total: commissionAmount * projQtyNum
+      }];
+    }
+
     const tableY = 86;
     doc.setFillColor(69, 26, 3);
     doc.rect(15, tableY, 180, 8, 'F');
@@ -4718,39 +4842,57 @@ export function buildInvoicePdfContent(
     doc.setFontSize(8.5);
     doc.setTextColor(255, 255, 255);
     doc.text("Itemized Production Scope & Timber Milling", 19, tableY + 5.5);
-    doc.text("Unit Rate / Size", 130, tableY + 5.5);
+    doc.text("Qty", 115, tableY + 5.5, { align: 'center' });
+    doc.text("Unit Rate", 145, tableY + 5.5);
     doc.text("Cleared Value", 191, tableY + 5.5, { align: 'right' });
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(31, 41, 55);
-    doc.text(projectTitle, 19, tableY + 14);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(107, 114, 128);
-    doc.text("Fine assembly, wood joinery, sanding, and hand polished finish.", 19, tableY + 18);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(75, 85, 99);
-    doc.text("Flat commission", 130, tableY + 14);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(31, 41, 55);
-    const quotePriceStr = `Le ${commissionAmount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
-    doc.text(quotePriceStr, 191, tableY + 14, { align: 'right' });
+    let modernSubtotalVal = 0;
+    const rowHeight = 8;
+    itemsToRender.forEach((it, idx) => {
+      modernSubtotalVal += it.total;
+      const currentY = tableY + 8 + idx * rowHeight;
+
+      if (idx % 2 === 1) {
+        doc.setFillColor(250, 248, 246);
+        doc.rect(15, currentY, 180, rowHeight, 'F');
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(31, 41, 55);
+      const splitDesc = doc.splitTextToSize(it.desc, 90)[0];
+      doc.text(splitDesc, 19, currentY + 5.5);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(69, 26, 3);
+      doc.text(it.qty, 115, currentY + 5.5, { align: 'center' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(75, 85, 99);
+      doc.text(`Le ${it.price.toLocaleString(undefined, { minimumFractionDigits: 0 })}`, 145, currentY + 5.5);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(31, 41, 55);
+      doc.text(`Le ${it.total.toLocaleString(undefined, { minimumFractionDigits: 0 })}`, 191, currentY + 5.5, { align: 'right' });
+
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.2);
+      doc.line(15, currentY + rowHeight, 195, currentY + rowHeight);
+    });
+
+    const minRows = Math.max(itemsToRender.length, 4);
+    const tableBottomY = tableY + 8 + minRows * rowHeight;
 
     doc.setDrawColor(209, 213, 219);
     doc.setLineWidth(0.3);
-    doc.line(15, tableY + 8, 195, tableY + 8);
-    doc.line(15, tableY + 23, 195, tableY + 23);
-    doc.line(15, tableY, 15, tableY + 105);
-    doc.line(195, tableY, 195, tableY + 105);
-    doc.line(15, tableY + 105, 195, tableY + 105);
+    doc.line(15, tableY, 15, tableBottomY);
+    doc.line(195, tableY, 195, tableBottomY);
+    doc.line(15, tableBottomY, 195, tableBottomY);
 
     // Totals Section
-    const botY = 198;
+    const botY = Math.min(tableBottomY + 8, 215);
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
@@ -4764,7 +4906,7 @@ export function buildInvoicePdfContent(
     doc.text(bankInstructionsText, 15, botY + 4.5);
 
     const totalPaid = job.payments.reduce((sum, p) => sum + p.amount, 0);
-    const outstanding = job.quoteAmount - totalPaid;
+    const outstanding = modernSubtotalVal - totalPaid;
 
     const calcX = 125;
     const calcWidth = 70;
@@ -4773,6 +4915,7 @@ export function buildInvoicePdfContent(
     doc.setFillColor(245, 245, 244);
     doc.rect(calcX, botY, calcWidth, 24, 'FD');
     
+    const quotePriceStr = `Le ${modernSubtotalVal.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(75, 85, 99);
