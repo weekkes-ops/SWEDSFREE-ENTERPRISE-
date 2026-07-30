@@ -106,12 +106,12 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative overflow-hidden antialiased font-sans">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex items-center justify-center p-4 relative overflow-hidden antialiased font-sans">
       
       {/* Mesh Gradient Background */}
-      <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-amber-600/35 rounded-full blur-[130px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-blue-600/25 rounded-full blur-[130px]"></div>
+      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-amber-400/20 rounded-full blur-[130px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-blue-400/15 rounded-full blur-[130px]"></div>
       </div>
 
       <motion.div 
@@ -121,18 +121,18 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
       >
         {/* Logo / Brand Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex p-2 bg-white/10 rounded-2xl border border-amber-500/30 text-white shadow-xl mb-3.5 backdrop-blur-md">
+          <div className="inline-flex p-2 bg-white rounded-2xl border border-amber-500/30 text-slate-900 shadow-md mb-3.5">
             <img src="/logo.svg" alt="Swedswood Enterprise Logo" className="w-16 h-16 object-contain" />
           </div>
-          <h1 className="font-display font-black text-2xl uppercase tracking-widest text-amber-500">
-            SWEDSWOOD<span className="text-white ml-1">ENTERPRISE</span>
+          <h1 className="font-display font-black text-2xl uppercase tracking-widest text-amber-600">
+            SWEDSWOOD<span className="text-slate-900 ml-1">ENTERPRISE</span>
           </h1>
-          <p className="text-xs text-slate-400 tracking-wider font-semibold uppercase mt-1 flex items-center justify-center gap-1.5">
+          <p className="text-xs text-slate-600 tracking-wider font-semibold uppercase mt-1 flex items-center justify-center gap-1.5">
             <span className="text-sm">🇸🇱</span> Bespoke Woodwork & Invoice Management System
           </p>
         </div>
 
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xl relative overflow-hidden">
           <AnimatePresence mode="wait">
             {successMsg ? (
               <motion.div
@@ -142,17 +142,17 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                 exit={{ opacity: 0 }}
                 className="text-center py-6 space-y-4"
               >
-                <div className="mx-auto w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center">
+                <div className="mx-auto w-14 h-14 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl flex items-center justify-center">
                   <CheckCircle className="w-8 h-8" />
                 </div>
                 <div className="space-y-1.5">
-                  <h3 className="text-lg font-bold text-white">Access Request Received</h3>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-                    Your request under the name <span className="text-amber-400 font-bold">{regName}</span> has been submitted to the database.
+                  <h3 className="text-lg font-bold text-slate-900">Access Request Received</h3>
+                  <p className="text-xs text-slate-600 max-w-xs mx-auto leading-relaxed">
+                    Your request under the name <span className="text-amber-600 font-bold">{regName}</span> has been submitted to the database.
                   </p>
                 </div>
-                <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 text-left text-xs text-slate-400 space-y-2">
-                  <p className="font-bold text-slate-300">Next Steps:</p>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs text-slate-600 space-y-2">
+                  <p className="font-bold text-slate-800">Next Steps:</p>
                   <ul className="list-disc pl-4 space-y-1">
                     <li>An Admin or Manager must review and approve your credentials.</li>
                     <li>You will appear in the <strong>Artisans Registry</strong> pending requests list.</li>
@@ -169,7 +169,7 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                     setRegPhone('');
                     setRegRole('Carpenter');
                   }}
-                  className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white transition"
+                  className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 transition"
                 >
                   Return to Sign In
                 </button>
@@ -188,31 +188,31 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                       setMode('login');
                       setRegError('');
                     }}
-                    className="p-1.5 hover:bg-white/5 text-slate-400 hover:text-white rounded-lg transition"
+                    className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 rounded-lg transition"
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </button>
                   <div>
-                    <h2 className="text-base font-bold text-white">Register For Access</h2>
-                    <p className="text-[10px] text-slate-400">Submit a profile request for approval</p>
+                    <h2 className="text-base font-bold text-slate-900">Register For Access</h2>
+                    <p className="text-[10px] text-slate-500">Submit a profile request for approval</p>
                   </div>
                 </div>
 
                 <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
                   {/* Name Input */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                       Full Name (Sierra Leonean Name) *
                     </label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <input
                         type="text"
                         required
                         placeholder="e.g. Alimamy Kamara"
                         value={regName}
                         onChange={(e) => setRegName(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-slate-950/60 border border-white/10 rounded-xl text-xs focus:outline-none focus:border-amber-500/50 text-slate-200"
+                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-amber-500 text-slate-900"
                       />
                     </div>
                     <p className="text-[9px] text-slate-500 font-semibold italic">
@@ -222,51 +222,51 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
 
                   {/* Email Input */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                       Email Address *
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <input
                         type="email"
                         required
                         placeholder="name@swedsfree.com"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-slate-950/60 border border-white/10 rounded-xl text-xs focus:outline-none focus:border-amber-500/50 text-slate-200"
+                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-amber-500 text-slate-900"
                       />
                     </div>
                   </div>
 
                   {/* Phone Input */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                       Phone Number *
                     </label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <input
                         type="text"
                         required
                         placeholder="+232 76 123 456"
                         value={regPhone}
                         onChange={(e) => setRegPhone(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-slate-950/60 border border-white/10 rounded-xl text-xs focus:outline-none focus:border-amber-500/50 text-slate-200"
+                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-amber-500 text-slate-900"
                       />
                     </div>
                   </div>
 
                   {/* Role Selector */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                       Assigned Workshop Role *
                     </label>
                     <div className="relative">
-                      <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+                      <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <select
                         value={regRole}
                         onChange={(e) => setRegRole(e.target.value as EmployeeRole)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-slate-950/60 border border-white/10 rounded-xl text-xs focus:outline-none focus:border-amber-500/50 text-slate-200"
+                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-amber-500 text-slate-900"
                       >
                         <option value="Carpenter">Carpenter</option>
                         <option value="Carver">Carver</option>
@@ -282,24 +282,24 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
 
                   {/* PIN Password Input */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                       Choose Password/PIN *
                     </label>
                     <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <input
                         type="password"
                         required
                         placeholder="Choose a PIN or password..."
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-slate-950/60 border border-white/10 rounded-xl text-xs focus:outline-none focus:border-amber-500/50 text-slate-200 font-mono"
+                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-amber-500 text-slate-900 font-mono"
                       />
                     </div>
                   </div>
 
                   {regError && (
-                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-[11px] text-red-400 leading-relaxed">
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-[11px] text-red-700 leading-relaxed">
                       <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
                       <span>{regError}</span>
                     </div>
@@ -307,7 +307,7 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
 
                   <button
                     type="submit"
-                    className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 font-bold text-slate-950 rounded-xl flex items-center justify-center gap-2 transition duration-200 text-xs shadow-lg shadow-amber-500/10"
+                    className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 font-bold text-white rounded-xl flex items-center justify-center gap-2 transition duration-200 text-xs shadow-md"
                   >
                     <UserPlus className="w-4 h-4" />
                     <span>Submit Request</span>
@@ -322,18 +322,18 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                 exit={{ opacity: 0, x: 20 }}
               >
                 <div className="flex items-center gap-2 mb-6">
-                  <LogIn className="w-5 h-5 text-amber-500" />
-                  <h2 className="text-lg font-bold text-white">Workshop Portal Sign In</h2>
+                  <LogIn className="w-5 h-5 text-amber-600" />
+                  <h2 className="text-lg font-bold text-slate-900">Workshop Portal Sign In</h2>
                 </div>
 
                 <form onSubmit={handleLoginSubmit} className="space-y-5">
                   {/* User Selection */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                       Username / Email Address *
                     </label>
                     <div className="relative">
-                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4.5 h-4.5" />
+                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4.5 h-4.5" />
                       <input
                         type="text"
                         required
@@ -343,7 +343,7 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                           setUsername(e.target.value);
                           setError('');
                         }}
-                        className="w-full pl-11 pr-4 py-3 bg-slate-950/60 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 text-slate-200 placeholder-slate-600"
+                        className="w-full pl-11 pr-4 py-3 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-amber-500 text-slate-900 placeholder-slate-400"
                         id="login-username-input"
                       />
                     </div>
@@ -351,11 +351,11 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
 
                   {/* Password input */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                       Security Password / PIN *
                     </label>
                     <div className="relative">
-                      <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4.5 h-4.5" />
+                      <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4.5 h-4.5" />
                       <input
                         type="password"
                         required
@@ -365,14 +365,14 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                           setPassword(e.target.value);
                           setError('');
                         }}
-                        className="w-full pl-11 pr-4 py-3 bg-slate-950/60 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 font-mono text-slate-200 placeholder-slate-600"
+                        className="w-full pl-11 pr-4 py-3 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-amber-500 font-mono text-slate-900 placeholder-slate-400"
                         id="login-password-input"
                       />
                     </div>
                   </div>
 
                   {error && (
-                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-xs text-red-400 leading-relaxed">
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-xs text-red-700 leading-relaxed">
                       <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
                       <span>{error}</span>
                     </div>
@@ -381,7 +381,7 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                   <div className="grid grid-cols-1 gap-3.5">
                     <button
                       type="submit"
-                      className="w-full py-3 bg-amber-500 hover:bg-amber-600 font-bold text-slate-950 rounded-xl flex items-center justify-center gap-2 transition duration-200 shadow-lg shadow-amber-500/10 text-sm"
+                      className="w-full py-3 bg-amber-600 hover:bg-amber-700 font-bold text-white rounded-xl flex items-center justify-center gap-2 transition duration-200 shadow-md text-sm"
                       id="login-submit-button"
                     >
                       <span>Authenticate Portal</span>
@@ -393,9 +393,9 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                         setMode('register');
                         setRegError('');
                       }}
-                      className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition duration-200 text-xs"
+                      className="w-full py-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 rounded-xl font-bold flex items-center justify-center gap-2 transition duration-200 text-xs"
                     >
-                      <UserPlus className="w-4 h-4 text-amber-500" />
+                      <UserPlus className="w-4 h-4 text-amber-600" />
                       <span>Request New Access Registration</span>
                     </button>
                   </div>
@@ -406,7 +406,7 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
         </div>
 
         {/* Footer info banner */}
-        <p className="text-center text-[10px] text-slate-600 font-medium mt-6">
+        <p className="text-center text-[10px] text-slate-500 font-medium mt-6">
           Swedsfree Workshop Hub secure local cryptographic sandbox authentication environment.
         </p>
       </motion.div>

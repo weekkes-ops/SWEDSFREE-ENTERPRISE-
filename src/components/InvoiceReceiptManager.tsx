@@ -68,6 +68,36 @@ export const DEFAULT_300X300_SIGNATURE = `data:image/svg+xml;utf8,<svg xmlns="ht
 // Default 300x300 Pixel Official Stamp / Seal (SVG Data URL)
 export const DEFAULT_300X300_STAMP = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="none"/><g transform="rotate(-10 150 150)"><circle cx="150" cy="150" r="138" fill="none" stroke="%23991b1b" stroke-width="6"/><circle cx="150" cy="150" r="126" fill="none" stroke="%23991b1b" stroke-width="2.5" stroke-dasharray="8 5"/><path id="stampTopArc" d="M 35 150 A 115 115 0 0 1 265 150" fill="none"/><text font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="900" fill="%23991b1b" letter-spacing="2.5"><textPath href="%23stampTopArc" startOffset="50%" text-anchor="middle">SWED WOOD WORK</textPath></text><path id="stampBotArc" d="M 265 150 A 115 115 0 0 1 35 150" fill="none"/><text font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="800" fill="%23991b1b" letter-spacing="1.5"><textPath href="%23stampBotArc" startOffset="50%" text-anchor="middle">FREETOWN • SIERRA LEONE</textPath></text><circle cx="150" cy="150" r="88" fill="none" stroke="%23991b1b" stroke-width="3"/><rect x="35" y="122" width="230" height="56" fill="%23991b1b" rx="6"/><text x="150" y="157" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="900" fill="%23ffffff" text-anchor="middle" letter-spacing="2">OFFICIAL STAMP</text><text x="65" y="112" font-family="sans-serif" font-size="16" fill="%23991b1b">★</text><text x="220" y="112" font-family="sans-serif" font-size="16" fill="%23991b1b">★</text><text x="150" y="206" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="800" fill="%23991b1b" text-anchor="middle" letter-spacing="1">AUDITED & CLEARED</text><text x="150" y="222" font-family="monospace" font-size="10" font-weight="bold" fill="%23991b1b" text-anchor="middle">300x300 OFFICIAL SEAL</text></g></svg>`;
 
+// Helper to rasterize logo URL (e.g. /logo.svg or custom upload) into PNG Data URL for jsPDF
+export async function getLogoDataUrl(logoUrl?: string): Promise<string | null> {
+  const url = logoUrl || '/logo.svg';
+  if (url.startsWith('data:image/png') || url.startsWith('data:image/jpeg')) {
+    return url;
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 400;
+        canvas.height = img.naturalHeight || 360;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/png'));
+          return;
+        }
+      } catch (e) {
+        console.error('Error rasterizing logo for PDF:', e);
+      }
+      resolve(null);
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 export interface IntelliSenseResult {
   id: string;
   type: 'INVOICE' | 'RECEIPT' | 'ORDER' | 'LINE_ITEM' | 'CUSTOMER';
@@ -1205,8 +1235,9 @@ export default function InvoiceReceiptManager({
     setTimeout(() => setSaveToast(null), 2500);
   };
 
-  const handleDownloadSinglePdf = () => {
+  const handleDownloadSinglePdf = async () => {
     if (!activeInvoice) return;
+    const logoDataUrl = await getLogoDataUrl(invoiceLogoUrl);
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -1230,7 +1261,8 @@ export default function InvoiceReceiptManager({
       invoiceProjectTitle,
       invoiceProjectDescription,
       invoiceCommissionAmount,
-      invoiceProjectQty
+      invoiceProjectQty,
+      logoDataUrl
     );
     const cleanName = (invoiceCustomerName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
     doc.save(`Invoice_${invoiceNo || '042'}_${cleanName}.pdf`);
@@ -1244,6 +1276,7 @@ export default function InvoiceReceiptManager({
     try {
       const zip = new JSZip();
       const selectedJobs = jobs.filter(job => selectedBulkJobIds.includes(job.id));
+      const logoDataUrl = await getLogoDataUrl(invoiceLogoUrl);
       
       let count = 0;
       for (const job of selectedJobs) {
@@ -1255,7 +1288,26 @@ export default function InvoiceReceiptManager({
         
         const customer = customers.find(c => c.id === job.customerId);
         
-        buildInvoicePdfContent(doc, job, customer, bulkTemplate, currentUser);
+        buildInvoicePdfContent(
+          doc,
+          job,
+          customer,
+          bulkTemplate,
+          currentUser,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          logoDataUrl
+        );
         
         const pdfArrayBuffer = doc.output('arraybuffer');
         
@@ -3083,63 +3135,6 @@ export default function InvoiceReceiptManager({
                         </div>
                       </div>
                     </div>
-
-                    {/* Signatures and Official Stamp (Horizontal Line & Compact User-Uploaded Images) */}
-                    <div className="mt-8 pt-5 border-t border-gray-200 flex flex-row items-end justify-between gap-4 sm:gap-8">
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-gray-700 font-bold text-[10px] sm:text-xs uppercase tracking-wider">
-                            Authorized Signatory:
-                          </p>
-                          <label className="text-[10px] text-blue-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 transition">
-                            <Upload className="w-3 h-3 text-blue-700" />
-                            <span>Upload Signature</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleImageUpload300(e, 'signature')}
-                              className="hidden"
-                            />
-                          </label>
-                        </div>
-                        {showSignature && (
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-blue-300 rounded-lg p-1 bg-blue-50/20 flex items-center justify-center relative group">
-                            <img
-                              src={signatureImageUrl}
-                              alt="Authorized Signature"
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-1.5 flex-1 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <p className="text-red-800 font-extrabold text-[10px] sm:text-xs uppercase tracking-wider">
-                            Official Stamp / Seal:
-                          </p>
-                          <label className="text-[10px] text-red-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition">
-                            <Upload className="w-3 h-3 text-red-700" />
-                            <span>Upload Stamp</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleImageUpload300(e, 'stamp')}
-                              className="hidden"
-                            />
-                          </label>
-                        </div>
-                        {showStamp && (
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-red-300 rounded-lg p-1 bg-red-50/30 flex items-center justify-center relative group ml-auto">
-                            <img
-                              src={stampImageUrl}
-                              alt="Official Stamp"
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 ) : (
                   /* ==========================================
@@ -3594,63 +3589,6 @@ export default function InvoiceReceiptManager({
                           <span className="font-bold text-xs uppercase">Net Balance Due:</span>
                           <span className="font-mono font-bold text-xs">{formatCurrency(totals.outstanding)}</span>
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Bottom official Signatures & Stamp block (Horizontal Line & Compact User-Uploaded Images) */}
-                    <div className="mt-8 pt-5 border-t border-gray-200 flex flex-row items-end justify-between gap-4 sm:gap-8">
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-gray-700 font-bold text-[10px] sm:text-xs uppercase tracking-wider">
-                            Authorized Signatory:
-                          </p>
-                          <label className="text-[10px] text-wood-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-200 transition">
-                            <Upload className="w-3 h-3 text-wood-800" />
-                            <span>Upload Signature</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleImageUpload300(e, 'signature')}
-                              className="hidden"
-                            />
-                          </label>
-                        </div>
-                        {showSignature && (
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-gray-300 rounded-lg p-1 bg-white flex items-center justify-center relative group">
-                            <img
-                              src={signatureImageUrl}
-                              alt="Authorized Signature"
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-1.5 flex-1 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <p className="text-red-800 font-extrabold text-[10px] sm:text-xs uppercase tracking-wider">
-                            Official Stamp / Seal:
-                          </p>
-                          <label className="text-[10px] text-red-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition">
-                            <Upload className="w-3 h-3 text-red-700" />
-                            <span>Upload Stamp</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleImageUpload300(e, 'stamp')}
-                              className="hidden"
-                            />
-                          </label>
-                        </div>
-                        {showStamp && (
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-red-300 rounded-lg p-1 bg-red-50/20 flex items-center justify-center relative group ml-auto">
-                            <img
-                              src={stampImageUrl}
-                              alt="Official Stamp"
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                        )}
                       </div>
                     </div>
                   </>
@@ -4341,7 +4279,8 @@ export function buildInvoicePdfContent(
   projectTitleOverride?: string,
   projectDescriptionOverride?: string,
   commissionAmountOverride?: number,
-  projectQtyOverride?: number | string
+  projectQtyOverride?: number | string,
+  logoDataUrl?: string | null
 ) {
   const isSwedsWood = template === 'SWEDS_WOOD';
   const projectTitle = projectTitleOverride || job.title;
@@ -4354,26 +4293,38 @@ export function buildInvoicePdfContent(
     doc.setLineWidth(0.3);
     doc.rect(10, 10, 190, 277, 'S');
 
-    // Terracotta / Black Sunburst Logo Disc vector
-    const logoX = 25;
-    const logoY = 27;
-    doc.setFillColor(155, 55, 31);
-    doc.circle(logoX, logoY, 9, 'F');
-
-    // White sunburst rays inside disc
-    doc.setLineWidth(0.6);
-    doc.setDrawColor(255, 255, 255);
-    for (let angle = 0; angle < 360; angle += 45) {
-      const rad = (angle * Math.PI) / 180;
-      const startX = logoX + Math.cos(rad) * 3.5;
-      const startY = logoY + Math.sin(rad) * 3.5;
-      const endX = logoX + Math.cos(rad) * 7;
-      const endY = logoY + Math.sin(rad) * 7;
-      doc.line(startX, startY, endX, endY);
+    // System Official Logo image embedding
+    let logoDrawn = false;
+    if (logoDataUrl) {
+      try {
+        doc.addImage(logoDataUrl, 'PNG', 15, 13, 22, 20);
+        logoDrawn = true;
+      } catch (err) {
+        console.error('Error drawing logo in PDF:', err);
+      }
     }
 
-    doc.setFillColor(255, 255, 255);
-    doc.circle(logoX, logoY, 2.5, 'F');
+    if (!logoDrawn) {
+      // Fallback vector logo disc
+      const logoX = 25;
+      const logoY = 27;
+      doc.setFillColor(155, 55, 31);
+      doc.circle(logoX, logoY, 9, 'F');
+
+      doc.setLineWidth(0.6);
+      doc.setDrawColor(255, 255, 255);
+      for (let angle = 0; angle < 360; angle += 45) {
+        const rad = (angle * Math.PI) / 180;
+        const startX = logoX + Math.cos(rad) * 3.5;
+        const startY = logoY + Math.sin(rad) * 3.5;
+        const endX = logoX + Math.cos(rad) * 7;
+        const endY = logoY + Math.sin(rad) * 7;
+        doc.line(startX, startY, endX, endY);
+      }
+
+      doc.setFillColor(255, 255, 255);
+      doc.circle(logoX, logoY, 2.5, 'F');
+    }
 
     // Company Name (Crisp Black)
     doc.setFont('helvetica', 'bold');
@@ -4647,50 +4598,31 @@ export function buildInvoicePdfContent(
       const balanceStr = `SLL ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
       doc.text(balanceStr, 191, totY + 21, { align: 'right' });
     }
-
-    // Signatures and Stamp
-    const sigY = 238;
-    const sigImg = localStorage.getItem('swedswood_signature_300') || DEFAULT_300X300_SIGNATURE;
-    const stampImg = localStorage.getItem('swedswood_stamp_300') || DEFAULT_300X300_STAMP;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Authorized Signature:", 20, sigY);
-
-    try {
-      doc.addImage(sigImg, 'PNG', 20, sigY + 2, 28, 28);
-    } catch (err) {
-      doc.setLineWidth(0.3);
-      doc.setDrawColor(0, 0, 0);
-      doc.line(20, sigY + 22, 80, sigY + 22);
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Official Stamp / Seal:", 120, sigY);
-
-    try {
-      doc.addImage(stampImg, 'PNG', 120, sigY + 2, 28, 28);
-    } catch (err) {
-      doc.setLineWidth(0.3);
-      doc.setDrawColor(0, 0, 0);
-      doc.line(120, sigY + 22, 180, sigY + 22);
-    }
   } else {
     // MODERN DIGITAL PROFESSIONAL TEMPLATE
     doc.setDrawColor(245, 245, 244);
     doc.setLineWidth(0.3);
     doc.rect(10, 10, 190, 277, 'S');
 
-    // Header
-    doc.setFillColor(69, 26, 3);
-    doc.rect(15, 15, 10, 10, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(255, 255, 255);
-    doc.text("W", 18.5, 21.5);
+    // Header Logo
+    let logoDrawn = false;
+    if (logoDataUrl) {
+      try {
+        doc.addImage(logoDataUrl, 'PNG', 15, 14, 12, 12);
+        logoDrawn = true;
+      } catch (err) {
+        console.error('Failed to add logo to modern PDF template:', err);
+      }
+    }
+
+    if (!logoDrawn) {
+      doc.setFillColor(69, 26, 3);
+      doc.rect(15, 15, 10, 10, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(255, 255, 255);
+      doc.text("W", 18.5, 21.5);
+    }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
@@ -4930,36 +4862,5 @@ export function buildInvoicePdfContent(
     doc.text("Outstanding:", calcX + 3, botY + 20);
     const outStrVal = `Le ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
     doc.text(outStrVal, calcX + calcWidth - 3, botY + 20, { align: 'right' });
-
-    // Signatures and Official Stamp
-    const sigY = 238;
-    const sigImg = localStorage.getItem('swedswood_signature_300') || DEFAULT_300X300_SIGNATURE;
-    const stampImg = localStorage.getItem('swedswood_stamp_300') || DEFAULT_300X300_STAMP;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(69, 26, 3);
-    doc.text("Authorized Signature:", 20, sigY);
-
-    try {
-      doc.addImage(sigImg, 'PNG', 20, sigY + 2, 28, 28);
-    } catch (err) {
-      doc.setLineWidth(0.3);
-      doc.setDrawColor(156, 163, 175);
-      doc.line(20, sigY + 22, 80, sigY + 22);
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(185, 28, 28);
-    doc.text("Official Clearance Seal:", 120, sigY);
-
-    try {
-      doc.addImage(stampImg, 'PNG', 120, sigY + 2, 28, 28);
-    } catch (err) {
-      doc.setLineWidth(0.3);
-      doc.setDrawColor(185, 28, 28);
-      doc.line(120, sigY + 22, 180, sigY + 22);
-    }
   }
 }

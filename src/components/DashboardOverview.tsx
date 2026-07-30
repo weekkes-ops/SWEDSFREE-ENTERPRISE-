@@ -301,60 +301,60 @@ export default function DashboardOverview({
       {isManager && (
         <motion.div 
           variants={itemVariants}
-          className="bg-slate-900 text-white p-6 rounded-2xl border border-amber-500/20 shadow-md relative overflow-hidden"
+          className="bg-white text-slate-900 p-6 rounded-2xl border border-amber-200 shadow-md relative overflow-hidden"
           id="mtd-financial-snapshot-card"
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg border border-amber-500/30">
+                <span className="p-1.5 bg-amber-50 text-amber-700 rounded-lg border border-amber-200">
                   <TrendingUp className="w-4 h-4" />
                 </span>
-                <h3 className="text-base font-bold tracking-tight text-white">Month-to-Date (MTD) Financial Snapshot</h3>
-                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase">
+                <h3 className="text-base font-bold tracking-tight text-slate-900">Month-to-Date (MTD) Financial Snapshot</h3>
+                <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase">
                   {monthName}
                 </span>
               </div>
-              <p className="text-xs text-slate-400">Derived in real time from workshop financial transactions state ledger.</p>
+              <p className="text-xs text-slate-500">Derived in real time from workshop financial transactions state ledger.</p>
             </div>
 
             <button
               onClick={() => setActiveTab('finance')}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition shadow-xs self-start md:self-auto cursor-pointer"
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs transition shadow-xs self-start md:self-auto cursor-pointer"
             >
               View Financial Ledger
             </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 relative z-10">
-            <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1">
                 <ArrowUpRight className="w-3.5 h-3.5" /> Total Income (MTD)
               </span>
-              <p className="text-2xl font-mono font-bold text-white mt-1">
+              <p className="text-2xl font-mono font-bold text-slate-900 mt-1">
                 {formatCurrency(mtdIncome)}
               </p>
-              <p className="text-[10px] text-slate-400 mt-1">Customer deposits & sales</p>
+              <p className="text-[10px] text-slate-500 mt-1">Customer deposits & sales</p>
             </div>
 
-            <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 flex items-center gap-1">
                 <ArrowDownRight className="w-3.5 h-3.5" /> Total Expenditure (MTD)
               </span>
-              <p className="text-2xl font-mono font-bold text-white mt-1">
+              <p className="text-2xl font-mono font-bold text-slate-900 mt-1">
                 {formatCurrency(mtdExpenditure)}
               </p>
-              <p className="text-[10px] text-slate-400 mt-1">Materials, wages & ops</p>
+              <p className="text-[10px] text-slate-500 mt-1">Materials, wages & ops</p>
             </div>
 
-            <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
                 Net MTD Profit / Margin
               </span>
-              <p className={`text-2xl font-mono font-bold mt-1 ${mtdNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <p className={`text-2xl font-mono font-bold mt-1 ${mtdNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                 {mtdNet >= 0 ? '+' : ''}{formatCurrency(mtdNet)}
               </p>
-              <p className="text-[10px] text-slate-400 mt-1">Net earnings retainment</p>
+              <p className="text-[10px] text-slate-500 mt-1">Net earnings retainment</p>
             </div>
           </div>
         </motion.div>

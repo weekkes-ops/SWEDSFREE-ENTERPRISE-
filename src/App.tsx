@@ -950,49 +950,49 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row antialiased font-sans relative overflow-x-hidden print:bg-white print:text-black">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col md:flex-row antialiased font-sans relative overflow-x-hidden print:bg-white print:text-black">
       
       {/* Mesh Gradient Background */}
-      <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-600/30 rounded-full blur-[120px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px]"></div>
+      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-amber-400/20 rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-400/15 rounded-full blur-[120px]"></div>
       </div>
 
       {/* Mobile Top Navigation Bar */}
-      <div className="md:hidden bg-slate-900/60 backdrop-blur-md text-white p-3 flex items-center justify-between border-b border-white/10 sticky top-0 z-40 print:hidden relative z-10">
+      <div className="md:hidden bg-white/90 backdrop-blur-md text-slate-900 p-3 flex items-center justify-between border-b border-slate-200 sticky top-0 z-40 print:hidden relative z-10 shadow-xs">
         <div className="flex items-center gap-2">
           <img src="/logo.svg" alt="Swedswood Enterprise Logo" className="w-7 h-7 object-contain" />
-          <span className="font-display font-black text-sm uppercase tracking-wider text-amber-500">SWEDSWOOD<span className="text-white ml-1">ENTERPRISE</span></span>
+          <span className="font-display font-black text-sm uppercase tracking-wider text-amber-600">SWEDSWOOD<span className="text-slate-900 ml-1">ENTERPRISE</span></span>
         </div>
         
         <button 
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-1 hover:bg-white/5 rounded transition"
+          className="p-1 hover:bg-slate-100 rounded transition"
         >
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
 
       {/* Desktop Left-Hand Sidebar Panel */}
-      <aside className={`w-64 backdrop-blur-xl bg-white/5 text-slate-100 shrink-0 flex flex-col justify-between p-5 border-r border-white/10 sticky top-0 h-screen z-40 transition-transform ${mobileMenuOpen ? 'translate-x-0 fixed inset-y-0 left-0 w-72' : 'max-md:-translate-x-full max-md:hidden'} print:hidden relative z-10`}>
+      <aside className={`w-64 bg-white text-slate-800 shrink-0 flex flex-col justify-between p-5 border-r border-slate-200 sticky top-0 h-screen z-40 transition-transform shadow-xs ${mobileMenuOpen ? 'translate-x-0 fixed inset-y-0 left-0 w-72' : 'max-md:-translate-x-full max-md:hidden'} print:hidden relative z-10`}>
         <div className="space-y-6">
           
           {/* Logo / Brand Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 px-1">
-              <div className="p-1.5 bg-white/10 rounded-xl border border-amber-500/30 text-white shadow-md shadow-slate-950/50">
+              <div className="p-1.5 bg-amber-500/10 rounded-xl border border-amber-500/30 text-amber-600 shadow-xs">
                 <img src="/logo.svg" alt="Swedswood Enterprise Logo" className="w-8 h-8 object-contain" />
               </div>
               <div>
-                <h2 className="font-display font-black text-sm uppercase tracking-wider text-amber-500">SWEDSWOOD<span className="text-white ml-1">ENTERPRISE</span></h2>
-                <p className="text-[9px] text-slate-400 font-semibold tracking-widest uppercase">Invoice & Workshop System</p>
+                <h2 className="font-display font-black text-sm uppercase tracking-wider text-amber-600">SWEDSWOOD<span className="text-slate-900 ml-1">ENTERPRISE</span></h2>
+                <p className="text-[9px] text-slate-500 font-semibold tracking-widest uppercase">Invoice & Workshop System</p>
               </div>
             </div>
 
             {/* Mobile close menu */}
             <button 
               onClick={() => setMobileMenuOpen(false)}
-              className="md:hidden text-slate-400 hover:text-white"
+              className="md:hidden text-slate-500 hover:text-slate-900"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1011,9 +1011,9 @@ export default function App() {
                     setMobileMenuOpen(false);
                     setQuickActionTrigger(null);
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${isActive ? 'bg-white/10 border border-white/10 text-amber-400 shadow-xs' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${isActive ? 'bg-amber-500/10 border border-amber-500/30 text-amber-700 shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
                 >
-                  <TabIcon className={`w-4 h-4 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
+                  <TabIcon className={`w-4 h-4 ${isActive ? 'text-amber-600' : 'text-slate-500'}`} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -1022,18 +1022,18 @@ export default function App() {
         </div>
 
         {/* Bottom Sidebar - User Profile Card & Database Section */}
-        <div className="space-y-4 pt-4 border-t border-white/10">
+        <div className="space-y-4 pt-4 border-t border-slate-200">
           
           {/* User Profile Card */}
           {currentUser && (
-            <div className="bg-white/5 p-3 rounded-2xl border border-white/10 space-y-3">
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/35 flex items-center justify-center font-black text-amber-400">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/35 flex items-center justify-center font-black text-amber-600">
                   {currentUser.name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-black text-slate-100 truncate leading-tight">{currentUser.name}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">{currentUser.role}</p>
+                  <p className="text-xs font-black text-slate-900 truncate leading-tight">{currentUser.name}</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">{currentUser.role}</p>
                 </div>
               </div>
               <button 
@@ -1041,7 +1041,7 @@ export default function App() {
                   setCurrentUser(null);
                   setActiveTab('dashboard');
                 }}
-                className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/15 rounded-xl text-[10px] font-black text-red-400 hover:text-red-300 transition duration-150 flex items-center justify-center gap-1.5"
+                className="w-full py-2 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl text-[10px] font-black text-red-700 transition duration-150 flex items-center justify-center gap-1.5"
                 id="btn-logout"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -1052,16 +1052,16 @@ export default function App() {
 
           {(isAdmin || isManager || isAuditor) && (
             <div className="space-y-3 pt-1">
-              <div className="bg-white/5 p-3 rounded-xl border border-white/10 text-[10px] text-slate-400 space-y-2">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[10px] text-slate-600 space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 font-bold text-slate-200">
-                    <Database className="w-3.5 h-3.5 text-amber-500" />
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                    <Database className="w-3.5 h-3.5 text-amber-600" />
                     <span>Offline Database</span>
                   </div>
                   <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
                     isOnline 
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' 
+                      : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'
                   }`}>
                     {isOnline ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
                     {isOnline ? 'Online' : 'Offline'}
@@ -1073,9 +1073,9 @@ export default function App() {
                 <div className="pt-1 flex flex-col gap-1.5">
                   <button
                     onClick={handleExportBackup}
-                    className="w-full py-1.5 px-2 bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    className="w-full py-1.5 px-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs"
                   >
-                    <Download className="w-3 h-3 text-amber-400" />
+                    <Download className="w-3 h-3 text-amber-600" />
                     <span>Backup Data (.JSON)</span>
                   </button>
                   <button

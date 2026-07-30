@@ -14,43 +14,42 @@
   width: 6px;
   height: 6px;
 }
+/* Scrollbar track & thumb for light theme */
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: #cbd5e1;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #94a3b8;
 }
 
 /* ==========================================================
-   GLOBAL FROSTED GLASS OVERRIDES
+   GLOBAL LIGHT THEME STYLES
    ========================================================== */
 
 /* Main canvas reset */
 body {
-  background-color: #020617 !important;
-  color: #f1f5f9 !important;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
 }
 
-/* Transform all standard white container panels (Cards, modules, sections) into Glassmorphism */
+/* White container panels (Cards, modules, sections) */
 .bg-white {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
-  color: #f1f5f9 !important;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Ensure secondary slate/gray light background elements are styled beautifully as dark glass surfaces */
+/* Secondary light background elements */
 .bg-gray-50, 
 .bg-slate-50, 
 .bg-wood-50 {
-  background-color: rgba(255, 255, 255, 0.02) !important;
-  color: #cbd5e1 !important;
+  background-color: #f8fafc !important;
+  color: #334155 !important;
 }
 
 .bg-gray-100, 
@@ -61,11 +60,37 @@ body {
 .bg-wood-200,
 .bg-gray-900\/40,
 .bg-wood-900\/40 {
-  background-color: rgba(255, 255, 255, 0.06) !important;
-  color: #f1f5f9 !important;
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
 }
 
-/* Seamless mapping of borders to transparent glowing divider lines */
+/* Force dark slate background utility classes to render cleanly in light mode */
+.bg-slate-900,
+.bg-slate-950,
+.bg-slate-800,
+.bg-slate-700,
+.bg-slate-900\/90,
+.bg-slate-900\/80,
+.bg-slate-950\/80,
+.bg-slate-950\/70,
+.bg-slate-950\/60,
+.bg-slate-950\/50,
+.bg-slate-950\/40,
+.bg-slate-950\/30 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Light background for backdrop overlays */
+.bg-slate-900\/80.backdrop-blur-md,
+.bg-slate-950\/70.backdrop-blur-sm,
+.fixed.inset-0.bg-slate-900\/80,
+.fixed.inset-0.bg-slate-950\/70 {
+  background-color: rgba(15, 23, 42, 0.4) !important;
+}
+
+/* Mapping of borders to subtle light gray dividers */
 .border,
 .border-t,
 .border-b,
@@ -81,7 +106,7 @@ body {
 .border-wood-900,
 .border-slate-100,
 .border-slate-200 {
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: #e2e8f0 !important;
 }
 
 /* ==========================================================
@@ -95,7 +120,7 @@ body {
 .text-slate-800,
 .text-wood-950,
 .text-slate-950 {
-  color: #f8fafc !important; /* Elegant slate off-white */
+  color: #0f172a !important; /* Rich crisp dark text */
 }
 
 .text-gray-600, 
@@ -105,13 +130,13 @@ body {
 .text-wood-300,
 .text-slate-400,
 .text-slate-500 {
-  color: #94a3b8 !important; /* Muted slate gray */
+  color: #475569 !important; /* Readable slate gray */
 }
 
-/* Highlight metrics or labels with gold-amber accent from mockup */
+/* Highlight metrics or labels with warm wood accent */
 .text-wood-800, 
 .text-wood-600 {
-  color: #f59e0b !important; /* amber-500 */
+  color: #d97706 !important; /* amber-600 */
 }
 
 /* ==========================================================
@@ -120,27 +145,27 @@ body {
 input, 
 select, 
 textarea {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  color: #f8fafc !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
   border-radius: 0.75rem !important; /* rounded-xl */
 }
 input:focus, 
 select:focus, 
 textarea:focus {
-  border-color: rgba(245, 158, 11, 0.5) !important; /* amber glowing focus state */
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2) !important;
+  border-color: #d97706 !important; /* amber focus ring */
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2) !important;
   outline: none !important;
 }
 input::placeholder, 
 textarea::placeholder {
-  color: #64748b !important;
+  color: #94a3b8 !important;
 }
 
-/* Fix dropdown options lists so system option dropdowns are dark and legible */
+/* Dropdown options lists */
 option {
-  background-color: #0f172a !important; /* slate-950 */
-  color: #f1f5f9 !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 /* ==========================================================
@@ -150,94 +175,92 @@ option {
 [role="dialog"] .bg-white,
 .modal-content,
 div[className*="fixed"] div[className*="bg-white"] {
-  background-color: rgba(15, 23, 42, 0.9) !important; /* 90% opaque dark blue-slate */
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  color: #0f172a !important;
 }
 
 /* ==========================================================
-   BUTTONS AND GLASS ACCENTS
+   BUTTONS AND ACCENTS
    ========================================================== */
 
-/* Primary action buttons mapped to beautiful high-contrast amber */
 .bg-wood-600, 
 .bg-wood-700,
 button.bg-wood-600,
 button.bg-wood-700 {
-  background-color: #f59e0b !important; /* amber-500 */
-  color: #020617 !important; /* slate-950 */
+  background-color: #d97706 !important; /* amber-600 */
+  color: #ffffff !important;
   font-weight: 700 !important;
   border: none !important;
-  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.2) !important;
+  box-shadow: 0 2px 8px 0 rgba(217, 119, 6, 0.25) !important;
   transition: all 0.2s ease-in-out !important;
 }
 .bg-wood-600:hover, 
 .bg-wood-700:hover,
 button.bg-wood-600:hover,
 button.bg-wood-700:hover {
-  background-color: #d97706 !important; /* amber-600 */
-  box-shadow: 0 4px 20px 0 rgba(245, 158, 11, 0.45) !important;
+  background-color: #b45309 !important; /* amber-700 */
+  box-shadow: 0 4px 12px 0 rgba(217, 119, 6, 0.35) !important;
   transform: translateY(-1px);
 }
 
-/* Glassy badge pills mapped to high contrast soft glowing states */
+/* Badge pills */
 .bg-emerald-50 {
-  background-color: rgba(16, 185, 129, 0.15) !important;
-  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+  background-color: #ecfdf5 !important;
+  border: 1px solid #a7f3d0 !important;
 }
 .text-emerald-800, 
 .text-emerald-700,
 .text-emerald-600 {
-  color: #34d399 !important; /* emerald-400 */
+  color: #047857 !important;
 }
 
 .bg-amber-50 {
-  background-color: rgba(245, 158, 11, 0.15) !important;
-  border: 1px solid rgba(245, 158, 11, 0.25) !important;
+  background-color: #fffbeb !important;
+  border: 1px solid #fde68a !important;
 }
 .text-amber-800, 
 .text-amber-700,
 .text-amber-600 {
-  color: #fbbf24 !important; /* amber-400 */
+  color: #b45309 !important;
 }
 
 .bg-blue-50 {
-  background-color: rgba(59, 130, 246, 0.15) !important;
-  border: 1px solid rgba(59, 130, 246, 0.25) !important;
+  background-color: #eff6ff !important;
+  border: 1px solid #bfdbfe !important;
 }
 .text-blue-800, 
 .text-blue-700,
 .text-blue-600 {
-  color: #60a5fa !important; /* blue-400 */
+  color: #1d4ed8 !important;
 }
 
 .bg-red-50 {
-  background-color: rgba(239, 68, 68, 0.15) !important;
-  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+  background-color: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
 }
 .text-red-800, 
 .text-red-700,
 .text-red-600 {
-  color: #f87171 !important; /* red-400 */
+  color: #b91c1c !important;
 }
 
 .bg-purple-50 {
-  background-color: rgba(168, 85, 247, 0.15) !important;
-  border: 1px solid rgba(168, 85, 247, 0.25) !important;
+  background-color: #faf5ff !important;
+  border: 1px solid #e9d5ff !important;
 }
 .text-purple-800, 
 .text-purple-700,
 .text-purple-600 {
-  color: #c084fc !important; /* purple-400 */
+  color: #6b21a8 !important;
 }
 
-/* Hover effects for interactive lists or table rows */
+/* Hover effects */
 .hover\:bg-wood-50\/30:hover, 
 .hover\:bg-gray-50:hover, 
 .hover\:bg-slate-50:hover {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+  background-color: #f1f5f9 !important;
 }
 
 /* ==========================================================
