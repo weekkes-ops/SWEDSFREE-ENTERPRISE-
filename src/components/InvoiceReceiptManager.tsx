@@ -1347,27 +1347,76 @@ export default function InvoiceReceiptManager({
   return (
     <div className="space-y-6">
       
-      {/* Print styles override (Prints print-area on clean white paper with crisp dark text) */}
+      {/* Print styles override (Prints print-area on clean A4 paper with crisp dark text) */}
       <style>{`
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 8mm 10mm 8mm 10mm;
+          }
+          html, body {
+            background-color: #ffffff !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           body * {
             visibility: hidden;
+          }
+          .fixed,
+          .fixed.inset-0,
+          .overflow-y-auto,
+          .backdrop-blur-md {
+            position: static !important;
+            inset: auto !important;
+            overflow: visible !important;
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            background: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
           }
           #print-area, #print-area * {
             visibility: visible;
           }
           #print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+            position: relative !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 210mm !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
             background: #ffffff !important;
-            color: #0f172a !important;
-            padding: 0.5cm !important;
+            color: #000000 !important;
             box-shadow: none !important;
             border: none !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+            overflow: visible !important;
+          }
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            page-break-inside: auto !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            page-break-after: auto !important;
+          }
+          thead {
+            display: table-header-group !important;
+          }
+          tfoot {
+            display: table-footer-group !important;
           }
           #print-area input,
           #print-area textarea,
@@ -1376,13 +1425,14 @@ export default function InvoiceReceiptManager({
             background: transparent !important;
             box-shadow: none !important;
             outline: none !important;
-            color: #0f172a !important;
+            color: #000000 !important;
             font-weight: bold !important;
             appearance: none !important;
             -webkit-appearance: none !important;
             resize: none !important;
           }
-          .no-print {
+          .no-print,
+          .print\:hidden {
             display: none !important;
           }
         }
