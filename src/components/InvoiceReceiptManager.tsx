@@ -2832,11 +2832,11 @@ export default function InvoiceReceiptManager({
                     <div className="overflow-hidden border border-gray-400 bg-white rounded-xs">
                       <table className="w-full border-collapse text-xs">
                         <thead>
-                          <tr className="bg-[#38bdf8] border-b border-gray-400 text-white font-black uppercase text-[10px] tracking-wider">
-                            <th className="py-2 px-3 border-r border-gray-400 text-left w-7/12 font-black text-white">Description</th>
-                            <th className="py-2 px-3 border-r border-gray-400 text-center w-1/12 font-black text-white bg-[#0f52ba]">Qty</th>
-                            <th className="py-2 px-3 border-r border-gray-400 text-right w-2/12 font-black text-white">Price</th>
-                            <th className="py-2 px-3 text-right w-2/12 font-black text-white">Total</th>
+                          <tr className="bg-slate-100 border-b border-gray-400 text-black font-black uppercase text-[10px] tracking-wider">
+                            <th className="py-2 px-3 border-r border-gray-400 text-left w-7/12 font-black text-black">Description</th>
+                            <th className="py-2 px-3 border-r border-gray-400 text-center w-1/12 font-black text-black bg-slate-200">Qty</th>
+                            <th className="py-2 px-3 border-r border-gray-400 text-right w-2/12 font-black text-black">Price</th>
+                            <th className="py-2 px-3 text-right w-2/12 font-black text-black">Total</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -2877,7 +2877,7 @@ export default function InvoiceReceiptManager({
                               <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">
                                 {invoicePdfMode === 'EDIT' ? (
                                   <>
-                                    <span className="qty-data inline-block font-mono font-black text-white bg-[#0f52ba] px-2.5 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                    <span className="qty-data inline-block font-mono font-black text-black bg-slate-100 border border-slate-300 px-2.5 py-0.5 rounded text-xs !text-black !font-black print:!text-black print:!font-black shadow-2xs">
                                       {invoiceProjectQty || 1}
                                     </span>
                                     <input
@@ -2886,19 +2886,19 @@ export default function InvoiceReceiptManager({
                                       step="any"
                                       value={invoiceProjectQty === 0 ? '' : invoiceProjectQty}
                                       onChange={(e) => setInvoiceProjectQty(e.target.value === '' ? '' : e.target.value)}
-                                      className="w-14 text-center font-mono font-black text-xs border border-blue-400 rounded px-1 py-0.5 bg-[#0f52ba] text-white print:hidden font-bold"
+                                      className="w-14 text-center font-mono font-black text-xs border border-slate-400 rounded px-1 py-0.5 bg-white text-black print:hidden font-bold"
                                     />
                                   </>
                                 ) : (
-                                  <span className="qty-data inline-block font-mono font-black text-white bg-[#0f52ba] px-2.5 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                  <span className="qty-data inline-block font-mono font-black text-black bg-slate-100 border border-slate-300 px-2.5 py-0.5 rounded text-xs !text-black !font-black print:!text-black print:!font-black shadow-2xs">
                                     {invoiceProjectQty || 1}
                                   </span>
                                 )}
                               </td>
-                              <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
+                              <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-black">
                                 {invoicePdfMode === 'EDIT' ? (
                                   <>
-                                    <span className="hidden print:inline font-mono font-bold text-gray-700">
+                                    <span className="hidden print:inline font-mono font-bold text-black">
                                       SLL {invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </span>
                                     <input
@@ -2906,14 +2906,14 @@ export default function InvoiceReceiptManager({
                                       min="0"
                                       value={invoiceCommissionAmount}
                                       onChange={(e) => setInvoiceCommissionAmount(Number(e.target.value))}
-                                      className="w-24 text-right border border-blue-300 rounded px-1.5 py-0.5 font-bold font-mono text-xs bg-white print:hidden"
+                                      className="w-24 text-right border border-blue-300 rounded px-1.5 py-0.5 font-bold font-mono text-xs bg-white text-black print:hidden"
                                     />
                                   </>
                                 ) : (
                                   `SLL ${invoiceCommissionAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                 )}
                               </td>
-                              <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
+                              <td className="py-2 px-3 text-right font-mono font-black text-black">
                                 SLL {((Number(invoiceCommissionAmount) || 0) * (parseFloat(String(invoiceProjectQty)) || 1)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </td>
                             </tr>
@@ -2956,7 +2956,7 @@ export default function InvoiceReceiptManager({
                                 <td className="py-2 px-3 border-r border-gray-400 text-center font-mono font-bold">
                                   {invoicePdfMode === 'EDIT' ? (
                                     <>
-                                      <span className="qty-data inline-block font-mono font-black text-white bg-[#0f52ba] px-2.5 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                      <span className="qty-data inline-block font-mono font-black text-black bg-slate-100 border border-slate-300 px-2.5 py-0.5 rounded text-xs !text-black !font-black print:!text-black print:!font-black shadow-2xs">
                                         {qty}
                                       </span>
                                       <input
@@ -2965,19 +2965,19 @@ export default function InvoiceReceiptManager({
                                         step="any"
                                         value={item.quantity === 0 ? '' : (item.quantity ?? qty)}
                                         onChange={(e) => handleUpdateCustomItem(item.id, 'quantity', e.target.value)}
-                                        className="w-14 text-center font-mono font-black text-xs border border-blue-400 rounded px-1 py-0.5 bg-[#0f52ba] text-white print:hidden font-bold"
+                                        className="w-14 text-center font-mono font-black text-xs border border-slate-400 rounded px-1 py-0.5 bg-white text-black print:hidden font-bold"
                                       />
                                     </>
                                   ) : (
-                                    <span className="qty-data inline-block font-mono font-black text-white bg-[#0f52ba] px-2.5 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                    <span className="qty-data inline-block font-mono font-black text-black bg-slate-100 border border-slate-300 px-2.5 py-0.5 rounded text-xs !text-black !font-black print:!text-black print:!font-black shadow-2xs">
                                       {qty}
                                     </span>
                                   )}
                                 </td>
-                                <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-gray-700">
+                                <td className="py-2 px-3 border-r border-gray-400 text-right font-mono font-bold text-black">
                                   {invoicePdfMode === 'EDIT' ? (
                                     <>
-                                      <span className="hidden print:inline font-mono font-bold text-gray-700">
+                                      <span className="hidden print:inline font-mono font-bold text-black">
                                         SLL {unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                       </span>
                                       <input
@@ -2985,17 +2985,17 @@ export default function InvoiceReceiptManager({
                                         min="0"
                                         value={unitPrice}
                                         onChange={(e) => handleUpdateCustomItem(item.id, 'unitPrice', e.target.value)}
-                                        className="w-24 text-right font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white print:hidden"
+                                        className="w-24 text-right font-mono font-bold text-xs border border-blue-300 rounded px-1 py-0.5 bg-white text-black print:hidden"
                                       />
                                     </>
                                   ) : (
                                     `SLL ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                   )}
                                 </td>
-                                <td className="py-2 px-3 text-right font-mono font-black text-gray-800">
+                                <td className="py-2 px-3 text-right font-mono font-black text-black">
                                   {invoicePdfMode === 'EDIT' ? (
                                     <>
-                                      <span className="hidden print:inline font-mono font-black text-gray-800">
+                                      <span className="hidden print:inline font-mono font-black text-black">
                                         SLL {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                       </span>
                                       <input
@@ -3003,7 +3003,7 @@ export default function InvoiceReceiptManager({
                                         min="0"
                                         value={totalAmount}
                                         onChange={(e) => handleUpdateCustomItem(item.id, 'amount', e.target.value)}
-                                        className="w-28 text-right font-mono font-black text-xs border border-blue-300 rounded px-1 py-0.5 bg-white print:hidden"
+                                        className="w-28 text-right font-mono font-black text-xs border border-blue-300 rounded px-1 py-0.5 bg-white text-black print:hidden"
                                       />
                                     </>
                                   ) : (
@@ -3390,7 +3390,7 @@ export default function InvoiceReceiptManager({
                                   </div>
                                 ) : (
                                   <span className="inline-flex items-center gap-1.5 justify-end">
-                                    <span className="qty-data inline-block bg-wood-950 text-white font-black px-2 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                    <span className="qty-data inline-block bg-slate-100 text-black border border-slate-300 font-black px-2 py-0.5 rounded text-xs !text-black !font-black print:!text-black print:!font-black shadow-2xs">
                                       {invoiceProjectQty || 1} Set(s)
                                     </span>
                                     <span className="text-gray-600 font-bold">× {formatCurrency(invoiceCommissionAmount, 0)}</span>
@@ -3458,7 +3458,7 @@ export default function InvoiceReceiptManager({
                                     </div>
                                   ) : (
                                     <span className="inline-flex items-center gap-1.5 justify-end">
-                                      <span className="qty-data inline-block bg-wood-950 text-white font-black px-2 py-0.5 rounded text-xs !text-white !font-black print:!text-white print:!font-black shadow-2xs">
+                                      <span className="qty-data inline-block bg-slate-100 text-black border border-slate-300 font-black px-2 py-0.5 rounded text-xs !text-black !font-black print:!text-black print:!font-black shadow-2xs">
                                         Qty: {qty}
                                       </span>
                                       <span className="text-gray-600 font-bold">× {formatCurrency(unitPrice, 0)}</span>
@@ -3955,9 +3955,9 @@ export default function InvoiceReceiptManager({
                             return rItems.map((item) => (
                               <tr key={item.id} className="text-[11px]">
                                 <td className="py-1.5 px-2 font-semibold text-gray-800">{item.desc}</td>
-                                <td className="py-1.5 px-2 text-center font-mono font-bold text-emerald-900">{item.qty}</td>
-                                <td className="py-1.5 px-2 text-right font-mono text-gray-600">{formatCurrency(item.unitPrice, 0)}</td>
-                                <td className="py-1.5 px-2 text-right font-mono font-bold text-emerald-900">{formatCurrency(item.total, 0)}</td>
+                                <td className="py-1.5 px-2 text-center font-mono font-bold text-black">{item.qty}</td>
+                                <td className="py-1.5 px-2 text-right font-mono text-black">{formatCurrency(item.unitPrice, 0)}</td>
+                                <td className="py-1.5 px-2 text-right font-mono font-bold text-black">{formatCurrency(item.total, 0)}</td>
                               </tr>
                             ));
                           })()}
