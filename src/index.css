@@ -241,7 +241,7 @@ button.bg-wood-700:hover {
 }
 
 /* ==========================================================
-   REFINE PROFESSIONAL PRINT STYLESHEET (WHITE FONT ON PRINTOUT)
+   REFINE PROFESSIONAL PRINT STYLESHEET (WHITE BACKGROUND ON PRINTOUT)
    ========================================================== */
 @media print {
   /* Set document size and printable margins */
@@ -250,11 +250,11 @@ button.bg-wood-700:hover {
     margin: 1.6cm !important;
   }
 
-  /* Reset layout for invoice printout with white font */
+  /* Reset layout for clean white printout */
   html, body {
-    background-color: #020617 !important;
-    background: #020617 !important;
-    color: #ffffff !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
     font-size: 11pt !important;
     line-height: 1.4 !important;
     margin: 0 !important;
@@ -263,7 +263,7 @@ button.bg-wood-700:hover {
     print-color-adjust: exact !important;
   }
 
-  /* Ensure print-area content and containers use white font color */
+  /* Ensure print-area content and containers use white background */
   .bg-white,
   .bg-slate-950,
   .bg-slate-900,
@@ -283,10 +283,10 @@ button.bg-wood-700:hover {
   .bg-purple-50,
   .sweds-paper-invoice,
   #print-area {
-    background-color: #020617 !important;
-    background: #020617 !important;
-    color: #ffffff !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
     box-shadow: none !important;
     text-shadow: none !important;
     backdrop-filter: none !important;
@@ -299,9 +299,9 @@ button.bg-wood-700:hover {
   .bg-wood-100,
   thead,
   tr.bg-gray-50 {
-    background-color: #0f172a !important;
-    background: #0f172a !important;
-    color: #ffffff !important;
+    background-color: #f1f5f9 !important;
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
   }
 
   /* Clean solid borders for printing */
@@ -315,42 +315,42 @@ button.bg-wood-700:hover {
   .border-wood-100,
   .border-slate-200,
   .divide-y > * {
-    border-color: rgba(255, 255, 255, 0.2) !important;
+    border-color: #e2e8f0 !important;
     border-width: 1px !important;
   }
 
-  /* White text colors for all headings, text, and cells */
+  /* Dark slate text colors for all headings, text, and cells */
   h1, h2, h3, h4, h5, h6, strong, b, td, th, p, span, div, li, option, label {
-    color: #ffffff !important;
+    color: #0f172a !important;
   }
 
-  /* Force Qty data to be crisp bold white on invoice printout */
+  /* Force Qty badges to be distinct and readable on white paper */
   .qty-data,
   .qty-badge,
   span.qty-data {
-    color: #ffffff !important;
-    font-weight: 900 !important;
+    color: #0f52ba !important;
+    font-weight: 800 !important;
     opacity: 1 !important;
-    background-color: #0f52ba !important;
+    background-color: #e0f2fe !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Branded color accents for print - glowing golden-amber */
+  /* Branded color accents for white print background */
   .text-amber-500,
   .text-amber-400,
   .text-wood-900,
   .text-wood-800,
   .text-wood-600 {
-    color: #fbbf24 !important;
+    color: #d97706 !important;
   }
 
   .text-emerald-700,
   .text-emerald-800 {
-    color: #34d399 !important;
+    color: #047857 !important;
   }
 
-  /* Hide UI elements on print */
+  /* Hide UI controls, buttons, forms on printout */
   .no-print,
   .print\:hidden,
   button,
@@ -363,7 +363,7 @@ button.bg-wood-700:hover {
     display: none !important;
   }
 
-  /* Ensure the main container prints cleanly without offset */
+  /* Ensure the main print container lays out flat on white background */
   #print-area {
     position: static !important;
     width: 100% !important;
@@ -371,14 +371,17 @@ button.bg-wood-700:hover {
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
   }
 
-  /* Branded print-only header and footer styles */
+  /* Branded print header and footer styles */
   .print-header {
     display: flex !important;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 2px solid #f59e0b !important;
+    border-bottom: 2px solid #0f52ba !important;
     padding-bottom: 12px;
     margin-bottom: 24px;
   }
@@ -391,8 +394,8 @@ button.bg-wood-700:hover {
     right: 0;
     text-align: center;
     font-size: 8pt !important;
-    color: #94a3b8 !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #64748b !important;
+    border-top: 1px solid #e2e8f0 !important;
     padding-top: 8px;
   }
 
