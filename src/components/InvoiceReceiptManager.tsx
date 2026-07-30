@@ -4349,12 +4349,12 @@ export function buildInvoicePdfContent(
   const commissionAmount = commissionAmountOverride !== undefined ? commissionAmountOverride : job.quoteAmount;
   
   if (isSwedsWood) {
-    // SWEDS WOOD ENTERPRISE OFFICIAL PAPER STYLE
-    doc.setDrawColor(219, 234, 254);
+    // SWEDS WOOD ENTERPRISE OFFICIAL PAPER STYLE (PURE WHITE BACKGROUND & BLACK FONTS)
+    doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
     doc.rect(10, 10, 190, 277, 'S');
 
-    // Terracotta Sunburst Logo Disc vector
+    // Terracotta / Black Sunburst Logo Disc vector
     const logoX = 25;
     const logoY = 27;
     doc.setFillColor(155, 55, 31);
@@ -4375,24 +4375,24 @@ export function buildInvoicePdfContent(
     doc.setFillColor(255, 255, 255);
     doc.circle(logoX, logoY, 2.5, 'F');
 
-    // Company Name
+    // Company Name (Crisp Black)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
-    doc.setTextColor(15, 82, 186);
+    doc.setTextColor(0, 0, 0);
     doc.text("SWEDS WOOD ENTERPRISE", 40, 27);
     
-    doc.setFillColor(15, 82, 186);
+    doc.setFillColor(0, 0, 0);
     doc.rect(40, 30, 75, 1.2, 'F');
     
-    // Invoice Badge Box
-    doc.setFillColor(56, 189, 248);
-    doc.setDrawColor(15, 82, 186);
-    doc.setLineWidth(0.6);
+    // Invoice Badge Box (White Background with Black Outline & Black Bold Text)
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.8);
     doc.rect(135, 18, 60, 16, 'FD');
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(0, 0, 0);
     doc.text("INVOICE", 135 + 30, 18 + 10.5, { align: 'center' });
 
     // Metadata Small Table
@@ -4413,11 +4413,11 @@ export function buildInvoicePdfContent(
     ];
     
     doc.setLineWidth(0.2);
-    doc.setDrawColor(156, 163, 175);
+    doc.setDrawColor(0, 0, 0);
     
     for (let i = 0; i < 4; i++) {
       const currentY = tableY + i * rowHeight;
-      doc.setFillColor(224, 242, 254);
+      doc.setFillColor(245, 245, 245);
       doc.rect(tableX, currentY, col1Width, rowHeight, 'FD');
       
       doc.setFillColor(255, 255, 255);
@@ -4425,11 +4425,11 @@ export function buildInvoicePdfContent(
       
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
-      doc.setTextColor(15, 82, 186);
+      doc.setTextColor(0, 0, 0);
       doc.text(metaData[i].label, tableX + 3, currentY + 4.5);
       
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(31, 41, 55);
+      doc.setTextColor(0, 0, 0);
       doc.text(metaData[i].val, tableX + col1Width + 3, currentY + 4.5);
     }
 
@@ -4437,21 +4437,21 @@ export function buildInvoicePdfContent(
     const custY = 76;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
-    doc.setTextColor(15, 82, 186);
+    doc.setTextColor(0, 0, 0);
     doc.text("Invoice to:", 15, custY);
     
     const boxY = custY + 2;
     const boxHeight = 22;
     doc.setLineWidth(0.2);
-    doc.setDrawColor(156, 163, 175);
+    doc.setDrawColor(0, 0, 0);
     doc.setFillColor(255, 255, 255);
     doc.rect(15, boxY, 180, boxHeight, 'FD');
     
-    doc.setFillColor(224, 242, 254);
+    doc.setFillColor(245, 245, 245);
     doc.rect(15, boxY, 180, 5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
-    doc.setTextColor(15, 82, 186);
+    doc.setTextColor(0, 0, 0);
     doc.text("CUSTOMER INFORMATION", 18, boxY + 3.5);
     
     const cName = customerNameOverride || job.customerName;
@@ -4461,24 +4461,17 @@ export function buildInvoicePdfContent(
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(75, 85, 99);
+    doc.setTextColor(0, 0, 0);
     doc.text("NAME:", 18, boxY + 10);
-    doc.setTextColor(17, 24, 39);
     doc.text(cName, 32, boxY + 10);
     
-    doc.setTextColor(75, 85, 99);
     doc.text("MOBILE:", 115, boxY + 10);
-    doc.setTextColor(17, 24, 39);
     doc.text(cPhone, 130, boxY + 10);
     
-    doc.setTextColor(75, 85, 99);
     doc.text("ADDRESS:", 18, boxY + 16);
-    doc.setTextColor(17, 24, 39);
     doc.text(cAddr, 32, boxY + 16);
     
-    doc.setTextColor(75, 85, 99);
     doc.text("EMAIL:", 115, boxY + 16);
-    doc.setTextColor(17, 24, 39);
     doc.text(cEmail, 130, boxY + 16);
 
     // Ledger Table
@@ -4488,12 +4481,13 @@ export function buildInvoicePdfContent(
     const ledCol3 = 25;
     const ledCol4 = 30;
     
-    doc.setFillColor(56, 189, 248);
+    doc.setFillColor(245, 245, 245);
+    doc.setDrawColor(0, 0, 0);
     doc.rect(15, ledY, 180, 8, 'FD');
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(0, 0, 0);
     doc.text("Description", 15 + 4, ledY + 5.5);
     doc.text("Qty", 15 + ledCol1 + 4, ledY + 5.5, { align: 'center' });
     doc.text("Price", 15 + ledCol1 + ledCol2 + ledCol3 - 4, ledY + 5.5, { align: 'right' });
@@ -4559,17 +4553,18 @@ export function buildInvoicePdfContent(
       
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
-      doc.setTextColor(31, 41, 55);
+      doc.setTextColor(0, 0, 0);
       const cleanDesc = doc.splitTextToSize(it.desc, ledCol1 - 6)[0];
       doc.text(cleanDesc, 19, currentY + 5.5);
       
-      // Draw solid blue badge box for Qty data
-      doc.setFillColor(15, 82, 186); // #0f52ba
-      doc.roundedRect(15 + ledCol1 + 2, currentY + 1.2, ledCol2 - 4, 5.5, 1, 1, 'F');
+      // Draw light gray badge box for Qty data
+      doc.setFillColor(240, 240, 240);
+      doc.setDrawColor(0, 0, 0);
+      doc.roundedRect(15 + ledCol1 + 2, currentY + 1.2, ledCol2 - 4, 5.5, 1, 1, 'FD');
       
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
-      doc.setTextColor(255, 255, 255); // Solid Bold White
+      doc.setTextColor(0, 0, 0);
       doc.text(it.qty, 15 + ledCol1 + (ledCol2 / 2), currentY + 5.2, { align: 'center' });
       
       doc.setFont('helvetica', 'bold');
@@ -4579,14 +4574,14 @@ export function buildInvoicePdfContent(
       doc.text(tStr, 15 + ledCol1 + ledCol2 + ledCol3 + ledCol4 - 4, currentY + 5.5, { align: 'right' });
     });
     
-    doc.setDrawColor(209, 213, 219);
+    doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.15);
     for (let r = 0; r <= actualRowsCount; r++) {
       const currentY = ledY + 8 + r * tableRowHeight;
       doc.line(15, currentY, 195, currentY);
     }
     
-    doc.setDrawColor(156, 163, 175);
+    doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
     doc.line(15, ledY, 15, tableBottomY);
     doc.line(15 + ledCol1, ledY, 15 + ledCol1, tableBottomY);
@@ -4599,16 +4594,16 @@ export function buildInvoicePdfContent(
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(156, 163, 175);
+    doc.setTextColor(0, 0, 0);
     doc.text("Customer Message", 15, totY);
     
-    doc.setDrawColor(156, 163, 175);
+    doc.setDrawColor(0, 0, 0);
     doc.setFillColor(255, 255, 255);
     doc.rect(15, totY + 2, 100, 20, 'FD');
     
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
-    doc.setTextColor(55, 65, 81);
+    doc.setTextColor(0, 0, 0);
     const msgText = customerMessageOverride !== undefined ? customerMessageOverride : "Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!";
     const messageLines = doc.splitTextToSize(msgText, 94);
     doc.text(messageLines, 18, totY + 7);
@@ -4616,37 +4611,38 @@ export function buildInvoicePdfContent(
     const totalPaid = job.payments.reduce((sum, p) => sum + p.amount, 0);
     const outstanding = subtotalVal - totalPaid;
     
-    doc.setFillColor(17, 24, 39);
-    doc.rect(122, totY + 2, 73, 7, 'F');
+    doc.setFillColor(245, 245, 245);
+    doc.setDrawColor(0, 0, 0);
+    doc.rect(122, totY + 2, 73, 7, 'FD');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(0, 0, 0);
     doc.text("Subtotal", 125, totY + 6.5);
     const subtotalStr = `SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
     doc.text(subtotalStr, 191, totY + 6.5, { align: 'right' });
     
     if (totalPaid > 0) {
-      doc.setDrawColor(156, 163, 175);
-      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(0, 0, 0);
+      doc.setFillColor(255, 255, 255);
       doc.rect(122, totY + 9, 73, 13, 'FD');
       
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
-      doc.setTextColor(107, 114, 128);
+      doc.setTextColor(0, 0, 0);
       doc.text("Total Quoted Amount:", 125, totY + 13.5);
       doc.text(subtotalStr, 191, totY + 13.5, { align: 'right' });
       
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(5, 150, 105);
+      doc.setTextColor(0, 0, 0);
       doc.text("Less Paid Deposits:", 125, totY + 17);
       const paidStr = `- SLL ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
       doc.text(paidStr, 191, totY + 17, { align: 'right' });
       
-      doc.setDrawColor(209, 213, 219);
+      doc.setDrawColor(200, 200, 200);
       doc.line(122, totY + 18.5, 195, totY + 18.5);
       
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(185, 28, 28);
+      doc.setTextColor(0, 0, 0);
       doc.text("Balance Due:", 125, totY + 21);
       const balanceStr = `SLL ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
       doc.text(balanceStr, 191, totY + 21, { align: 'right' });
@@ -4659,30 +4655,29 @@ export function buildInvoicePdfContent(
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(15, 82, 186);
+    doc.setTextColor(0, 0, 0);
     doc.text("Authorized Signature:", 20, sigY);
 
     try {
       doc.addImage(sigImg, 'PNG', 20, sigY + 2, 28, 28);
     } catch (err) {
       doc.setLineWidth(0.3);
-      doc.setDrawColor(156, 163, 175);
+      doc.setDrawColor(0, 0, 0);
       doc.line(20, sigY + 22, 80, sigY + 22);
     }
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.setTextColor(185, 28, 28);
+    doc.setTextColor(0, 0, 0);
     doc.text("Official Stamp / Seal:", 120, sigY);
 
     try {
       doc.addImage(stampImg, 'PNG', 120, sigY + 2, 28, 28);
     } catch (err) {
       doc.setLineWidth(0.3);
-      doc.setDrawColor(185, 28, 28);
+      doc.setDrawColor(0, 0, 0);
       doc.line(120, sigY + 22, 180, sigY + 22);
     }
-    
   } else {
     // MODERN DIGITAL PROFESSIONAL TEMPLATE
     doc.setDrawColor(245, 245, 244);
