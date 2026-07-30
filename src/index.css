@@ -264,70 +264,35 @@ button.bg-wood-700:hover {
 }
 
 /* ==========================================================
-   REFINE PROFESSIONAL PRINT STYLESHEET (STRICT A4 PORTRAIT & PURE WHITE BACKGROUND)
+   REFINE PROFESSIONAL PRINT STYLESHEET (STRICT PURE WHITE BACKGROUND)
    ========================================================== */
 @media print {
-  /* Set document size and printable margins for A4 */
+  /* Set document size and printable margins */
   @page {
     size: A4 portrait;
-    margin: 8mm 10mm 8mm 10mm !important;
+    margin: 1.2cm !important;
   }
 
-  /* Reset document root layout for unclipped multi-page printout */
+  /* Reset layout for clean pure white printout */
   html, 
   body, 
   #root, 
-  main {
+  main, 
+  .fixed, 
+  .absolute, 
+  #print-area, 
+  .sweds-paper-invoice {
     background-color: #ffffff !important;
     background: #ffffff !important;
     color: #000000 !important;
-    font-size: 10pt !important;
-    line-height: 1.35 !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
     margin: 0 !important;
     padding: 0 !important;
-    height: auto !important;
-    min-height: auto !important;
-    overflow: visible !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-  }
-
-  /* Expand modal overlays and wrappers so all items flow naturally across pages */
-  .fixed,
-  .fixed.inset-0,
-  .overflow-y-auto,
-  .overflow-x-auto,
-  .backdrop-blur-md,
-  .backdrop-blur-xs {
-    position: static !important;
-    inset: auto !important;
-    overflow: visible !important;
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    max-height: none !important;
-    background: #ffffff !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-  }
-
-  /* Main invoice print container styled precisely to A4 width */
-  #print-area,
-  .sweds-paper-invoice {
-    position: relative !important;
-    width: 100% !important;
-    max-width: 210mm !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    background-color: #ffffff !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    box-shadow: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-    overflow: visible !important;
   }
 
   /* Remove shadows and glowing text effects on print */
@@ -444,38 +409,17 @@ button.bg-wood-700:hover {
     display: none !important;
   }
 
-  /* Ensure the main print container lays out flat on white background sized for A4 */
+  /* Ensure the main print container lays out flat on white background */
   #print-area {
-    position: relative !important;
+    position: static !important;
     width: 100% !important;
-    max-width: 210mm !important;
-    margin: 0 auto !important;
+    max-width: 100% !important;
+    margin: 0 !important;
     padding: 0 !important;
     border: none !important;
     background-color: #ffffff !important;
     background: #ffffff !important;
     color: #000000 !important;
-    overflow: visible !important;
-  }
-
-  /* Table pagination and page breaks for itemized printouts */
-  table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    page-break-inside: auto !important;
-  }
-
-  tr {
-    page-break-inside: avoid !important;
-    page-break-after: auto !important;
-  }
-
-  thead {
-    display: table-header-group !important;
-  }
-
-  tfoot {
-    display: table-footer-group !important;
   }
 
   /* Branded print header and footer styles */
