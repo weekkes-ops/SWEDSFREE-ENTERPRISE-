@@ -241,37 +241,59 @@ button.bg-wood-700:hover {
 }
 
 /* ==========================================================
-   REFINE PROFESSIONAL PRINT STYLESHEET (WHITE BACKGROUND ON PRINTOUT)
+   REFINE PROFESSIONAL PRINT STYLESHEET (STRICT PURE WHITE BACKGROUND)
    ========================================================== */
 @media print {
   /* Set document size and printable margins */
   @page {
     size: A4 portrait;
-    margin: 1.6cm !important;
+    margin: 1.2cm !important;
   }
 
-  /* Reset layout for clean white printout */
-  html, body {
+  /* Reset layout for clean pure white printout */
+  html, 
+  body, 
+  #root, 
+  main, 
+  .fixed, 
+  .absolute, 
+  #print-area, 
+  .sweds-paper-invoice {
     background-color: #ffffff !important;
     background: #ffffff !important;
-    color: #0f172a !important;
+    color: #000000 !important;
     font-size: 11pt !important;
     line-height: 1.4 !important;
     margin: 0 !important;
     padding: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Ensure print-area content and containers use white background */
+  /* Remove shadows and glowing text effects on print */
+  #print-area *,
+  .sweds-paper-invoice * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Ensure print-area content and containers strictly use white background */
   .bg-white,
   .bg-slate-950,
   .bg-slate-900,
+  .bg-slate-800,
+  .bg-slate-700,
+  .bg-slate-100,
+  .bg-slate-50,
   .bg-slate-900\/60,
   .bg-slate-950\/60,
   .bg-slate-950\/40,
   .bg-gray-50,
-  .bg-slate-50,
+  .bg-gray-100,
+  .bg-wood-950,
+  .bg-wood-900,
   .bg-wood-50,
   .bg-wood-50\/50,
   .bg-gray-50\/50,
@@ -285,23 +307,25 @@ button.bg-wood-700:hover {
   #print-area {
     background-color: #ffffff !important;
     background: #ffffff !important;
-    color: #0f172a !important;
+    color: #000000 !important;
     border-color: #cbd5e1 !important;
     box-shadow: none !important;
-    text-shadow: none !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
   }
 
-  /* Table headers and callouts on print */
+  /* Table headers and metadata banners get a subtle clean off-white background */
+  thead,
+  thead tr,
+  th,
   .bg-gray-100,
   .bg-slate-100,
   .bg-wood-100,
-  thead,
+  .bg-[#e0f2fe],
   tr.bg-gray-50 {
-    background-color: #f1f5f9 !important;
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
+    background-color: #f8fafc !important;
+    background: #f8fafc !important;
+    color: #000000 !important;
   }
 
   /* Clean solid borders for printing */
@@ -312,51 +336,50 @@ button.bg-wood-700:hover {
   .border-l,
   .border-gray-100,
   .border-gray-200,
+  .border-gray-300,
+  .border-gray-400,
   .border-wood-100,
   .border-slate-200,
-  .divide-y > * {
-    border-color: #e2e8f0 !important;
+  .divide-y > *,
+  td, 
+  th {
+    border-color: #cbd5e1 !important;
     border-width: 1px !important;
   }
 
-  /* Dark slate text colors for all headings, text, and cells */
+  /* Crisp black text color for all typography */
   h1, h2, h3, h4, h5, h6, strong, b, td, th, p, span, div, li, option, label {
-    color: #0f172a !important;
+    color: #000000 !important;
   }
 
-  /* Force Qty badges to be distinct and readable on white paper */
+  /* Quantity badges render in clean crisp dark blue text on light background */
   .qty-data,
   .qty-badge,
   span.qty-data {
     color: #0f52ba !important;
     font-weight: 800 !important;
     opacity: 1 !important;
-    background-color: #e0f2fe !important;
+    background-color: #f1f5f9 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Branded color accents for white print background */
+  /* Accent text colors mapped cleanly for black/dark typography */
   .text-amber-500,
   .text-amber-400,
   .text-wood-900,
   .text-wood-800,
-  .text-wood-600 {
-    color: #d97706 !important;
+  .text-wood-600,
+  .text-[#0f52ba],
+  .text-[#1e3a8a] {
+    color: #000000 !important;
   }
 
-  .text-emerald-700,
-  .text-emerald-800 {
-    color: #047857 !important;
-  }
-
-  /* Hide UI controls, buttons, forms on printout */
+  /* Hide UI controls, buttons, forms, navigation on printout */
   .no-print,
   .print\:hidden,
   button,
   select,
-  input,
-  form,
   aside,
   header:not(.print-header),
   footer:not(.print-footer) {
@@ -373,7 +396,7 @@ button.bg-wood-700:hover {
     border: none !important;
     background-color: #ffffff !important;
     background: #ffffff !important;
-    color: #0f172a !important;
+    color: #000000 !important;
   }
 
   /* Branded print header and footer styles */
@@ -381,7 +404,7 @@ button.bg-wood-700:hover {
     display: flex !important;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 2px solid #0f52ba !important;
+    border-bottom: 2px solid #000000 !important;
     padding-bottom: 12px;
     margin-bottom: 24px;
   }
@@ -394,8 +417,8 @@ button.bg-wood-700:hover {
     right: 0;
     text-align: center;
     font-size: 8pt !important;
-    color: #64748b !important;
-    border-top: 1px solid #e2e8f0 !important;
+    color: #475569 !important;
+    border-top: 1px solid #cbd5e1 !important;
     padding-top: 8px;
   }
 
