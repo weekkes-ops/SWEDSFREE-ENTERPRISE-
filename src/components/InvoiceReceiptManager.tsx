@@ -422,7 +422,7 @@ export default function InvoiceReceiptManager({
   // ==========================================
   const [invoiceLogoUrl, setInvoiceLogoUrl] = useState<string>('/logo.svg');
   const [invoiceLogoSize, setInvoiceLogoSize] = useState<'sm' | 'md' | 'lg'>('md');
-  const [invoiceCompany, setInvoiceCompany] = useState("SWED WOOD WORK");
+  const [invoiceCompany, setInvoiceCompany] = useState("SWEDS WOOD ENTERPRISE");
   const [invoiceCompanyContact, setInvoiceCompanyContact] = useState("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 112 3344");
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
@@ -667,7 +667,7 @@ export default function InvoiceReceiptManager({
   // ==========================================
   // INLINE EDITABLE STATES - RECEIPT PDF
   // ==========================================
-  const [receiptCompany, setReceiptCompany] = useState("SWED WOOD WORK");
+  const [receiptCompany, setReceiptCompany] = useState("SWEDS WOOD ENTERPRISE");
   const [receiptCompanySub, setReceiptCompanySub] = useState("2 Sweds free Avenue, Sussex Freetown Sierra Leone • Official Commission Receipt");
   const [receiptNo, setReceiptNo] = useState("");
   const [receiptDate, setReceiptDate] = useState("");
@@ -763,7 +763,7 @@ export default function InvoiceReceiptManager({
         setInvoiceBankInstructions("");
         setInvoiceCustomerMessage("Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!");
       } else {
-        setInvoiceCompany("SWED WOOD WORK");
+        setInvoiceCompany("SWEDS WOOD ENTERPRISE");
         setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 112 3344");
         setInvoiceTerms("Payment Clear / Standard Log");
         setInvoiceBankInstructions(`Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${activeInvoice.id.slice(4).toUpperCase()}`);
@@ -810,7 +810,7 @@ export default function InvoiceReceiptManager({
   // Sync Receipt local editable states when an activeReceipt is selected/opened
   useEffect(() => {
     if (activeReceipt) {
-      setReceiptCompany("SWED WOOD WORK");
+      setReceiptCompany("SWEDS WOOD ENTERPRISE");
       setReceiptCompanySub("2 Sweds free Avenue, Sussex Freetown Sierra Leone • Official Commission Receipt");
       setReceiptNo(`REC-${activeReceipt.payment.id.toUpperCase()}`);
       setReceiptDate(activeReceipt.payment.date);
@@ -3546,7 +3546,7 @@ export default function InvoiceReceiptManager({
                     {/* Calculations Summary block */}
                     <div className="pt-6 border-t border-gray-100 flex flex-col md:flex-row justify-between items-start gap-6 text-xs">
                       <div className="max-w-md text-gray-400 font-semibold leading-relaxed whitespace-pre-line">
-                        <h5 className="font-extrabold text-wood-950 uppercase tracking-widest text-[9px] mb-1.5">SWED WOOD WORK CLEARANCE INSTRUCTIONS:</h5>
+                        <h5 className="font-extrabold text-wood-950 uppercase tracking-widest text-[9px] mb-1.5">SWEDS WOOD ENTERPRISE CLEARANCE INSTRUCTIONS:</h5>
                         {invoicePdfMode === 'EDIT' ? (
                           <textarea
                             rows={3}
@@ -3981,7 +3981,7 @@ export default function InvoiceReceiptManager({
                   )}
                   
                   <p className="text-[11px] text-gray-400 italic">
-                    All customized SWED WOOD WORK timber, carving, hardware assembly, and polishing commissions are subject to official delivery clearance terms.
+                    All customized SWEDS WOOD ENTERPRISE timber, carving, hardware assembly, and polishing commissions are subject to official delivery clearance terms.
                   </p>
                 </div>
 
@@ -4560,7 +4560,7 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(69, 26, 3);
-    doc.text("SWED WOOD WORK", 28, 20);
+    doc.text("SWEDS WOOD ENTERPRISE", 28, 20);
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
