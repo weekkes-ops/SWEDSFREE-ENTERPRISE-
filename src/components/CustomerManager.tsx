@@ -1,6 +1,5 @@
 import { useState, FormEvent } from 'react';
 import { Customer, Job, Employee, JobPayment, formatCurrency } from '../types';
-import { DEFAULT_300X300_SIGNATURE, DEFAULT_300X300_STAMP } from './InvoiceReceiptManager';
 import { 
   Plus, 
   Search, 
@@ -877,7 +876,7 @@ export default function CustomerManager({
                   <img src="/logo.svg" alt="Company Logo" className="w-12 h-12 object-contain mx-auto mb-2" />
                   <h2 className="font-display font-black text-xl text-wood-950 uppercase tracking-tight">Swedswood Enterprise</h2>
                   <p className="text-[11px] text-gray-500 font-semibold">Custom Hardwood Carpentry & Bespoke Furniture</p>
-                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">Plot 42 Wilkinson Road, Freetown, Sierra Leone</p>
+                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">2 Sweds free Avenue, Sussex Freetown Sierra Leone</p>
                   <div className="mt-3 inline-block px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-black uppercase tracking-wider">
                     Official Payment Installment Receipt
                   </div>
@@ -932,33 +931,6 @@ export default function CustomerManager({
                   <div className="flex justify-between text-amber-800 font-bold border-t border-gray-200 pt-1.5">
                     <span>Remaining Balance Due:</span>
                     <span>{formatCurrency(Math.max(0, viewReceiptPayment.job.quoteAmount - viewReceiptPayment.job.payments.reduce((s, p) => s + p.amount, 0)))}</span>
-                  </div>
-                </div>
-
-                {/* Footer 300x300 Signature & Official Stamp */}
-                <div className="pt-4 border-t border-gray-200 grid grid-cols-2 gap-4 items-end text-[10px] text-gray-500">
-                  <div className="space-y-1 text-center">
-                    <p className="font-bold text-gray-700 uppercase tracking-wider text-[9px]">Authorized Signature:</p>
-                    <div className="w-24 h-24 mx-auto border border-dashed border-blue-200 rounded bg-blue-50/20 p-1 flex items-center justify-center">
-                      <img
-                        src={localStorage.getItem('swedswood_signature_300') || DEFAULT_300X300_SIGNATURE}
-                        alt="300x300 Authorized Signature"
-                        className="max-w-full max-h-full object-contain"
-                      />
-                    </div>
-                    <p className="text-[8px] font-mono text-gray-400">300×300 PX SIGNATURE</p>
-                  </div>
-
-                  <div className="space-y-1 text-center">
-                    <p className="font-bold text-red-800 uppercase tracking-wider text-[9px]">Official Stamp / Seal:</p>
-                    <div className="w-24 h-24 mx-auto border border-dashed border-red-200 rounded bg-red-50/20 p-1 flex items-center justify-center">
-                      <img
-                        src={localStorage.getItem('swedswood_stamp_300') || DEFAULT_300X300_STAMP}
-                        alt="300x300 Official Stamp"
-                        className="max-w-full max-h-full object-contain"
-                      />
-                    </div>
-                    <p className="text-[8px] font-mono text-red-700">300×300 PX STAMP</p>
                   </div>
                 </div>
 

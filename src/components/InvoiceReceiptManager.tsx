@@ -423,7 +423,7 @@ export default function InvoiceReceiptManager({
   const [invoiceLogoUrl, setInvoiceLogoUrl] = useState<string>('/logo.svg');
   const [invoiceLogoSize, setInvoiceLogoSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [invoiceCompany, setInvoiceCompany] = useState("SWED WOOD WORK");
-  const [invoiceCompanyContact, setInvoiceCompanyContact] = useState("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: Wilkinson Road, Freetown.\nContact: info@swedwoodwork.com | +232 76 112 3344");
+  const [invoiceCompanyContact, setInvoiceCompanyContact] = useState("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 112 3344");
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [invoiceTerms, setInvoiceTerms] = useState("Payment Clear / Standard Log");
@@ -668,7 +668,7 @@ export default function InvoiceReceiptManager({
   // INLINE EDITABLE STATES - RECEIPT PDF
   // ==========================================
   const [receiptCompany, setReceiptCompany] = useState("SWED WOOD WORK");
-  const [receiptCompanySub, setReceiptCompanySub] = useState("Wilkinson Road, Freetown, Sierra Leone • Official Commission Receipt");
+  const [receiptCompanySub, setReceiptCompanySub] = useState("2 Sweds free Avenue, Sussex Freetown Sierra Leone • Official Commission Receipt");
   const [receiptNo, setReceiptNo] = useState("");
   const [receiptDate, setReceiptDate] = useState("");
   const [receiptCustomer, setReceiptCustomer] = useState("");
@@ -764,7 +764,7 @@ export default function InvoiceReceiptManager({
         setInvoiceCustomerMessage("Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!");
       } else {
         setInvoiceCompany("SWED WOOD WORK");
-        setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: Wilkinson Road, Freetown.\nContact: info@swedwoodwork.com | +232 76 112 3344");
+        setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 112 3344");
         setInvoiceTerms("Payment Clear / Standard Log");
         setInvoiceBankInstructions(`Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${activeInvoice.id.slice(4).toUpperCase()}`);
         setInvoiceCustomerMessage("");
@@ -811,7 +811,7 @@ export default function InvoiceReceiptManager({
   useEffect(() => {
     if (activeReceipt) {
       setReceiptCompany("SWED WOOD WORK");
-      setReceiptCompanySub("Wilkinson Road, Freetown, Sierra Leone • Official Commission Receipt");
+      setReceiptCompanySub("2 Sweds free Avenue, Sussex Freetown Sierra Leone • Official Commission Receipt");
       setReceiptNo(`REC-${activeReceipt.payment.id.toUpperCase()}`);
       setReceiptDate(activeReceipt.payment.date);
       setReceiptCustomer(activeReceipt.job.customerName);
@@ -2372,7 +2372,7 @@ export default function InvoiceReceiptManager({
                         </span>
                       </div>
                       <p className="text-[11px] text-emerald-100/80 leading-snug">
-                        Generate & print an official 100% payment clearance receipt for client <strong className="text-white">{selectedJob.customerName}</strong> including 300x300 digital signature & official stamp.
+                        Generate & print an official 100% payment clearance receipt for client <strong className="text-white">{selectedJob.customerName}</strong>.
                       </p>
                     </div>
 
@@ -3985,73 +3985,6 @@ export default function InvoiceReceiptManager({
                   </p>
                 </div>
 
-                {/* Bottom Signatures & Official Stamp (Horizontal Line & Compact User-Uploaded Images) */}
-                <div className="mt-8 pt-5 border-t border-gray-200 flex flex-row items-end justify-between gap-4 sm:gap-8">
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-emerald-950 font-extrabold text-[10px] sm:text-xs uppercase tracking-wider">
-                        Received By (Authorized Signatory):
-                      </p>
-                      <label className="text-[10px] text-emerald-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition">
-                        <Upload className="w-3 h-3 text-emerald-800" />
-                        <span>Upload Signature</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleImageUpload300(e, 'signature')}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                    {receiptPdfMode === 'EDIT' && (
-                      <input
-                        type="text"
-                        value={receiptReceivedBy}
-                        onChange={(e) => setReceiptReceivedBy(e.target.value)}
-                        className="font-serif italic text-emerald-900 border-b border-gray-300 bg-amber-50/50 rounded px-2 py-0.5 text-xs w-full mb-1"
-                        placeholder="Cashier / Signatory Name"
-                      />
-                    )}
-                    {showSignature && (
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-emerald-300 rounded-lg p-1 bg-emerald-50/30 flex items-center justify-center relative group">
-                        <img
-                          src={signatureImageUrl}
-                          alt="Authorized Signature"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                    )}
-                    <p className="text-[9px] text-gray-500 font-bold uppercase">{receiptReceivedBy || 'Authorized Cashier Signature'}</p>
-                  </div>
-
-                  <div className="space-y-1.5 flex-1 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <p className="text-red-800 font-extrabold text-[10px] sm:text-xs uppercase tracking-wider">
-                        Official Clearance Stamp / Seal:
-                      </p>
-                      <label className="text-[10px] text-red-800 font-extrabold hover:underline cursor-pointer flex items-center gap-1 no-print shrink-0 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded border border-red-200 transition">
-                        <Upload className="w-3 h-3 text-red-700" />
-                        <span>Upload Stamp</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleImageUpload300(e, 'stamp')}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                    {showStamp && (
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-red-300 rounded-lg p-1 bg-red-50/30 flex items-center justify-center relative group ml-auto">
-                        <img
-                          src={stampImageUrl}
-                          alt="Official Stamp"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
               </div>
               )}
 
@@ -4635,7 +4568,7 @@ export function buildInvoicePdfContent(
     doc.text("Corporate Carpentry, Woodwork, Timber Logistics & Design.", 28, 24);
 
     doc.setFontSize(6.5);
-    const contactText = "Freetown Workshop & Site Installations.\nSierra Leone Office: Wilkinson Road, Freetown.\nContact: info@swedwoodwork.com | +232 76 112 3344";
+    const contactText = "Freetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 112 3344";
     doc.text(contactText, 15, 30);
 
     // Title
