@@ -62,6 +62,11 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
       return;
     }
 
+    if (emp.status !== 'Active') {
+      setError(`Account Access Denied: Your account status is currently '${emp.status}'. An active account is required to access the system and backup data.`);
+      return;
+    }
+
     const expectedPassword = emp.password || (
       emp.role === 'Admin' ? 'admin' : 
       emp.role === 'Manager' ? 'manager' : 
@@ -406,9 +411,15 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
         </div>
 
         {/* Footer info banner */}
-        <p className="text-center text-[10px] text-slate-500 font-medium mt-6">
-          Swedsfree Workshop Hub secure local cryptographic sandbox authentication environment.
-        </p>
+        <div className="mt-6 space-y-2 text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-800 rounded-full text-[10px] font-bold">
+            <Sparkles className="w-3 h-3 text-amber-600 shrink-0" />
+            <span>Active Account Required: Users must hold an active account to backup data & access workshop tools.</span>
+          </div>
+          <p className="text-[10px] text-slate-500 font-medium">
+            Swedsfree Workshop Hub secure local cryptographic sandbox authentication environment.
+          </p>
+        </div>
       </motion.div>
     </div>
   );

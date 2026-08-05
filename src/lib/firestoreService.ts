@@ -139,3 +139,22 @@ export async function clearEntireCollection(collectionName: string): Promise<voi
     console.error(`Error clearing entire collection ${collectionName}:`, err);
   }
 }
+
+// Fetch all documents from a Firestore collection directly from server
+export async function fetchCollectionFromFirestore<T extends { id: string }>(
+  collectionName: string
+): Promise<T[]> {
+  try {
+    const colRef = collection(db, collectionName);
+    const snapshot = await getDocs(colRef);
+    const items: T[] = [];
+    snapshot.forEach((docSnap) => {
+      items.push({ id: docSnap.id, ...docSnap.data() } as T);
+    });
+    return items;
+  } catch (err) {
+    console.error(`Error fetching collection ${collectionName} from Firestore:`, err);
+    return [];
+  }
+}
+

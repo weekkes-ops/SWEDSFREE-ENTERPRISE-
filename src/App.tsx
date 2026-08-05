@@ -19,7 +19,8 @@ import {
   WifiOff,
   Download,
   Upload,
-  HardDrive
+  HardDrive,
+  Settings
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -34,11 +35,20 @@ import FinancialLedger from './components/FinancialLedger';
 import ReportGenerator from './components/ReportGenerator';
 import DailyWorkManager from './components/DailyWorkManager';
 import InvoiceReceiptManager from './components/InvoiceReceiptManager';
+import SettingsManager from './components/SettingsManager';
 import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
 
 // Seed data & types
-import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments, deleteBatchDocuments, clearEntireCollection } from './lib/firestoreService';
+import { 
+  subscribeToCollection, 
+  saveDocument, 
+  deleteDocument, 
+  saveBatchDocuments, 
+  deleteBatchDocuments, 
+  clearEntireCollection,
+  fetchCollectionFromFirestore 
+} from './lib/firestoreService';
 import { 
   INITIAL_INVENTORY, 
   INITIAL_CUSTOMERS, 
@@ -46,7 +56,10 @@ import {
   INITIAL_JOBS, 
   INITIAL_INVENTORY_TRANSACTIONS, 
   INITIAL_FINANCIALS,
-  INITIAL_DAILY_WORK_LOGS
+  INITIAL_DAILY_WORK_LOGS,
+  INITIAL_REGISTRATION_REQUESTS,
+  INITIAL_WARNING_LETTERS,
+  INITIAL_SAVED_INVOICES
 } from './data';
 
 const LIVE_ADMIN_EMPLOYEE: Employee = {
@@ -76,7 +89,8 @@ import {
   DailyWorkLog,
   RegistrationRequest,
   EmployeeRole,
-  WarningLetter
+  WarningLetter,
+  SavedInvoice
 } from './types';
 
 export default function App() {
@@ -109,21 +123,41 @@ export default function App() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const performAutoOnlineSync = () => {
+  const performAutoOnlineSync = async () => {
     setSyncStatus('syncing');
-    setSyncBannerMessage('Internet connection restored! Automatically updating online database with offline records...');
+    setSyncBannerMessage('Internet connection active! Synchronizing all local records with online Firestore database...');
     
-    setTimeout(() => {
+    try {
+      if (inventory.length > 0) await saveBatchDocuments('inventory', inventory);
+      if (customers.length > 0) await saveBatchDocuments('customers', customers);
+      if (employees.length > 0) await saveBatchDocuments('employees', employees);
+      if (jobs.length > 0) await saveBatchDocuments('jobs', jobs);
+      if (inventoryTransactions.length > 0) await saveBatchDocuments('inventoryTransactions', inventoryTransactions);
+      if (financialTransactions.length > 0) await saveBatchDocuments('financialTransactions', financialTransactions);
+      if (dailyWorkLogs.length > 0) await saveBatchDocuments('dailyWorkLogs', dailyWorkLogs);
+      if (registrationRequests.length > 0) await saveBatchDocuments('registrationRequests', registrationRequests);
+      if (warningLetters.length > 0) await saveBatchDocuments('warningLetters', warningLetters);
+
+      const rawInvs = localStorage.getItem('swedswood_saved_invoices');
+      if (rawInvs) {
+        try {
+          const invs = JSON.parse(rawInvs);
+          if (Array.isArray(invs) && invs.length > 0) {
+            await saveBatchDocuments('savedInvoices', invs);
+          }
+        } catch {}
+      }
+
       const nowStr = new Date().toLocaleTimeString();
       setSyncStatus('synced');
       setLastSyncTime(nowStr);
       localStorage.setItem('swedsfree_last_online_sync', nowStr);
       setSyncBannerMessage('✓ Online database automatically updated and synchronized with all local offline records!');
-      
-      setTimeout(() => {
-        setSyncBannerMessage(null);
-      }, 7000);
-    }, 1500);
+      setTimeout(() => setSyncBannerMessage(null), 6000);
+    } catch (err) {
+      console.error('Error auto syncing with online database:', err);
+      setSyncStatus('error');
+    }
   };
 
   useEffect(() => {
@@ -148,12 +182,29 @@ export default function App() {
 
   // Offline Data Export (JSON)
   const handleExportBackup = () => {
+    if (!currentUser) {
+      alert("Active Account Required: You must be logged in with an active user account to backup system data.");
+      return;
+    }
+
+    if (currentUser.status !== 'Active') {
+      alert(`Active Account Required: Your account status is currently '${currentUser.status}'. Only active account holders can perform data backups.`);
+      return;
+    }
+
     const localSavedInvoices = localStorage.getItem('swedswood_saved_invoices');
     const savedInvoices = localSavedInvoices ? JSON.parse(localSavedInvoices) : [];
 
     const backupData = {
       appName: 'Sweds Wood Enterprise',
       exportDate: new Date().toISOString(),
+      exportedBy: {
+        id: currentUser.id,
+        name: currentUser.name,
+        email: currentUser.email,
+        role: currentUser.role,
+        status: currentUser.status
+      },
       inventory,
       customers,
       employees,
@@ -177,30 +228,68 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Offline Data Import (JSON)
+  // Offline Data Import (JSON) -> Saves directly to Firestore Online Database
   const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!currentUser) {
+      alert("Active Account Required: You must be logged in with an active user account to restore system data.");
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (currentUser.status !== 'Active') {
+      alert(`Active Account Required: Your account status is currently '${currentUser.status}'. Only active account holders can restore system backups.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
+        setSyncStatus('syncing');
+        setSyncBannerMessage('Importing backup file & uploading all records to online Firestore database...');
         const data = JSON.parse(event.target?.result as string);
-        if (data.inventory) setInventory(data.inventory);
-        if (data.customers) setCustomers(data.customers);
-        if (data.employees) setEmployees(data.employees);
-        if (data.jobs) setJobs(data.jobs);
-        if (data.inventoryTransactions) setInventoryTransactions(data.inventoryTransactions);
-        if (data.financialTransactions) setFinancialTransactions(data.financialTransactions);
-        if (data.dailyWorkLogs) setDailyWorkLogs(data.dailyWorkLogs);
-        if (data.registrationRequests) setRegistrationRequests(data.registrationRequests);
-        if (data.warningLetters) setWarningLetters(data.warningLetters);
-        if (data.savedInvoices) {
-          localStorage.setItem('swedswood_saved_invoices', JSON.stringify(data.savedInvoices));
+
+        // Disable automatic demo re-seeding so backup file is treated as ground truth
+        localStorage.setItem('swedsfree_seed_disabled', 'true');
+
+        const collectionsToProcess = [
+          { key: 'inventory', localKey: 'swedsfree_inventory', data: data.inventory, setter: setInventory },
+          { key: 'customers', localKey: 'swedsfree_customers', data: data.customers, setter: setCustomers },
+          { key: 'employees', localKey: 'swedsfree_employees', data: data.employees, setter: setEmployees },
+          { key: 'jobs', localKey: 'swedsfree_jobs', data: data.jobs, setter: setJobs },
+          { key: 'inventoryTransactions', localKey: 'swedsfree_inv_transactions', data: data.inventoryTransactions, setter: setInventoryTransactions },
+          { key: 'financialTransactions', localKey: 'swedsfree_fin_transactions', data: data.financialTransactions, setter: setFinancialTransactions },
+          { key: 'dailyWorkLogs', localKey: 'swedsfree_daily_work_logs', data: data.dailyWorkLogs, setter: setDailyWorkLogs },
+          { key: 'registrationRequests', localKey: 'swedsfree_registration_requests', data: data.registrationRequests, setter: setRegistrationRequests },
+          { key: 'warningLetters', localKey: 'swedsfree_warning_letters', data: data.warningLetters, setter: setWarningLetters },
+          { key: 'savedInvoices', localKey: 'swedswood_saved_invoices', data: data.savedInvoices, setter: null },
+        ];
+
+        for (const col of collectionsToProcess) {
+          if (Array.isArray(col.data)) {
+            if (col.setter) col.setter(col.data);
+            localStorage.setItem(col.localKey, JSON.stringify(col.data));
+            await clearEntireCollection(col.key);
+            if (col.data.length > 0) {
+              await saveBatchDocuments(col.key, col.data);
+            }
+          }
         }
-        alert('Data backup imported successfully! All records updated.');
+
+        const nowStr = new Date().toLocaleTimeString();
+        setSyncStatus('synced');
+        setLastSyncTime(nowStr);
+        localStorage.setItem('swedsfree_last_online_sync', nowStr);
+        setSyncBannerMessage('✓ Backup imported and saved to online Firestore database successfully!');
+        alert('Data backup imported successfully! All records saved to online Firestore database.');
+        setTimeout(() => setSyncBannerMessage(null), 6000);
       } catch (err) {
-        alert('Failed to parse backup file. Please upload a valid JSON backup file.');
+        console.error('Failed to parse or save backup file to online database:', err);
+        setSyncStatus('error');
+        alert('Failed to parse or save backup file to online database. Please verify the JSON file.');
       }
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -302,6 +391,79 @@ export default function App() {
     }
   };
 
+  // Restore all records dated up to today (August 5, 2026) from Firestore
+  const handleRestoreAllDataTillToday = async () => {
+    try {
+      setSyncStatus('syncing');
+      localStorage.removeItem('swedsfree_seed_disabled');
+
+      // Save complete initial records dated up to today to Firestore
+      await saveBatchDocuments('inventory', INITIAL_INVENTORY);
+      await saveBatchDocuments('customers', INITIAL_CUSTOMERS);
+      await saveBatchDocuments('employees', INITIAL_EMPLOYEES);
+      await saveBatchDocuments('jobs', INITIAL_JOBS);
+      await saveBatchDocuments('inventoryTransactions', INITIAL_INVENTORY_TRANSACTIONS);
+      await saveBatchDocuments('financialTransactions', INITIAL_FINANCIALS);
+      await saveBatchDocuments('dailyWorkLogs', INITIAL_DAILY_WORK_LOGS);
+      await saveBatchDocuments('registrationRequests', INITIAL_REGISTRATION_REQUESTS);
+      await saveBatchDocuments('warningLetters', INITIAL_WARNING_LETTERS);
+      await saveBatchDocuments('savedInvoices', INITIAL_SAVED_INVOICES);
+
+      // Query Firestore directly for server documents
+      const inv = await fetchCollectionFromFirestore<InventoryItem>('inventory');
+      const cust = await fetchCollectionFromFirestore<Customer>('customers');
+      const emp = await fetchCollectionFromFirestore<Employee>('employees');
+      const jbs = await fetchCollectionFromFirestore<Job>('jobs');
+      const invTx = await fetchCollectionFromFirestore<InventoryTransaction>('inventoryTransactions');
+      const finTx = await fetchCollectionFromFirestore<FinancialTransaction>('financialTransactions');
+      const wLogs = await fetchCollectionFromFirestore<DailyWorkLog>('dailyWorkLogs');
+      const reqs = await fetchCollectionFromFirestore<RegistrationRequest>('registrationRequests');
+      const warns = await fetchCollectionFromFirestore<WarningLetter>('warningLetters');
+      const invs = await fetchCollectionFromFirestore<SavedInvoice>('savedInvoices');
+
+      const finalInv = inv.length > 0 ? inv : INITIAL_INVENTORY;
+      const finalCust = cust.length > 0 ? cust : INITIAL_CUSTOMERS;
+      const finalEmp = emp.length > 0 ? emp : INITIAL_EMPLOYEES;
+      const finalJobs = jbs.length > 0 ? jbs : INITIAL_JOBS;
+      const finalInvTx = invTx.length > 0 ? invTx : INITIAL_INVENTORY_TRANSACTIONS;
+      const finalFinTx = finTx.length > 0 ? finTx : INITIAL_FINANCIALS;
+      const finalWLogs = wLogs.length > 0 ? wLogs : INITIAL_DAILY_WORK_LOGS;
+      const finalReqs = reqs.length > 0 ? reqs : INITIAL_REGISTRATION_REQUESTS;
+      const finalWarns = warns.length > 0 ? warns : INITIAL_WARNING_LETTERS;
+      const finalInvs = invs.length > 0 ? invs : INITIAL_SAVED_INVOICES;
+
+      setInventory(finalInv);
+      setCustomers(finalCust);
+      setEmployees(finalEmp);
+      setJobs(finalJobs);
+      setInventoryTransactions(finalInvTx);
+      setFinancialTransactions(finalFinTx);
+      setDailyWorkLogs(finalWLogs);
+      setRegistrationRequests(finalReqs);
+      setWarningLetters(finalWarns);
+
+      localStorage.setItem('swedsfree_inventory', JSON.stringify(finalInv));
+      localStorage.setItem('swedsfree_customers', JSON.stringify(finalCust));
+      localStorage.setItem('swedsfree_employees', JSON.stringify(finalEmp));
+      localStorage.setItem('swedsfree_jobs', JSON.stringify(finalJobs));
+      localStorage.setItem('swedsfree_inv_transactions', JSON.stringify(finalInvTx));
+      localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(finalFinTx));
+      localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify(finalWLogs));
+      localStorage.setItem('swedsfree_registration_requests', JSON.stringify(finalReqs));
+      localStorage.setItem('swedsfree_warning_letters', JSON.stringify(finalWarns));
+      localStorage.setItem('swedswood_saved_invoices', JSON.stringify(finalInvs));
+
+      setLastSyncTime(new Date().toLocaleTimeString());
+      setSyncStatus('synced');
+
+      alert("SUCCESS: All system data up to today's date (August 5, 2026) has been completely restored from Cloud Firestore!");
+    } catch (err) {
+      console.error('Error bringing data back from Firestore:', err);
+      setSyncStatus('error');
+      alert('Could not sync with Firestore database. Please verify internet connectivity.');
+    }
+  };
+
   // 1. Initial Load & Real-Time Sync from Firestore Database
   useEffect(() => {
     const unsubs: (() => void)[] = [];
@@ -350,19 +512,18 @@ export default function App() {
       unsubs.push(unsub);
     };
 
-    syncCollection('inventory', setInventory, 'swedsfree_inventory', []);
-    syncCollection('customers', setCustomers, 'swedsfree_customers', []);
-    syncCollection('employees', setEmployees, 'swedsfree_employees', [LIVE_ADMIN_EMPLOYEE]);
-    syncCollection('jobs', setJobs, 'swedsfree_jobs', []);
-    syncCollection('inventoryTransactions', setInventoryTransactions, 'swedsfree_inv_transactions', []);
-    syncCollection('financialTransactions', setFinancialTransactions, 'swedsfree_fin_transactions', []);
-    syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs', []);
-    syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests', []);
-    syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters', []);
+    syncCollection('inventory', setInventory, 'swedsfree_inventory', INITIAL_INVENTORY);
+    syncCollection('customers', setCustomers, 'swedsfree_customers', INITIAL_CUSTOMERS);
+    syncCollection('employees', setEmployees, 'swedsfree_employees', INITIAL_EMPLOYEES);
+    syncCollection('jobs', setJobs, 'swedsfree_jobs', INITIAL_JOBS);
+    syncCollection('inventoryTransactions', setInventoryTransactions, 'swedsfree_inv_transactions', INITIAL_INVENTORY_TRANSACTIONS);
+    syncCollection('financialTransactions', setFinancialTransactions, 'swedsfree_fin_transactions', INITIAL_FINANCIALS);
+    syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs', INITIAL_DAILY_WORK_LOGS);
+    syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests', INITIAL_REGISTRATION_REQUESTS);
+    syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters', INITIAL_WARNING_LETTERS);
 
-    // Perform immediate data clear if go-live request was issued or initial purge not done
+    // Mark initialization complete without clearing data automatically
     if (localStorage.getItem('swedsfree_initial_purge_done') !== 'true') {
-      handleClearAllSystemDataForGoLive(true);
       localStorage.setItem('swedsfree_initial_purge_done', 'true');
     }
 
@@ -934,6 +1095,7 @@ export default function App() {
       { id: 'finance', label: 'Financial Ledger', icon: DollarSign },
       { id: 'reports', label: 'Audit Reports', icon: FileBarChart },
     ] : []),
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   if (!currentUser) {
@@ -1067,31 +1229,20 @@ export default function App() {
                     {isOnline ? 'Online' : 'Offline'}
                   </span>
                 </div>
-                <p className="leading-relaxed">All woodwork logs are secured in sandboxed LocalStorage cache.</p>
+                <p className="leading-relaxed">All woodwork logs are secured in sandboxed cache. Backup & Restore are available in Settings.</p>
                 
-                {/* Backup & Restore Action Buttons */}
-                <div className="pt-1 flex flex-col gap-1.5">
+                {/* Link to Settings area for backup & restore */}
+                <div className="pt-1">
                   <button
-                    onClick={handleExportBackup}
-                    className="w-full py-1.5 px-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs"
+                    onClick={() => {
+                      setActiveTab('settings');
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full py-1.5 px-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-500/30 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs"
                   >
-                    <Download className="w-3 h-3 text-amber-600" />
-                    <span>Backup Data (.JSON)</span>
+                    <Settings className="w-3 h-3 text-amber-600" />
+                    <span>Backup & Settings</span>
                   </button>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-1.5 px-2 bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  >
-                    <Upload className="w-3 h-3 text-sky-400" />
-                    <span>Restore Data (.JSON)</span>
-                  </button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleImportBackup}
-                    accept=".json"
-                    className="hidden"
-                  />
                 </div>
               </div>
 
@@ -1178,20 +1329,12 @@ export default function App() {
               </button>
             )}
             <button
-              onClick={handleExportBackup}
-              className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
-              title="Download local records as JSON data backup file"
+              onClick={() => setActiveTab('settings')}
+              className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="Manage system settings and data backup/restore"
             >
-              <Download className="w-3.5 h-3.5 text-amber-400" />
-              <span>Backup Data</span>
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
-              title="Upload JSON backup file to restore data"
-            >
-              <Upload className="w-3.5 h-3.5 text-sky-400" />
-              <span>Restore Data</span>
+              <Settings className="w-3.5 h-3.5 text-amber-400" />
+              <span>Settings & Backup</span>
             </button>
           </div>
         </div>
@@ -1331,6 +1474,35 @@ export default function App() {
                 inventoryTransactions={inventoryTransactions}
                 financialTransactions={financialTransactions}
                 currentUser={currentUser}
+              />
+            )}
+
+            {activeTab === 'settings' && (
+              <SettingsManager
+                currentUser={currentUser}
+                isOnline={isOnline}
+                lastSyncTime={lastSyncTime}
+                syncStatus={syncStatus}
+                onPerformSync={performAutoOnlineSync}
+                onExportBackup={handleExportBackup}
+                onImportBackup={handleImportBackup}
+                onRestoreAllDataTillToday={handleRestoreAllDataTillToday}
+                fileInputRef={fileInputRef}
+                onClearData={handleClearAllSystemDataForGoLive}
+                recordCounts={{
+                  inventory: inventory.length,
+                  customers: customers.length,
+                  employees: employees.length,
+                  jobs: jobs.length,
+                  financials: financialTransactions.length,
+                  dailyLogs: dailyWorkLogs.length,
+                  savedInvoices: (() => {
+                    try {
+                      const raw = localStorage.getItem('swedswood_saved_invoices');
+                      return raw ? JSON.parse(raw).length : 0;
+                    } catch { return 0; }
+                  })()
+                }}
               />
             )}
           </motion.div>
