@@ -13,7 +13,8 @@ import {
   Check,
   Sparkles,
   ChevronRight,
-  Filter
+  Filter,
+  Trash2
 } from 'lucide-react';
 import { Employee, Job, DailyWorkLog } from '../types';
 
@@ -22,6 +23,7 @@ interface DailyWorkManagerProps {
   jobs: Job[];
   workLogs: DailyWorkLog[];
   onAddWorkLog: (log: Omit<DailyWorkLog, 'id'>) => void;
+  onDeleteWorkLog?: (id: string) => void;
   currentUser?: Employee | null;
 }
 
@@ -57,6 +59,7 @@ export default function DailyWorkManager({
   jobs, 
   workLogs, 
   onAddWorkLog,
+  onDeleteWorkLog,
   currentUser
 }: DailyWorkManagerProps) {
   
@@ -277,7 +280,20 @@ export default function DailyWorkManager({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent"></div>
                   
-                  {/* Badge */}
+                  {/* Delete Button & Time Badge */}
+                  {!isAuditor && onDeleteWorkLog && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete daily work log entry from ${log.employeeName} (${log.date})?`)) {
+                          onDeleteWorkLog(log.id);
+                        }
+                      }}
+                      className="absolute top-4 left-4 bg-red-950/80 hover:bg-red-900 border border-red-500/30 text-red-300 hover:text-white p-2 rounded-full transition cursor-pointer shadow-lg z-10"
+                      title="Delete Work Log"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <span className="absolute top-4 right-4 bg-slate-950/80 backdrop-blur-md border border-white/10 text-amber-400 text-[10px] uppercase font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow">
                     <Clock className="w-3 h-3 text-amber-500" />
                     <span>{log.timeStarted} - {log.timeEnd}</span>

@@ -36,8 +36,10 @@ interface EmployeeManagerProps {
   registrationRequests?: RegistrationRequest[];
   onApproveRequest?: (requestId: string) => void;
   onRejectRequest?: (requestId: string) => void;
+  onDeleteRegistrationRequest?: (id: string) => void;
   warningLetters?: WarningLetter[];
   onAddWarningLetter?: (warning: Omit<WarningLetter, 'id'>) => void;
+  onDeleteWarningLetter?: (id: string) => void;
 }
 
 export default function EmployeeManager({
@@ -53,8 +55,10 @@ export default function EmployeeManager({
   registrationRequests = [],
   onApproveRequest,
   onRejectRequest,
+  onDeleteRegistrationRequest,
   warningLetters = [],
-  onAddWarningLetter
+  onAddWarningLetter,
+  onDeleteWarningLetter
 }: EmployeeManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [searchTerm, setSearchTerm] = useState('');
@@ -287,29 +291,48 @@ export default function EmployeeManager({
                     const activeJobsCount = jobs.filter(j => j.assignedEmployees.includes(e.id) && j.status !== 'Completed' && j.status !== 'Delivered').length;
                     
                     return (
-                      <button
+                      <div
                         key={e.id}
                         onClick={() => {
                           setSelectedEmployee(e);
                           setSelectedRequestId('');
                         }}
-                        className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex items-start justify-between gap-3 ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
+                        className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex items-start justify-between gap-3 cursor-pointer ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
                       >
-                        <div className="flex gap-3 min-w-0">
-                          <div className="p-2.5 bg-wood-100 text-wood-700 rounded-xl font-display font-bold text-xs whitespace-nowrap">
+                        <div className="flex gap-3 min-w-0 flex-1">
+                          <div className="p-2.5 bg-wood-100 text-wood-700 rounded-xl font-display font-bold text-xs whitespace-nowrap shrink-0">
                             {e.role.substring(0, 4).toUpperCase()}
                           </div>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <h4 className="text-sm font-bold text-gray-800 truncate">{e.name}</h4>
                             <p className="text-[11px] text-gray-400 font-bold">{e.role}</p>
                           </div>
                         </div>
 
-                        <div className="text-right whitespace-nowrap">
-                          <span className={`inline-block w-2.5 h-2.5 rounded-full ${e.status === 'Active' ? 'bg-emerald-500' : e.status === 'On Leave' ? 'bg-amber-500' : 'bg-gray-300'}`} />
-                          <p className="text-[10px] text-gray-400 mt-1 font-semibold">{activeJobsCount} active jobs</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right whitespace-nowrap">
+                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${e.status === 'Active' ? 'bg-emerald-500' : e.status === 'On Leave' ? 'bg-amber-500' : 'bg-gray-300'}`} />
+                            <p className="text-[10px] text-gray-400 mt-1 font-semibold">{activeJobsCount} active jobs</p>
+                          </div>
+                          {!isAuditor && onDeleteEmployee && (
+                            <button
+                              onClick={(evt) => {
+                                evt.stopPropagation();
+                                if (window.confirm(`Are you sure you want to delete worker "${e.name}"?`)) {
+                                  onDeleteEmployee(e.id);
+                                  if (selectedEmployee?.id === e.id) {
+                                    setSelectedEmployee(employees.find(item => item.id !== e.id) || null);
+                                  }
+                                }
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                              title="Delete Worker"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
-                      </button>
+                      </div>
                     );
                   })
                 )}
@@ -326,33 +349,52 @@ export default function EmployeeManager({
                   const isActive = selectedRequestId === req.id;
                   
                   return (
-                    <button
+                    <div
                       key={req.id}
                       onClick={() => {
                         setSelectedRequestId(req.id);
                         setSelectedEmployee(null);
                       }}
-                      className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex items-start justify-between gap-3 ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
+                      className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex items-start justify-between gap-3 cursor-pointer ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
                     >
-                      <div className="flex gap-3 min-w-0">
-                        <div className="p-2.5 bg-amber-50 text-amber-700 rounded-xl font-display font-bold text-xs whitespace-nowrap">
+                      <div className="flex gap-3 min-w-0 flex-1">
+                        <div className="p-2.5 bg-amber-50 text-amber-700 rounded-xl font-display font-bold text-xs whitespace-nowrap shrink-0">
                           REQ
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <h4 className="text-sm font-bold text-gray-800 truncate">{req.name}</h4>
                           <p className="text-[11px] text-gray-400 font-bold">{req.role}</p>
                         </div>
                       </div>
 
-                      <div className="text-right whitespace-nowrap">
-                        <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-                          req.status === 'Pending' ? 'bg-amber-100 text-amber-800' :
-                          req.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
-                          'bg-red-100 text-red-800'
-                        }`} />
-                        <p className="text-[10px] text-gray-400 mt-1 font-semibold">{req.status}</p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right whitespace-nowrap">
+                          <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                            req.status === 'Pending' ? 'bg-amber-100 text-amber-800' :
+                            req.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                            'bg-red-100 text-red-800'
+                          }`} />
+                          <p className="text-[10px] text-gray-400 mt-1 font-semibold">{req.status}</p>
+                        </div>
+                        {!isAuditor && onDeleteRegistrationRequest && (
+                          <button
+                            onClick={(evt) => {
+                              evt.stopPropagation();
+                              if (window.confirm(`Delete registration request for "${req.name}"?`)) {
+                                onDeleteRegistrationRequest(req.id);
+                                if (selectedRequestId === req.id) {
+                                  setSelectedRequestId('');
+                                }
+                              }
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Delete Request"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
-                    </button>
+                    </div>
                   );
                 })
               )}
@@ -390,7 +432,7 @@ export default function EmployeeManager({
                         Edit Details
                       </button>
                     )}
-                    {currentUser?.role === 'Admin' && onDeleteEmployee && (
+                    {!isAuditor && onDeleteEmployee && (
                       confirmDeleteId === selectedEmployee.id ? (
                         <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 p-1.5 rounded-xl">
                           <span className="text-[10px] font-bold text-red-700 uppercase px-1">Confirm?</span>
@@ -554,7 +596,22 @@ export default function EmployeeManager({
                         <p className="text-gray-700 leading-relaxed font-medium mb-2">{warn.reason}</p>
                         <div className="flex flex-wrap items-center justify-between text-[10px] text-gray-400 font-semibold border-t border-red-100/30 pt-1.5 mt-1.5 font-mono">
                           <span>Issued by: <strong className="text-gray-600">{warn.issuedBy}</strong></span>
-                          <span>{warn.date}</span>
+                          <div className="flex items-center gap-2">
+                            <span>{warn.date}</span>
+                            {!isAuditor && onDeleteWarningLetter && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Delete this warning letter issued on ${warn.date}?`)) {
+                                    onDeleteWarningLetter(warn.id);
+                                  }
+                                }}
+                                className="p-1 text-gray-400 hover:text-red-600 rounded transition"
+                                title="Delete Warning Letter"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}

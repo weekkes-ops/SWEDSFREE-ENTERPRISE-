@@ -31,6 +31,8 @@ interface JobManagerProps {
   onCreateJob: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   onUpdateJob?: (updatedJob: Job) => void;
   onDeleteJob?: (jobId: string) => void;
+  onDeleteJobMaterial?: (jobId: string, itemId: string) => void;
+  onDeleteJobPayment?: (jobId: string, paymentId: string) => void;
   onUpdateJobStatus: (id: string, status: JobStatus) => void;
   onLogJobMaterial: (jobId: string, material: JobMaterial) => void;
   onRecordJobPayment: (jobId: string, payment: Omit<JobPayment, 'id'>) => void;
@@ -49,6 +51,8 @@ export default function JobManager({
   onCreateJob,
   onUpdateJob,
   onDeleteJob,
+  onDeleteJobMaterial,
+  onDeleteJobPayment,
   onUpdateJobStatus,
   onLogJobMaterial,
   onRecordJobPayment,
@@ -429,16 +433,35 @@ export default function JobManager({
                 const completePercent = Math.round((paid / job.quoteAmount) * 100);
 
                 return (
-                  <button
+                  <div
                     key={job.id}
                     onClick={() => setSelectedJob(job)}
-                    className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex flex-col gap-2 ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
+                    className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex flex-col gap-2 cursor-pointer ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-1 w-full">
                       <h4 className="text-sm font-bold text-gray-800 line-clamp-2 pr-2">{job.title}</h4>
-                      <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded border whitespace-nowrap uppercase ${job.status === 'Completed' || job.status === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                        {job.status}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded border whitespace-nowrap uppercase ${job.status === 'Completed' || job.status === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                          {job.status}
+                        </span>
+                        {!isAuditor && onDeleteJob && (
+                          <button
+                            onClick={(evt) => {
+                              evt.stopPropagation();
+                              if (window.confirm(`Delete job "${job.title}"?`)) {
+                                onDeleteJob(job.id);
+                                if (selectedJob?.id === job.id) {
+                                  setSelectedJob(null);
+                                }
+                              }
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Delete Job"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex justify-between items-center text-[11px] font-bold text-gray-400">
@@ -452,7 +475,7 @@ export default function JobManager({
                       <span>Val: {formatCurrency(job.quoteAmount, 0)}</span>
                       <span>Paid: {completePercent}%</span>
                     </div>
-                  </button>
+                  </div>
                 );
               })
             )}
@@ -496,7 +519,7 @@ export default function JobManager({
                           <span>Issue / View Receipt</span>
                         </button>
                       )}
-                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager') && onDeleteJob && (
+                      {!isAuditor && onDeleteJob && (
                         <button
                           onClick={() => {
                             if (window.confirm(`Are you sure you want to delete job "${activeSelectedJob.title}"? This action cannot be undone.`)) {
@@ -747,12 +770,13 @@ export default function JobManager({
                         <th className="py-2.5 px-3 text-right">Quantity Consumed</th>
                         <th className="py-2.5 px-3 text-right">Unit cost</th>
                         <th className="py-2.5 px-3 text-right">Total Material Cost</th>
+                        {!isAuditor && onDeleteJobMaterial && <th className="py-2.5 px-3 text-center">Action</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50 text-gray-600">
                       {activeSelectedJob.materialsUsed.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="text-center py-6 text-gray-400 font-medium">
+                          <td colSpan={5} className="text-center py-6 text-gray-400 font-medium">
                             No wood, hardware, or polish sheets logged to this commission yet.
                           </td>
                         </tr>
@@ -765,6 +789,21 @@ export default function JobManager({
                             <td className="py-2 px-3 text-right font-mono font-bold text-gray-800">
                               {formatCurrency(mat.totalCost)}
                             </td>
+                            {!isAuditor && onDeleteJobMaterial && (
+                              <td className="py-2 px-3 text-center">
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Delete material log for "${mat.name}"?`)) {
+                                      onDeleteJobMaterial(activeSelectedJob.id, mat.itemId);
+                                    }
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                                  title="Delete Material Log"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))
                       )}
@@ -776,6 +815,7 @@ export default function JobManager({
                           <td className="py-2.5 px-3 text-right font-mono text-sm">
                             {formatCurrency(activeSelectedJob.materialsUsed.reduce((sum, m) => sum + m.totalCost, 0))}
                           </td>
+                          {!isAuditor && onDeleteJobMaterial && <td></td>}
                         </tr>
                       </tfoot>
                     )}
@@ -804,7 +844,7 @@ export default function JobManager({
                           <span className="font-bold text-gray-800">{p.method} Clear</span>
                           {p.note && <span className="block text-[10px] text-gray-400 font-medium">{p.note}</span>}
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <span className="font-mono font-bold text-emerald-800">+{formatCurrency(p.amount)}</span>
                           {onTriggerReceipt && (
                             <button
@@ -813,6 +853,19 @@ export default function JobManager({
                             >
                               <Receipt className="w-3 h-3 text-emerald-700" />
                               <span>Receipt</span>
+                            </button>
+                          )}
+                          {!isAuditor && onDeleteJobPayment && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete payment record of ${formatCurrency(p.amount)}?`)) {
+                                  onDeleteJobPayment(activeSelectedJob.id, p.id);
+                                }
+                              }}
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition ml-1"
+                              title="Delete Payment Record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>

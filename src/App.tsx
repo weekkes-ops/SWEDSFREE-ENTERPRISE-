@@ -958,6 +958,54 @@ export default function App() {
     deleteDocument('inventory', id);
   };
 
+  const handleDeleteInventoryTransaction = (id: string) => {
+    setInventoryTransactions(prev => prev.filter(tx => tx.id !== id));
+    deleteDocument('inventoryTransactions', id);
+  };
+
+  const handleDeleteDailyWorkLog = (id: string) => {
+    setDailyWorkLogs(prev => prev.filter(log => log.id !== id));
+    deleteDocument('dailyWorkLogs', id);
+  };
+
+  const handleDeleteWarningLetter = (id: string) => {
+    setWarningLetters(prev => prev.filter(warn => warn.id !== id));
+    deleteDocument('warningLetters', id);
+  };
+
+  const handleDeleteRegistrationRequest = (id: string) => {
+    setRegistrationRequests(prev => prev.filter(req => req.id !== id));
+    deleteDocument('registrationRequests', id);
+  };
+
+  const handleDeleteJobMaterial = (jobId: string, itemId: string) => {
+    setJobs(prev => prev.map(job => {
+      if (job.id === jobId) {
+        const updated = {
+          ...job,
+          materialsUsed: job.materialsUsed.filter(mat => mat.itemId !== itemId)
+        };
+        saveDocument('jobs', updated);
+        return updated;
+      }
+      return job;
+    }));
+  };
+
+  const handleDeleteJobPayment = (jobId: string, paymentId: string) => {
+    setJobs(prev => prev.map(job => {
+      if (job.id === jobId) {
+        const updated = {
+          ...job,
+          payments: job.payments.filter(pay => pay.id !== paymentId)
+        };
+        saveDocument('jobs', updated);
+        return updated;
+      }
+      return job;
+    }));
+  };
+
   const handleUpdateCustomer = (updatedCustomer: Customer) => {
     setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
     saveDocument('customers', updatedCustomer);
@@ -1373,6 +1421,7 @@ export default function App() {
                 onLogTransaction={handleLogTransaction}
                 onUpdateInventoryItem={handleUpdateInventoryItem}
                 onDeleteInventoryItem={handleDeleteInventoryItem}
+                onDeleteTransaction={handleDeleteInventoryTransaction}
                 currentUser={currentUser}
               />
             )}
@@ -1407,8 +1456,10 @@ export default function App() {
                 registrationRequests={registrationRequests}
                 onApproveRequest={handleApproveRequest}
                 onRejectRequest={handleRejectRequest}
+                onDeleteRegistrationRequest={handleDeleteRegistrationRequest}
                 warningLetters={warningLetters}
                 onAddWarningLetter={handleAddWarningLetter}
+                onDeleteWarningLetter={handleDeleteWarningLetter}
               />
             )}
 
@@ -1421,6 +1472,8 @@ export default function App() {
                 onCreateJob={handleCreateJob}
                 onUpdateJob={handleUpdateJob}
                 onDeleteJob={handleDeleteJob}
+                onDeleteJobMaterial={handleDeleteJobMaterial}
+                onDeleteJobPayment={handleDeleteJobPayment}
                 onUpdateJobStatus={handleUpdateJobStatus}
                 onLogJobMaterial={handleLogJobMaterial}
                 onRecordJobPayment={handleRecordJobPayment}
@@ -1450,6 +1503,7 @@ export default function App() {
                 jobs={jobs}
                 workLogs={dailyWorkLogs}
                 onAddWorkLog={handleAddDailyWorkLog}
+                onDeleteWorkLog={handleDeleteDailyWorkLog}
                 currentUser={currentUser}
               />
             )}

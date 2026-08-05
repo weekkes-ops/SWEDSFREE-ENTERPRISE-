@@ -21,6 +21,7 @@ interface InventoryManagerProps {
   onLogTransaction: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
   onUpdateInventoryItem?: (item: InventoryItem) => void;
   onDeleteInventoryItem?: (id: string) => void;
+  onDeleteTransaction?: (id: string) => void;
   currentUser?: Employee | null;
 }
 
@@ -31,6 +32,7 @@ export default function InventoryManager({
   onLogTransaction,
   onUpdateInventoryItem,
   onDeleteInventoryItem,
+  onDeleteTransaction,
   currentUser
 }: InventoryManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
@@ -417,7 +419,7 @@ export default function InventoryManager({
                                       >
                                         <ArrowUpRight className="w-3.5 h-3.5" />
                                       </button>
-                                      {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager') && onDeleteInventoryItem && (
+                                      {!isAuditor && onDeleteInventoryItem && (
                                         <button 
                                           onClick={() => setConfirmDeleteId(item.id)}
                                           className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition"
@@ -547,7 +549,7 @@ export default function InventoryManager({
                                 >
                                   <ArrowUpRight className="w-3.5 h-3.5" />
                                 </button>
-                                {(currentUser?.role === 'Admin' || currentUser?.role === 'Manager') && onDeleteInventoryItem && (
+                                {!isAuditor && onDeleteInventoryItem && (
                                   <button 
                                     onClick={() => setConfirmDeleteId(item.id)}
                                     className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition"
@@ -593,12 +595,13 @@ export default function InventoryManager({
                   <th className="py-3.5 px-4 text-right">Unit Rate</th>
                   <th className="py-3.5 px-4 text-right">Total Outflow/Inflow</th>
                   <th className="py-3.5 px-4">Purpose & reference</th>
+                  {!isAuditor && onDeleteTransaction && <th className="py-3.5 px-4 text-center">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-sm">
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12 text-gray-400">
+                    <td colSpan={8} className="text-center py-12 text-gray-400">
                       No transactions logged yet.
                     </td>
                   </tr>
@@ -635,6 +638,21 @@ export default function InventoryManager({
                             </span>
                           )}
                         </td>
+                        {!isAuditor && onDeleteTransaction && (
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete inventory transaction record for "${tx.itemName}"?`)) {
+                                  onDeleteTransaction(tx.id);
+                                }
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                              title="Delete Transaction Record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })

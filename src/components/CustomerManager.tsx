@@ -319,29 +319,48 @@ export default function CustomerManager({
                 const isActive = selectedCustomer?.id === c.id;
                 const cJobs = jobs.filter(j => j.customerId === c.id);
                 return (
-                  <button
+                  <div
                     key={c.id}
                     onClick={() => setSelectedCustomer(c)}
-                    className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex items-start gap-3 cursor-pointer ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
+                    className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex items-start justify-between gap-3 cursor-pointer ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
                   >
-                    <div className="p-2.5 bg-wood-100 text-wood-700 rounded-xl shrink-0">
-                      <User className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-bold text-gray-800 truncate">{c.name}</h4>
-                      {c.company && (
-                        <p className="text-[11px] text-gray-400 font-semibold flex items-center gap-1 truncate mt-0.5">
-                          <Building2 className="w-3 h-3" />
-                          {c.company}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 mt-2 text-[10px] text-gray-400 font-medium">
-                        <span>{cJobs.length} commission(s)</span>
-                        <span>&bull;</span>
-                        <span className="font-mono">Reg: {c.registrationDate}</span>
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="p-2.5 bg-wood-100 text-wood-700 rounded-xl shrink-0">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-bold text-gray-800 truncate">{c.name}</h4>
+                        {c.company && (
+                          <p className="text-[11px] text-gray-400 font-semibold flex items-center gap-1 truncate mt-0.5">
+                            <Building2 className="w-3 h-3" />
+                            {c.company}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2 text-[10px] text-gray-400 font-medium">
+                          <span>{cJobs.length} commission(s)</span>
+                          <span>&bull;</span>
+                          <span className="font-mono">Reg: {c.registrationDate}</span>
+                        </div>
                       </div>
                     </div>
-                  </button>
+                    {!isAuditor && onDeleteCustomer && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Are you sure you want to delete client "${c.name}"?`)) {
+                            onDeleteCustomer(c.id);
+                            if (selectedCustomer?.id === c.id) {
+                              setSelectedCustomer(customers.find(item => item.id !== c.id) || null);
+                            }
+                          }
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition shrink-0"
+                        title="Delete Client"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 );
               })
             )}
@@ -380,7 +399,7 @@ export default function CustomerManager({
                         Edit Profile
                       </button>
                     )}
-                    {currentUser?.role === 'Admin' && onDeleteCustomer && (
+                    {!isAuditor && onDeleteCustomer && (
                       confirmDeleteId === selectedCustomer.id ? (
                         <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 p-1.5 rounded-xl">
                           <span className="text-[10px] font-bold text-red-700 uppercase px-1">Confirm?</span>

@@ -1211,7 +1211,13 @@ export default function InvoiceReceiptManager({
   };
 
   const handleDeleteSavedInvoice = (id: string) => {
-    setSavedInvoices(prev => prev.filter(inv => inv.id !== id));
+    setSavedInvoices(prev => {
+      const filtered = prev.filter(inv => inv.id !== id);
+      try {
+        localStorage.setItem('swedswood_saved_invoices', JSON.stringify(filtered));
+      } catch (e) {}
+      return filtered;
+    });
     deleteDocument('savedInvoices', id);
     if (editingSavedInvoiceId === id) {
       setEditingSavedInvoiceId(null);
