@@ -484,6 +484,7 @@ export default function App() {
               saveBatchDocuments(collectionName, initialFallback);
               setter(initialFallback);
               localStorage.setItem(localKey, JSON.stringify(initialFallback));
+              localStorage.setItem('swedsfree_seed_disabled', 'true');
               return;
             }
           }
@@ -496,13 +497,15 @@ export default function App() {
               const combined = [...(items || []), ...missingItems];
               setter(combined);
               localStorage.setItem(localKey, JSON.stringify(combined));
+              localStorage.setItem('swedsfree_seed_disabled', 'true');
               return;
             }
           }
+          localStorage.setItem('swedsfree_seed_disabled', 'true');
         }
 
         let finalItems = items || [];
-        if (seedDisabled && collectionName === 'employees' && finalItems.length === 0) {
+        if (collectionName === 'employees' && finalItems.length === 0) {
           finalItems = [LIVE_ADMIN_EMPLOYEE] as unknown as T[];
         }
 
@@ -750,7 +753,12 @@ export default function App() {
   };
 
   const handleDeleteJob = (jobId: string) => {
-    setJobs(prev => prev.filter(job => job.id !== jobId));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setJobs(prev => {
+      const filtered = prev.filter(job => job.id !== jobId);
+      localStorage.setItem('swedsfree_jobs', JSON.stringify(filtered));
+      return filtered;
+    });
     deleteDocument('jobs', jobId);
   };
 
@@ -954,7 +962,12 @@ export default function App() {
   };
 
   const handleDeleteInventoryItem = (id: string) => {
-    setInventory(prev => prev.filter(item => item.id !== id));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setInventory(prev => {
+      const filtered = prev.filter(item => item.id !== id);
+      localStorage.setItem('swedsfree_inventory', JSON.stringify(filtered));
+      return filtered;
+    });
     deleteDocument('inventory', id);
   };
 
@@ -1030,12 +1043,22 @@ export default function App() {
   };
 
   const handleDeleteCustomer = (id: string) => {
-    setCustomers(prev => prev.filter(c => c.id !== id));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setCustomers(prev => {
+      const filtered = prev.filter(c => c.id !== id);
+      localStorage.setItem('swedsfree_customers', JSON.stringify(filtered));
+      return filtered;
+    });
     deleteDocument('customers', id);
   };
 
   const handleDeleteEmployee = (id: string) => {
-    setEmployees(prev => prev.filter(emp => emp.id !== id));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setEmployees(prev => {
+      const filtered = prev.filter(emp => emp.id !== id);
+      localStorage.setItem('swedsfree_employees', JSON.stringify(filtered));
+      return filtered;
+    });
     deleteDocument('employees', id);
   };
 
