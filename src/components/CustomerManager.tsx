@@ -21,7 +21,13 @@ import {
   Clock,
   ArrowUpRight,
   Percent,
-  Download
+  Download,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Edit2,
+  X,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -32,6 +38,8 @@ interface CustomerManagerProps {
   onUpdateCustomer?: (customer: Customer) => void;
   onDeleteCustomer?: (id: string) => void;
   onRecordPayment?: (jobId: string, payment: Omit<JobPayment, 'id'>) => void;
+  onUpdateJobPayment?: (jobId: string, payment: JobPayment) => void;
+  onDeleteJobPayment?: (jobId: string, paymentId: string) => void;
   onAddJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   onUpdateJob?: (job: Job) => void;
   showRegisterModalOnLoad?: boolean;
@@ -46,6 +54,8 @@ export default function CustomerManager({
   onUpdateCustomer,
   onDeleteCustomer,
   onRecordPayment,
+  onUpdateJobPayment,
+  onDeleteJobPayment,
   onAddJob,
   onUpdateJob,
   showRegisterModalOnLoad = false,
@@ -234,10 +244,107 @@ export default function CustomerManager({
     setInstallmentNote('');
   };
 
+  // Edit payment states
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [editingPaymentItem, setEditingPaymentItem] = useState<{ payment: JobPayment; job: Job } | null>(null);
+  const [editPaymentAmount, setEditPaymentAmount] = useState<number>(0);
+  const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Cheque' | 'Mobile Money'>('Cash');
+  const [editPaymentDate, setEditPaymentDate] = useState<string>('');
+  const [editPaymentNote, setEditPaymentNote] = useState<string>('');
+
+  const handleOpenEditPaymentModal = (item: { payment: JobPayment; job: Job }) => {
+    setEditingPaymentItem(item);
+    setEditPaymentAmount(item.payment.amount);
+    setEditPaymentMethod(item.payment.method);
+    setEditPaymentDate(item.payment.date || new Date().toISOString().split('T')[0]);
+    setEditPaymentNote(item.payment.note || '');
+    setShowEditPaymentModal(true);
+  };
+
+  const handleUpdatePaymentSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingPaymentItem) return;
+
+    if (editPaymentAmount <= 0) {
+      alert('Payment amount must be greater than 0');
+      return;
+    }
+
+    const updatedPayment: JobPayment = {
+      ...editingPaymentItem.payment,
+      amount: editPaymentAmount,
+      method: editPaymentMethod,
+      date: editPaymentDate,
+      note: editPaymentNote
+    };
+
+    if (onUpdateJobPayment) {
+      onUpdateJobPayment(editingPaymentItem.job.id, updatedPayment);
+    } else if (onUpdateJob) {
+      const updatedPayments = editingPaymentItem.job.payments.map(p => p.id === editingPaymentItem.payment.id ? updatedPayment : p);
+      onUpdateJob({ ...editingPaymentItem.job, payments: updatedPayments });
+    }
+
+    setShowEditPaymentModal(false);
+    setEditingPaymentItem(null);
+  };
+
+  // Sorting states for Customers Directory and Payment Installments
+  const [customerSortField, setCustomerSortField] = useState<'name' | 'company' | 'status' | 'date'>('name');
+  const [customerSortDirection, setCustomerSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const [installmentSortField, setInstallmentSortField] = useState<'date' | 'jobTitle' | 'note' | 'method' | 'amount'>('date');
+  const [installmentSortDirection, setInstallmentSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleCustomerSort = (field: 'name' | 'company' | 'status' | 'date') => {
+    if (customerSortField === field) {
+      setCustomerSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setCustomerSortField(field);
+      setCustomerSortDirection(field === 'date' ? 'desc' : 'asc');
+    }
+  };
+
+  const handleInstallmentSort = (field: 'date' | 'jobTitle' | 'note' | 'method' | 'amount') => {
+    if (installmentSortField === field) {
+      setInstallmentSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setInstallmentSortField(field);
+      setInstallmentSortDirection(field === 'date' || field === 'amount' ? 'desc' : 'asc');
+    }
+  };
+
   // Filter customers
   const filteredCustomers = customers.filter(c => {
     const searchString = `${c.name} ${c.company || ''} ${c.email} ${c.phone}`.toLowerCase();
     return searchString.includes(searchTerm.toLowerCase());
+  });
+
+  const sortedCustomers = [...filteredCustomers].sort((a, b) => {
+    let valA: any = a.name;
+    let valB: any = b.name;
+
+    if (customerSortField === 'company') {
+      valA = a.company || '';
+      valB = b.company || '';
+    } else if (customerSortField === 'date') {
+      valA = a.registrationDate || '';
+      valB = b.registrationDate || '';
+    } else if (customerSortField === 'status') {
+      const aJobs = jobs.filter(j => j.customerId === a.id).length;
+      const bJobs = jobs.filter(j => j.customerId === b.id).length;
+      valA = aJobs;
+      valB = bJobs;
+    }
+
+    if (typeof valA === 'string') {
+      const comp = (valA || '').localeCompare(valB || '');
+      return customerSortDirection === 'asc' ? comp : -comp;
+    }
+
+    if (valA < valB) return customerSortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return customerSortDirection === 'asc' ? 1 : -1;
+    return 0;
   });
 
   // Get active selected customer's jobs
@@ -259,8 +366,34 @@ export default function CustomerManager({
       allCustomerInstallments.push({ payment, job });
     });
   });
-  // Sort by newest date first
-  allCustomerInstallments.sort((a, b) => new Date(b.payment.date).getTime() - new Date(a.payment.date).getTime());
+
+  const sortedInstallments = [...allCustomerInstallments].sort((a, b) => {
+    let valA: any = a.payment.date;
+    let valB: any = b.payment.date;
+
+    if (installmentSortField === 'jobTitle') {
+      valA = a.job.title;
+      valB = b.job.title;
+    } else if (installmentSortField === 'note') {
+      valA = a.payment.note || '';
+      valB = b.payment.note || '';
+    } else if (installmentSortField === 'method') {
+      valA = a.payment.method;
+      valB = b.payment.method;
+    } else if (installmentSortField === 'amount') {
+      valA = a.payment.amount;
+      valB = b.payment.amount;
+    }
+
+    if (typeof valA === 'string') {
+      const comp = (valA || '').localeCompare(valB || '');
+      return installmentSortDirection === 'asc' ? comp : -comp;
+    }
+
+    if (valA < valB) return installmentSortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return installmentSortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   return (
     <div className="space-y-6">
@@ -309,13 +442,49 @@ export default function CustomerManager({
             </div>
           </div>
 
+          {/* Directory Column Header Sorting Bar */}
+          <div className="px-4 py-2 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between text-[11px] font-bold text-gray-500 uppercase select-none">
+            <button 
+              onClick={() => handleCustomerSort('name')} 
+              className="flex items-center gap-1 hover:text-wood-800 transition cursor-pointer"
+              title="Click to sort by Client Name"
+            >
+              <span>Name</span>
+              {customerSortField === 'name' ? (
+                customerSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+              ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+            </button>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => handleCustomerSort('status')} 
+                className="flex items-center gap-1 hover:text-wood-800 transition cursor-pointer"
+                title="Click to sort by Commissions Status"
+              >
+                <span>Status</span>
+                {customerSortField === 'status' ? (
+                  customerSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+              </button>
+              <button 
+                onClick={() => handleCustomerSort('date')} 
+                className="flex items-center gap-1 hover:text-wood-800 transition cursor-pointer"
+                title="Click to sort by Registration Date"
+              >
+                <span>Reg Date</span>
+                {customerSortField === 'date' ? (
+                  customerSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+              </button>
+            </div>
+          </div>
+
           <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-            {filteredCustomers.length === 0 ? (
+            {sortedCustomers.length === 0 ? (
               <div className="text-center py-12 px-4 text-gray-400 text-sm">
                 No clients found in directory. Click "Register New Customer" to create one.
               </div>
             ) : (
-              filteredCustomers.map(c => {
+              sortedCustomers.map(c => {
                 const isActive = selectedCustomer?.id === c.id;
                 const cJobs = jobs.filter(j => j.customerId === c.id);
                 return (
@@ -565,17 +734,72 @@ export default function CustomerManager({
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="bg-gray-50 text-gray-500 font-bold uppercase text-[10px] border-y border-gray-100">
-                          <th className="py-2.5 px-3">Date</th>
-                          <th className="py-2.5 px-3">Commission / Job</th>
-                          <th className="py-2.5 px-3">Milestone / Note</th>
-                          <th className="py-2.5 px-3">Method</th>
-                          <th className="py-2.5 px-3 text-right">Amount Paid</th>
-                          <th className="py-2.5 px-3 text-center">Receipt</th>
+                        <tr className="bg-gray-50 text-gray-500 font-bold uppercase text-[10px] border-y border-gray-100 select-none">
+                          <th 
+                            onClick={() => handleInstallmentSort('date')}
+                            className="py-2.5 px-3 cursor-pointer hover:bg-gray-100/80 transition"
+                            title="Click to sort by payment date"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span>Date</span>
+                              {installmentSortField === 'date' ? (
+                                installmentSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                              ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                            </div>
+                          </th>
+                          <th 
+                            onClick={() => handleInstallmentSort('jobTitle')}
+                            className="py-2.5 px-3 cursor-pointer hover:bg-gray-100/80 transition"
+                            title="Click to sort by commission job title"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span>Commission / Job</span>
+                              {installmentSortField === 'jobTitle' ? (
+                                installmentSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                              ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                            </div>
+                          </th>
+                          <th 
+                            onClick={() => handleInstallmentSort('note')}
+                            className="py-2.5 px-3 cursor-pointer hover:bg-gray-100/80 transition"
+                            title="Click to sort by milestone note"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span>Milestone / Note</span>
+                              {installmentSortField === 'note' ? (
+                                installmentSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                              ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                            </div>
+                          </th>
+                          <th 
+                            onClick={() => handleInstallmentSort('method')}
+                            className="py-2.5 px-3 cursor-pointer hover:bg-gray-100/80 transition"
+                            title="Click to sort by payment method"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span>Method</span>
+                              {installmentSortField === 'method' ? (
+                                installmentSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                              ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                            </div>
+                          </th>
+                          <th 
+                            onClick={() => handleInstallmentSort('amount')}
+                            className="py-2.5 px-3 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                            title="Click to sort by amount paid"
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span>Amount Paid</span>
+                              {installmentSortField === 'amount' ? (
+                                installmentSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                              ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                            </div>
+                          </th>
+                          <th className="py-2.5 px-3 text-center">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {allCustomerInstallments.map(({ payment, job }) => (
+                        {sortedInstallments.map(({ payment, job }) => (
                           <tr key={payment.id} className="hover:bg-wood-50/30 transition">
                             <td className="py-3 px-3 font-mono font-semibold text-gray-700 whitespace-nowrap">
                               {payment.date}
@@ -595,13 +819,36 @@ export default function CustomerManager({
                               {formatCurrency(payment.amount)}
                             </td>
                             <td className="py-3 px-3 text-center whitespace-nowrap">
-                              <button
-                                onClick={() => setViewReceiptPayment({ payment, job })}
-                                className="px-2.5 py-1 text-[11px] font-bold text-wood-700 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-lg flex items-center gap-1 mx-auto transition cursor-pointer"
-                              >
-                                <Receipt className="w-3 h-3 text-wood-600" />
-                                <span>Receipt</span>
-                              </button>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => setViewReceiptPayment({ payment, job })}
+                                  className="px-2.5 py-1 text-[11px] font-bold text-wood-700 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                                  title="View Receipt"
+                                >
+                                  <Receipt className="w-3 h-3 text-wood-600" />
+                                  <span>Receipt</span>
+                                </button>
+                                <button
+                                  onClick={() => handleOpenEditPaymentModal({ payment, job })}
+                                  className="p-1 text-gray-400 hover:text-wood-700 hover:bg-wood-50 rounded transition cursor-pointer"
+                                  title="Edit Payment Record"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                {onDeleteJobPayment && (
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm(`Delete payment installment of ${formatCurrency(payment.amount)}?`)) {
+                                        onDeleteJobPayment(job.id, payment.id);
+                                      }
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
+                                    title="Delete Payment Record"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1066,6 +1313,102 @@ export default function CustomerManager({
                     className="px-5 py-2 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
                   >
                     Save Changes
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* MODAL: Edit Existing Payment Installment */}
+        {showEditPaymentModal && editingPaymentItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-wood-100 shadow-xl w-full max-w-md overflow-hidden"
+            >
+              <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-lg flex items-center gap-2">
+                    <Check className="w-5 h-5 text-emerald-400" />
+                    <span>Edit Payment Installment</span>
+                  </h3>
+                  <p className="text-xs text-wood-200">Update payment details for {editingPaymentItem.job.title}</p>
+                </div>
+                <button 
+                  onClick={() => setShowEditPaymentModal(false)}
+                  className="text-wood-300 hover:text-white font-bold p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdatePaymentSubmit} className="p-6 space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Payment Amount (Le) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    step="any"
+                    value={editPaymentAmount}
+                    onChange={(e) => setEditPaymentAmount(Number(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-emerald-800 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Cleared Method *</label>
+                  <select
+                    value={editPaymentMethod}
+                    onChange={(e) => setEditPaymentMethod(e.target.value as any)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 bg-white"
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer / wire</option>
+                    <option value="Cheque">Check Clearance</option>
+                    <option value="Mobile Money">Mobile Money (Momo)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Payment Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={editPaymentDate}
+                    onChange={(e) => setEditPaymentDate(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Reference / Note</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Initial deposit / Milestone clear"
+                    value={editPaymentNote}
+                    onChange={(e) => setEditPaymentNote(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm text-gray-700"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowEditPaymentModal(false)}
+                    className="py-2.5 px-4 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-bold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="py-2.5 px-5 rounded-xl bg-wood-800 hover:bg-wood-900 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span>Save Payment Changes</span>
                   </button>
                 </div>
               </form>

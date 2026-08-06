@@ -876,21 +876,36 @@ export default function App() {
 
   // E. Manual financial ledger mutators
   const handleAddFinancialTransaction = (transaction: Omit<FinancialTransaction, 'id'>) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
     const newTx: FinancialTransaction = {
       ...transaction,
       id: `fin-manual-${Date.now()}`
     };
-    setFinancialTransactions(prev => [...prev, newTx]);
+    setFinancialTransactions(prev => {
+      const updated = [...prev, newTx];
+      localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(updated));
+      return updated;
+    });
     saveDocument('financialTransactions', newTx);
   };
 
   const handleUpdateFinancialTransaction = (updatedTx: FinancialTransaction) => {
-    setFinancialTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setFinancialTransactions(prev => {
+      const updated = prev.map(t => t.id === updatedTx.id ? updatedTx : t);
+      localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(updated));
+      return updated;
+    });
     saveDocument('financialTransactions', updatedTx);
   };
 
   const handleDeleteFinancialTransaction = (id: string) => {
-    setFinancialTransactions(prev => prev.filter(t => t.id !== id));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setFinancialTransactions(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(updated));
+      return updated;
+    });
     deleteDocument('financialTransactions', id);
   };
 
@@ -1005,18 +1020,43 @@ export default function App() {
     }));
   };
 
+  const handleUpdateJobPayment = (jobId: string, updatedPayment: JobPayment) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setJobs(prev => {
+      const updatedJobs = prev.map(job => {
+        if (job.id === jobId) {
+          const updatedPayments = job.payments.map(pay => pay.id === updatedPayment.id ? updatedPayment : pay);
+          const updated = {
+            ...job,
+            payments: updatedPayments
+          };
+          saveDocument('jobs', updated);
+          return updated;
+        }
+        return job;
+      });
+      localStorage.setItem('swedsfree_jobs', JSON.stringify(updatedJobs));
+      return updatedJobs;
+    });
+  };
+
   const handleDeleteJobPayment = (jobId: string, paymentId: string) => {
-    setJobs(prev => prev.map(job => {
-      if (job.id === jobId) {
-        const updated = {
-          ...job,
-          payments: job.payments.filter(pay => pay.id !== paymentId)
-        };
-        saveDocument('jobs', updated);
-        return updated;
-      }
-      return job;
-    }));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setJobs(prev => {
+      const updatedJobs = prev.map(job => {
+        if (job.id === jobId) {
+          const updated = {
+            ...job,
+            payments: job.payments.filter(pay => pay.id !== paymentId)
+          };
+          saveDocument('jobs', updated);
+          return updated;
+        }
+        return job;
+      });
+      localStorage.setItem('swedsfree_jobs', JSON.stringify(updatedJobs));
+      return updatedJobs;
+    });
   };
 
   const handleUpdateCustomer = (updatedCustomer: Customer) => {
@@ -1457,6 +1497,8 @@ export default function App() {
                 onUpdateCustomer={handleUpdateCustomer}
                 onDeleteCustomer={handleDeleteCustomer}
                 onRecordPayment={handleRecordJobPayment}
+                onUpdateJobPayment={handleUpdateJobPayment}
+                onDeleteJobPayment={handleDeleteJobPayment}
                 onAddJob={handleCreateJob}
                 onUpdateJob={handleUpdateJob}
                 showRegisterModalOnLoad={quickActionTrigger === 'register-customer'}
@@ -1496,6 +1538,7 @@ export default function App() {
                 onUpdateJob={handleUpdateJob}
                 onDeleteJob={handleDeleteJob}
                 onDeleteJobMaterial={handleDeleteJobMaterial}
+                onUpdateJobPayment={handleUpdateJobPayment}
                 onDeleteJobPayment={handleDeleteJobPayment}
                 onUpdateJobStatus={handleUpdateJobStatus}
                 onLogJobMaterial={handleLogJobMaterial}
@@ -1517,6 +1560,8 @@ export default function App() {
                 initialSubTab={invoiceInitialSubTab}
                 onClearInvoiceJobId={() => setInvoiceJobId(null)}
                 onUpdateJob={handleUpdateJob}
+                onUpdateJobPayment={handleUpdateJobPayment}
+                onDeleteJobPayment={handleDeleteJobPayment}
               />
             )}
 

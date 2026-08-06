@@ -10,7 +10,10 @@ import {
   History, 
   Flame, 
   Trash2,
-  ShieldAlert
+  ShieldAlert,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -168,12 +171,80 @@ export default function InventoryManager({
     setShowLogModal(false);
   };
 
-  // Filter logic
+  // Sorting states
+  type StockSortField = 'name' | 'category' | 'currentStock' | 'unitCost' | 'minStockThreshold' | 'status' | 'date';
+  const [stockSortField, setStockSortField] = useState<StockSortField>('name');
+  const [stockSortDirection, setStockSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  type TxSortField = 'date' | 'itemName' | 'type' | 'quantity' | 'unitCost' | 'totalValue';
+  const [txSortField, setTxSortField] = useState<TxSortField>('date');
+  const [txSortDirection, setTxSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const handleStockSort = (field: StockSortField) => {
+    if (stockSortField === field) {
+      setStockSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setStockSortField(field);
+      setStockSortDirection(field === 'date' || field === 'currentStock' || field === 'unitCost' ? 'desc' : 'asc');
+    }
+  };
+
+  const handleTxSort = (field: TxSortField) => {
+    if (txSortField === field) {
+      setTxSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setTxSortField(field);
+      setTxSortDirection(field === 'date' || field === 'quantity' || field === 'totalValue' ? 'desc' : 'asc');
+    }
+  };
+
+  // Filter & Sort logic
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || item.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
     const matchesLowStock = !showLowStockOnly || item.currentStock <= item.minStockThreshold;
     return matchesSearch && matchesCategory && matchesLowStock;
+  });
+
+  const sortedInventory = [...filteredInventory].sort((a, b) => {
+    let valA: any = a[stockSortField as keyof InventoryItem];
+    let valB: any = b[stockSortField as keyof InventoryItem];
+
+    if (stockSortField === 'status') {
+      const getStatusRank = (item: InventoryItem) => {
+        if (item.currentStock < 5) return 3;
+        if (item.currentStock <= item.minStockThreshold) return 2;
+        return 1;
+      };
+      valA = getStatusRank(a);
+      valB = getStatusRank(b);
+    } else if (stockSortField === 'date') {
+      valA = a.lastUpdated || '';
+      valB = b.lastUpdated || '';
+    }
+
+    if (typeof valA === 'string') {
+      const comp = (valA || '').localeCompare(valB || '');
+      return stockSortDirection === 'asc' ? comp : -comp;
+    }
+
+    if (valA < valB) return stockSortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return stockSortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const sortedTransactions = [...transactions].sort((a, b) => {
+    let valA: any = a[txSortField as keyof InventoryTransaction];
+    let valB: any = b[txSortField as keyof InventoryTransaction];
+
+    if (typeof valA === 'string') {
+      const comp = (valA || '').localeCompare(valB || '');
+      return txSortDirection === 'asc' ? comp : -comp;
+    }
+
+    if (valA < valB) return txSortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return txSortDirection === 'asc' ? 1 : -1;
+    return 0;
   });
 
   return (
@@ -314,25 +385,91 @@ export default function InventoryManager({
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400 font-bold">
-                      <th className="py-3 px-4">Material Details</th>
-                      <th className="py-3 px-4">Category</th>
-                      <th className="py-3 px-4 text-right">Current Stock</th>
-                      <th className="py-3 px-4 text-right">Unit rate</th>
-                      <th className="py-3 px-4 text-right">Min. Threshold</th>
-                      <th className="py-3 px-4 text-center">Stock status</th>
+                    <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-500 font-bold select-none">
+                      <th 
+                        onClick={() => handleStockSort('name')} 
+                        className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by material name"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Material Details</span>
+                          {stockSortField === 'name' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('category')} 
+                        className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by category"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Category</span>
+                          {stockSortField === 'category' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('currentStock')} 
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by current stock level"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Current Stock</span>
+                          {stockSortField === 'currentStock' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('unitCost')} 
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by unit rate"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Unit rate</span>
+                          {stockSortField === 'unitCost' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('minStockThreshold')} 
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by minimum threshold"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Min. Threshold</span>
+                          {stockSortField === 'minStockThreshold' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('status')} 
+                        className="py-3 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by stock status severity"
+                      >
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>Stock status</span>
+                          {stockSortField === 'status' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
                       {!isAuditor && <th className="py-3 px-4 text-right">Actions</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium">
-                    {filteredInventory.length === 0 ? (
+                    {sortedInventory.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="text-center py-12 text-gray-400">
                           No inventory items match your filters.
                         </td>
                       </tr>
                     ) : (
-                      filteredInventory.map(item => {
+                      sortedInventory.map(item => {
                         const isLow = item.currentStock <= item.minStockThreshold;
                         const isWarningThreshold = item.currentStock < 5;
                         return (
@@ -444,12 +581,12 @@ export default function InventoryManager({
           ) : (
             /* Cards Display Grid */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredInventory.length === 0 ? (
+              {sortedInventory.length === 0 ? (
                 <div className="col-span-full text-center py-12 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400">
                   <p>No inventory items match your filters.</p>
                 </div>
               ) : (
-                filteredInventory.map(item => {
+                sortedInventory.map(item => {
                   const isLow = item.currentStock <= item.minStockThreshold;
                   const isWarningThreshold = item.currentStock < 5;
                   return (
@@ -587,26 +724,92 @@ export default function InventoryManager({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100 text-[11px] uppercase tracking-wider text-gray-400 font-semibold">
-                  <th className="py-3.5 px-4">Date</th>
-                  <th className="py-3.5 px-4">Material Details</th>
-                  <th className="py-3.5 px-4 text-center">Flow Type</th>
-                  <th className="py-3.5 px-4 text-right">Quantity</th>
-                  <th className="py-3.5 px-4 text-right">Unit Rate</th>
-                  <th className="py-3.5 px-4 text-right">Total Outflow/Inflow</th>
+                <tr className="bg-gray-50 border-b border-gray-100 text-[11px] uppercase tracking-wider text-gray-500 font-bold select-none">
+                  <th 
+                    onClick={() => handleTxSort('date')}
+                    className="py-3.5 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by transaction date"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Date</span>
+                      {txSortField === 'date' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('itemName')}
+                    className="py-3.5 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by material name"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Material Details</span>
+                      {txSortField === 'itemName' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('type')}
+                    className="py-3.5 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by flow type"
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Flow Type</span>
+                      {txSortField === 'type' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('quantity')}
+                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by quantity"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Quantity</span>
+                      {txSortField === 'quantity' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('unitCost')}
+                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by unit rate"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Unit Rate</span>
+                      {txSortField === 'unitCost' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('totalValue')}
+                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by total outflow/inflow"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Total Outflow/Inflow</span>
+                      {txSortField === 'totalValue' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
                   <th className="py-3.5 px-4">Purpose & reference</th>
                   {!isAuditor && onDeleteTransaction && <th className="py-3.5 px-4 text-center">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-sm">
-                {transactions.length === 0 ? (
+                {sortedTransactions.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="text-center py-12 text-gray-400">
                       No transactions logged yet.
                     </td>
                   </tr>
                 ) : (
-                  [...transactions].reverse().map(tx => {
+                  sortedTransactions.map(tx => {
                     const isIn = tx.type === 'INWARDS';
                     return (
                       <tr key={tx.id} className="hover:bg-gray-50/50 transition">

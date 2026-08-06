@@ -19,7 +19,10 @@ import {
   Check,
   X,
   Users,
-  Trash2
+  Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -187,10 +190,48 @@ export default function EmployeeManager({
     if (onCloseRegisterModal) onCloseRegisterModal();
   };
 
+  // Sorting states for Staff Directory
+  const [empSortField, setEmpSortField] = useState<'name' | 'role' | 'status' | 'date'>('name');
+  const [empSortDirection, setEmpSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleEmpSort = (field: 'name' | 'role' | 'status' | 'date') => {
+    if (empSortField === field) {
+      setEmpSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setEmpSortField(field);
+      setEmpSortDirection(field === 'date' ? 'desc' : 'asc');
+    }
+  };
+
   // Filter employees
   const filteredEmployees = employees.filter(e => {
     const searchString = `${e.name} ${e.role} ${e.email}`.toLowerCase();
     return searchString.includes(searchTerm.toLowerCase());
+  });
+
+  const sortedEmployees = [...filteredEmployees].sort((a, b) => {
+    let valA: any = a.name;
+    let valB: any = b.name;
+
+    if (empSortField === 'role') {
+      valA = a.role;
+      valB = b.role;
+    } else if (empSortField === 'status') {
+      valA = a.status;
+      valB = b.status;
+    } else if (empSortField === 'date') {
+      valA = a.hireDate || '';
+      valB = b.hireDate || '';
+    }
+
+    if (typeof valA === 'string') {
+      const comp = (valA || '').localeCompare(valB || '');
+      return empSortDirection === 'asc' ? comp : -comp;
+    }
+
+    if (valA < valB) return empSortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return empSortDirection === 'asc' ? 1 : -1;
+    return 0;
   });
 
   // Calculate worker's assignments
@@ -280,13 +321,49 @@ export default function EmployeeManager({
                 </div>
               </div>
 
+              {/* Staff Directory Column Header Sorting Bar */}
+              <div className="px-4 py-2 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between text-[11px] font-bold text-gray-500 uppercase select-none">
+                <button 
+                  onClick={() => handleEmpSort('name')} 
+                  className="flex items-center gap-1 hover:text-wood-800 transition cursor-pointer"
+                  title="Click to sort by Employee Name"
+                >
+                  <span>Name</span>
+                  {empSortField === 'name' ? (
+                    empSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                  ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                </button>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => handleEmpSort('role')} 
+                    className="flex items-center gap-1 hover:text-wood-800 transition cursor-pointer"
+                    title="Click to sort by Role"
+                  >
+                    <span>Role</span>
+                    {empSortField === 'role' ? (
+                      empSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                    ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                  </button>
+                  <button 
+                    onClick={() => handleEmpSort('status')} 
+                    className="flex items-center gap-1 hover:text-wood-800 transition cursor-pointer"
+                    title="Click to sort by Status"
+                  >
+                    <span>Status</span>
+                    {empSortField === 'status' ? (
+                      empSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                    ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                  </button>
+                </div>
+              </div>
+
               <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
-                {filteredEmployees.length === 0 ? (
+                {sortedEmployees.length === 0 ? (
                   <div className="text-center py-12 text-gray-400 text-sm">
                     No employees found.
                   </div>
                 ) : (
-                  filteredEmployees.map(e => {
+                  sortedEmployees.map(e => {
                     const isActive = selectedEmployee?.id === e.id;
                     const activeJobsCount = jobs.filter(j => j.assignedEmployees.includes(e.id) && j.status !== 'Completed' && j.status !== 'Delivered').length;
                     

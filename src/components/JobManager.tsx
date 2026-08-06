@@ -19,7 +19,10 @@ import {
   FileText,
   Trash2,
   Receipt,
-  ListOrdered
+  ListOrdered,
+  Edit2,
+  X,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -32,6 +35,7 @@ interface JobManagerProps {
   onUpdateJob?: (updatedJob: Job) => void;
   onDeleteJob?: (jobId: string) => void;
   onDeleteJobMaterial?: (jobId: string, itemId: string) => void;
+  onUpdateJobPayment?: (jobId: string, payment: JobPayment) => void;
   onDeleteJobPayment?: (jobId: string, paymentId: string) => void;
   onUpdateJobStatus: (id: string, status: JobStatus) => void;
   onLogJobMaterial: (jobId: string, material: JobMaterial) => void;
@@ -52,6 +56,7 @@ export default function JobManager({
   onUpdateJob,
   onDeleteJob,
   onDeleteJobMaterial,
+  onUpdateJobPayment,
   onDeleteJobPayment,
   onUpdateJobStatus,
   onLogJobMaterial,
@@ -340,6 +345,52 @@ export default function JobManager({
     if (shouldTriggerReceipt && onTriggerReceipt) {
       onTriggerReceipt(targetJobId);
     }
+  };
+
+  // Edit payment states
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<JobPayment | null>(null);
+  const [editPaymentAmount, setEditPaymentAmount] = useState<number>(0);
+  const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Cheque' | 'Mobile Money'>('Cash');
+  const [editPaymentDate, setEditPaymentDate] = useState<string>('');
+  const [editPaymentNote, setEditPaymentNote] = useState<string>('');
+
+  const handleOpenEditPaymentModal = (p: JobPayment) => {
+    setEditingPayment(p);
+    setEditPaymentAmount(p.amount);
+    setEditPaymentMethod(p.method);
+    setEditPaymentDate(p.date || new Date().toISOString().split('T')[0]);
+    setEditPaymentNote(p.note || '');
+    setShowEditPaymentModal(true);
+  };
+
+  const handleUpdatePaymentSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const activeSelectedJob = jobs.find(j => j.id === selectedJob?.id) || selectedJob;
+    if (!activeSelectedJob || !editingPayment) return;
+
+    if (editPaymentAmount <= 0) {
+      alert('Payment amount must be greater than 0');
+      return;
+    }
+
+    const updatedPayment: JobPayment = {
+      ...editingPayment,
+      amount: editPaymentAmount,
+      method: editPaymentMethod,
+      date: editPaymentDate,
+      note: editPaymentNote
+    };
+
+    if (onUpdateJobPayment) {
+      onUpdateJobPayment(activeSelectedJob.id, updatedPayment);
+    } else if (onUpdateJob) {
+      const updatedPayments = activeSelectedJob.payments.map(p => p.id === editingPayment.id ? updatedPayment : p);
+      onUpdateJob({ ...activeSelectedJob, payments: updatedPayments });
+    }
+
+    setShowEditPaymentModal(false);
+    setEditingPayment(null);
   };
 
   const toggleStaffAssignment = (staffId: string) => {
@@ -855,6 +906,15 @@ export default function JobManager({
                               <span>Receipt</span>
                             </button>
                           )}
+                          {!isAuditor && (
+                            <button
+                              onClick={() => handleOpenEditPaymentModal(p)}
+                              className="p-1 text-gray-400 hover:text-wood-700 hover:bg-wood-50 rounded transition ml-1 cursor-pointer"
+                              title="Edit Payment Record"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {!isAuditor && onDeleteJobPayment && (
                             <button
                               onClick={() => {
@@ -862,7 +922,7 @@ export default function JobManager({
                                   onDeleteJobPayment(activeSelectedJob.id, p.id);
                                 }
                               }}
-                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition ml-1"
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
                               title="Delete Payment Record"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1249,6 +1309,102 @@ export default function JobManager({
                       <span>Clear & Open Receipt</span>
                     </button>
                   )}
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* MODAL: Edit Existing Payment Record */}
+        {showEditPaymentModal && editingPayment && activeSelectedJob && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-wood-100 shadow-xl w-full max-w-md overflow-hidden"
+            >
+              <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-lg flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-emerald-400" />
+                    <span>Edit Payment Record</span>
+                  </h3>
+                  <p className="text-xs text-wood-200">Modify clear date, amount, method, or notes for payment ID: {editingPayment.id}</p>
+                </div>
+                <button 
+                  onClick={() => setShowEditPaymentModal(false)}
+                  className="text-wood-300 hover:text-white font-bold p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdatePaymentSubmit} className="p-6 space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Payment Amount (Le) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    step="any"
+                    value={editPaymentAmount}
+                    onChange={(e) => setEditPaymentAmount(Number(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-emerald-800 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Cleared Method *</label>
+                  <select
+                    value={editPaymentMethod}
+                    onChange={(e) => setEditPaymentMethod(e.target.value as any)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 bg-white"
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer / wire</option>
+                    <option value="Cheque">Check Clearance</option>
+                    <option value="Mobile Money">Mobile Money (Momo)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Payment Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={editPaymentDate}
+                    onChange={(e) => setEditPaymentDate(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Reference / Note</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Initial deposit / Milestone clear"
+                    value={editPaymentNote}
+                    onChange={(e) => setEditPaymentNote(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm text-gray-700"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowEditPaymentModal(false)}
+                    className="py-2.5 px-4 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-bold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="py-2.5 px-5 rounded-xl bg-wood-800 hover:bg-wood-900 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span>Save Payment Changes</span>
+                  </button>
                 </div>
               </form>
             </motion.div>
