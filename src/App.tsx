@@ -59,7 +59,8 @@ import {
   INITIAL_DAILY_WORK_LOGS,
   INITIAL_REGISTRATION_REQUESTS,
   INITIAL_WARNING_LETTERS,
-  INITIAL_SAVED_INVOICES
+  INITIAL_SAVED_INVOICES,
+  INITIAL_PAYMENT_AUDIT_LOGS
 } from './data';
 
 const LIVE_ADMIN_EMPLOYEE: Employee = {
@@ -90,7 +91,8 @@ import {
   RegistrationRequest,
   EmployeeRole,
   WarningLetter,
-  SavedInvoice
+  SavedInvoice,
+  PaymentAuditLogEntry
 } from './types';
 
 export default function App() {
@@ -214,7 +216,8 @@ export default function App() {
       dailyWorkLogs,
       registrationRequests,
       warningLetters,
-      savedInvoices
+      savedInvoices,
+      paymentAuditLogs
     };
     const jsonStr = JSON.stringify(backupData, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -265,6 +268,7 @@ export default function App() {
           { key: 'dailyWorkLogs', localKey: 'swedsfree_daily_work_logs', data: data.dailyWorkLogs, setter: setDailyWorkLogs },
           { key: 'registrationRequests', localKey: 'swedsfree_registration_requests', data: data.registrationRequests, setter: setRegistrationRequests },
           { key: 'warningLetters', localKey: 'swedsfree_warning_letters', data: data.warningLetters, setter: setWarningLetters },
+          { key: 'paymentAuditLogs', localKey: 'swedsfree_payment_audit_logs', data: data.paymentAuditLogs, setter: setPaymentAuditLogs },
           { key: 'savedInvoices', localKey: 'swedswood_saved_invoices', data: data.savedInvoices, setter: null },
         ];
 
@@ -338,6 +342,7 @@ export default function App() {
   const [dailyWorkLogs, setDailyWorkLogs] = useState<DailyWorkLog[]>(() => getStoredData('swedsfree_daily_work_logs', []));
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>(() => getStoredData('swedsfree_registration_requests', []));
   const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters', []));
+  const [paymentAuditLogs, setPaymentAuditLogs] = useState<PaymentAuditLogEntry[]>(() => getStoredData('swedsfree_payment_audit_logs', INITIAL_PAYMENT_AUDIT_LOGS));
 
   // Clear all data function for live production
   const handleClearAllSystemDataForGoLive = async (silent: boolean = false) => {
@@ -524,6 +529,7 @@ export default function App() {
     syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs', INITIAL_DAILY_WORK_LOGS);
     syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests', INITIAL_REGISTRATION_REQUESTS);
     syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters', INITIAL_WARNING_LETTERS);
+    syncCollection('paymentAuditLogs', setPaymentAuditLogs, 'swedsfree_payment_audit_logs', INITIAL_PAYMENT_AUDIT_LOGS);
 
     // Mark initialization complete without clearing data automatically
     if (localStorage.getItem('swedsfree_initial_purge_done') !== 'true') {
@@ -846,6 +852,8 @@ export default function App() {
       id: paymentId
     };
 
+    const targetJob = jobs.find(j => j.id === jobId);
+
     // 1. Log payment inside job object
     setJobs(prev => prev.map(job => {
       if (job.id === jobId) {
@@ -872,6 +880,30 @@ export default function App() {
     };
     setFinancialTransactions(prev => [...prev, finTx]);
     saveDocument('financialTransactions', finTx);
+
+    // 3. Log to Payment Audit Trail
+    if (targetJob) {
+      const auditEntry: PaymentAuditLogEntry = {
+        id: `audit-pay-${Date.now()}`,
+        jobId: targetJob.id,
+        jobTitle: targetJob.title,
+        customerName: targetJob.customerName,
+        paymentId: paymentId,
+        action: 'CREATED',
+        amount: payment.amount,
+        method: payment.method,
+        date: payment.date || dateStr,
+        note: payment.note || '',
+        modifiedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'System Admin',
+        timestamp: new Date().toISOString()
+      };
+      setPaymentAuditLogs(prev => {
+        const updated = [auditEntry, ...prev];
+        localStorage.setItem('swedsfree_payment_audit_logs', JSON.stringify(updated));
+        return updated;
+      });
+      saveDocument('paymentAuditLogs', auditEntry);
+    }
   };
 
   // E. Manual financial ledger mutators
@@ -1022,6 +1054,9 @@ export default function App() {
 
   const handleUpdateJobPayment = (jobId: string, updatedPayment: JobPayment) => {
     localStorage.setItem('swedsfree_seed_disabled', 'true');
+    const targetJob = jobs.find(j => j.id === jobId);
+    const oldPayment = targetJob?.payments.find(p => p.id === updatedPayment.id);
+
     setJobs(prev => {
       const updatedJobs = prev.map(job => {
         if (job.id === jobId) {
@@ -1038,10 +1073,41 @@ export default function App() {
       localStorage.setItem('swedsfree_jobs', JSON.stringify(updatedJobs));
       return updatedJobs;
     });
+
+    // Log to Payment Audit Trail
+    if (targetJob && oldPayment) {
+      const auditEntry: PaymentAuditLogEntry = {
+        id: `audit-pay-${Date.now()}`,
+        jobId: targetJob.id,
+        jobTitle: targetJob.title,
+        customerName: targetJob.customerName,
+        paymentId: updatedPayment.id,
+        action: 'UPDATED',
+        amount: updatedPayment.amount,
+        previousAmount: oldPayment.amount,
+        method: updatedPayment.method,
+        previousMethod: oldPayment.method,
+        date: updatedPayment.date,
+        previousDate: oldPayment.date,
+        note: updatedPayment.note || '',
+        previousNote: oldPayment.note || '',
+        modifiedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'System Admin',
+        timestamp: new Date().toISOString()
+      };
+      setPaymentAuditLogs(prev => {
+        const updated = [auditEntry, ...prev];
+        localStorage.setItem('swedsfree_payment_audit_logs', JSON.stringify(updated));
+        return updated;
+      });
+      saveDocument('paymentAuditLogs', auditEntry);
+    }
   };
 
   const handleDeleteJobPayment = (jobId: string, paymentId: string) => {
     localStorage.setItem('swedsfree_seed_disabled', 'true');
+    const targetJob = jobs.find(j => j.id === jobId);
+    const oldPayment = targetJob?.payments.find(p => p.id === paymentId);
+
     setJobs(prev => {
       const updatedJobs = prev.map(job => {
         if (job.id === jobId) {
@@ -1057,6 +1123,30 @@ export default function App() {
       localStorage.setItem('swedsfree_jobs', JSON.stringify(updatedJobs));
       return updatedJobs;
     });
+
+    // Log to Payment Audit Trail
+    if (targetJob && oldPayment) {
+      const auditEntry: PaymentAuditLogEntry = {
+        id: `audit-pay-${Date.now()}`,
+        jobId: targetJob.id,
+        jobTitle: targetJob.title,
+        customerName: targetJob.customerName,
+        paymentId: paymentId,
+        action: 'DELETED',
+        amount: oldPayment.amount,
+        method: oldPayment.method,
+        date: oldPayment.date,
+        note: oldPayment.note || '',
+        modifiedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'System Admin',
+        timestamp: new Date().toISOString()
+      };
+      setPaymentAuditLogs(prev => {
+        const updated = [auditEntry, ...prev];
+        localStorage.setItem('swedsfree_payment_audit_logs', JSON.stringify(updated));
+        return updated;
+      });
+      saveDocument('paymentAuditLogs', auditEntry);
+    }
   };
 
   const handleUpdateCustomer = (updatedCustomer: Customer) => {
@@ -1562,6 +1652,7 @@ export default function App() {
                 onUpdateJob={handleUpdateJob}
                 onUpdateJobPayment={handleUpdateJobPayment}
                 onDeleteJobPayment={handleDeleteJobPayment}
+                paymentAuditLogs={paymentAuditLogs}
               />
             )}
 

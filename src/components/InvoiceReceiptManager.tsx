@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, FormEvent, ChangeEvent, KeyboardEvent } from 'react';
-import { Job, Customer, Employee, formatCurrency, JobPayment, FinancialCategory, SavedInvoice, SavedInvoiceItem } from '../types';
+import { Job, Customer, Employee, formatCurrency, JobPayment, FinancialCategory, SavedInvoice, SavedInvoiceItem, PaymentAuditLogEntry } from '../types';
 import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments } from '../lib/firestoreService';
 import { 
   FileText, 
@@ -35,7 +35,11 @@ import {
   X,
   Check,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ShieldCheck,
+  Lock,
+  PlusCircle,
+  ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -120,11 +124,12 @@ interface InvoiceReceiptManagerProps {
   customers: Customer[];
   currentUser: Employee | null;
   invoiceJobId?: string | null;
-  initialSubTab?: 'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT';
+  initialSubTab?: 'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT' | 'AUDIT_LOG';
   onClearInvoiceJobId?: () => void;
   onUpdateJob?: (updatedJob: Job) => void;
   onUpdateJobPayment?: (jobId: string, payment: JobPayment) => void;
   onDeleteJobPayment?: (jobId: string, paymentId: string) => void;
+  paymentAuditLogs?: PaymentAuditLogEntry[];
 }
 
 export default function InvoiceReceiptManager({
@@ -136,14 +141,20 @@ export default function InvoiceReceiptManager({
   onClearInvoiceJobId,
   onUpdateJob,
   onUpdateJobPayment,
-  onDeleteJobPayment
+  onDeleteJobPayment,
+  paymentAuditLogs = []
 }: InvoiceReceiptManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(jobs[0]?.id || null);
   
-  // Top level tabs: Invoice Workspace vs Saved Invoices Directory vs Receipt Workspace
-  const [subTab, setSubTab] = useState<'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT'>('INVOICE');
+  // Top level tabs: Invoice Workspace vs Saved Invoices Directory vs Receipt Workspace vs Payment Audit Log
+  const [subTab, setSubTab] = useState<'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT' | 'AUDIT_LOG'>('INVOICE');
+
+  // Payment Audit Log Filters State
+  const [auditSearchTerm, setAuditSearchTerm] = useState('');
+  const [auditActionFilter, setAuditActionFilter] = useState<'ALL' | 'CREATED' | 'UPDATED' | 'DELETED'>('ALL');
+  const [auditJobFilter, setAuditJobFilter] = useState<string>('ALL');
 
   // Saved Invoices Persistent State
   const [savedInvoices, setSavedInvoices] = useState<SavedInvoice[]>(() => {
@@ -734,6 +745,8 @@ export default function InvoiceReceiptManager({
   const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Cheque' | 'Mobile Money' | 'Check'>('Cash');
   const [editPaymentDate, setEditPaymentDate] = useState<string>('');
   const [editPaymentNote, setEditPaymentNote] = useState<string>('');
+  const [editPaymentError, setEditPaymentError] = useState<string | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<{ payment: JobPayment; job: Job } | null>(null);
 
   const handleOpenEditPaymentModal = (item: { payment: JobPayment; job: Job }) => {
     setEditingPaymentItem(item);
@@ -741,6 +754,7 @@ export default function InvoiceReceiptManager({
     setEditPaymentMethod(item.payment.method as any);
     setEditPaymentDate(item.payment.date || new Date().toISOString().split('T')[0]);
     setEditPaymentNote(item.payment.note || '');
+    setEditPaymentError(null);
     setShowEditPaymentModal(true);
   };
 
@@ -749,7 +763,7 @@ export default function InvoiceReceiptManager({
     if (!editingPaymentItem) return;
 
     if (editPaymentAmount <= 0) {
-      alert('Payment amount must be greater than 0');
+      setEditPaymentError('Payment amount must be greater than 0');
       return;
     }
 
@@ -763,14 +777,43 @@ export default function InvoiceReceiptManager({
 
     if (onUpdateJobPayment) {
       onUpdateJobPayment(editingPaymentItem.job.id, updatedPayment);
-    } else if (onUpdateJob) {
-      const updatedPayments = editingPaymentItem.job.payments.map(p => p.id === editingPaymentItem.payment.id ? updatedPayment : p);
-      onUpdateJob({ ...editingPaymentItem.job, payments: updatedPayments });
+    }
+    if (onUpdateJob) {
+      const currentJob = jobs.find(j => j.id === editingPaymentItem.job.id) || editingPaymentItem.job;
+      const updatedPayments = currentJob.payments.map(p => p.id === editingPaymentItem.payment.id ? updatedPayment : p);
+      onUpdateJob({ ...currentJob, payments: updatedPayments });
+    }
+
+    if (activeReceipt && activeReceipt.payment.id === updatedPayment.id) {
+      setActiveReceipt(prev => prev ? { ...prev, payment: updatedPayment } : null);
     }
 
     setShowEditPaymentModal(false);
     setEditingPaymentItem(null);
-    setSaveToast(`Payment ${updatedPayment.id} updated successfully!`);
+    setEditPaymentError(null);
+    setSaveToast(`Payment installment #${updatedPayment.id} updated successfully!`);
+    setTimeout(() => setSaveToast(null), 3500);
+  };
+
+  const handleConfirmDeletePayment = () => {
+    if (!paymentToDelete) return;
+    const { payment, job } = paymentToDelete;
+
+    if (onDeleteJobPayment) {
+      onDeleteJobPayment(job.id, payment.id);
+    }
+    if (onUpdateJob) {
+      const currentJob = jobs.find(j => j.id === job.id) || job;
+      const updatedPayments = currentJob.payments.filter(p => p.id !== payment.id);
+      onUpdateJob({ ...currentJob, payments: updatedPayments });
+    }
+
+    if (activeReceipt && activeReceipt.payment.id === payment.id) {
+      setActiveReceipt(null);
+    }
+
+    setPaymentToDelete(null);
+    setSaveToast(`Payment installment #${payment.id} deleted successfully.`);
     setTimeout(() => setSaveToast(null), 3500);
   };
 
@@ -1517,6 +1560,23 @@ export default function InvoiceReceiptManager({
               <Receipt className="w-4 h-4 text-emerald-600" />
               <span>Receipt Desk</span>
             </button>
+
+            <button
+              onClick={() => setSubTab('AUDIT_LOG')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                subTab === 'AUDIT_LOG' 
+                  ? 'bg-white text-purple-950 shadow-xs' 
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-purple-600" />
+              <span>Payment Audit Log</span>
+              {(paymentAuditLogs || []).length > 0 && (
+                <span className="px-1.5 py-0.2 bg-purple-100 text-purple-800 text-[10px] font-black rounded-full ml-0.5">
+                  {(paymentAuditLogs || []).length}
+                </span>
+              )}
+            </button>
           </div>
 
           <button
@@ -1958,6 +2018,384 @@ export default function InvoiceReceiptManager({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ==========================================
+         PAYMENT INSTALLMENT HISTORY AUDIT LOG TAB
+         ========================================== */}
+      {subTab === 'AUDIT_LOG' && (
+        <div className="space-y-6 no-print">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 p-6 rounded-2xl border border-purple-500/30 text-white shadow-lg space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2.5 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-black uppercase tracking-wider rounded-md flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-purple-400" /> Read-Only Audit History
+                  </span>
+                  <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider rounded-md flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Tamper-Evident Logs
+                  </span>
+                </div>
+                <h3 className="text-xl font-display font-black text-white flex items-center gap-2">
+                  <ShieldCheck className="w-6 h-6 text-purple-400" />
+                  Installment Payment Modification Audit Log
+                </h3>
+                <p className="text-xs text-purple-200/80 max-w-2xl mt-1 leading-relaxed">
+                  A transparent, read-only audit log recording every creation, update, and removal of customer installment payments across all custom woodwork orders.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 bg-purple-900/40 p-3 rounded-xl border border-purple-500/30">
+                <ShieldCheck className="w-8 h-8 text-purple-400" />
+                <div>
+                  <span className="text-[10px] text-purple-300 uppercase font-bold block">Security Status</span>
+                  <span className="text-xs font-black text-white font-mono">VERIFIED IMMUTABLE</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Metric Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Total Audit Records</span>
+                <p className="text-2xl font-black text-wood-950 mt-1 font-mono">{(paymentAuditLogs || []).length}</p>
+              </div>
+              <div className="p-3 bg-purple-50 text-purple-700 rounded-xl">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Created Payments</span>
+                <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">
+                  {(paymentAuditLogs || []).filter(l => l.action === 'CREATED').length}
+                </p>
+              </div>
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                <PlusCircle className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Modified / Updated</span>
+                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">
+                  {(paymentAuditLogs || []).filter(l => l.action === 'UPDATED').length}
+                </p>
+              </div>
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                <Edit2 className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Removed / Deleted</span>
+                <p className="text-2xl font-black text-red-600 mt-1 font-mono">
+                  {(paymentAuditLogs || []).filter(l => l.action === 'DELETED').length}
+                </p>
+              </div>
+              <div className="p-3 bg-red-50 text-red-600 rounded-xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filters Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs space-y-3">
+            <div className="flex flex-col sm:flex-row items-center gap-3 justify-between">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="Search order, customer, payment ID, or modifier..."
+                  value={auditSearchTerm}
+                  onChange={(e) => setAuditSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 outline-none focus:border-purple-500 focus:bg-white"
+                />
+                {auditSearchTerm && (
+                  <button onClick={() => setAuditSearchTerm('')} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl text-xs font-bold text-gray-700">
+                  <Filter className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-[10px] uppercase text-gray-400">Action:</span>
+                  <select
+                    value={auditActionFilter}
+                    onChange={(e) => setAuditActionFilter(e.target.value as any)}
+                    className="bg-transparent font-bold text-xs outline-none cursor-pointer text-gray-800"
+                  >
+                    <option value="ALL">All Actions</option>
+                    <option value="CREATED">Created Only</option>
+                    <option value="UPDATED">Updated Only</option>
+                    <option value="DELETED">Deleted Only</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl text-xs font-bold text-gray-700">
+                  <Tag className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-[10px] uppercase text-gray-400">Order:</span>
+                  <select
+                    value={auditJobFilter}
+                    onChange={(e) => setAuditJobFilter(e.target.value)}
+                    className="bg-transparent font-bold text-xs outline-none cursor-pointer text-gray-800 max-w-[160px] truncate"
+                  >
+                    <option value="ALL">All Orders</option>
+                    {jobs.map(j => (
+                      <option key={j.id} value={j.id}>{j.title}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(auditSearchTerm || auditActionFilter !== 'ALL' || auditJobFilter !== 'ALL') && (
+                  <button
+                    onClick={() => {
+                      setAuditSearchTerm('');
+                      setAuditActionFilter('ALL');
+                      setAuditJobFilter('ALL');
+                    }}
+                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Clear Filters</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Audit Logs Table */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-purple-600" />
+                <h4 className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                  Immutable Audit Records
+                </h4>
+              </div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Read-Only • Sorted Newest First
+              </span>
+            </div>
+
+            {(() => {
+              const filteredLogs = (paymentAuditLogs || []).filter(log => {
+                const matchesSearch = 
+                  !auditSearchTerm ||
+                  log.jobTitle.toLowerCase().includes(auditSearchTerm.toLowerCase()) ||
+                  log.customerName.toLowerCase().includes(auditSearchTerm.toLowerCase()) ||
+                  log.paymentId.toLowerCase().includes(auditSearchTerm.toLowerCase()) ||
+                  log.modifiedBy.toLowerCase().includes(auditSearchTerm.toLowerCase()) ||
+                  (log.note && log.note.toLowerCase().includes(auditSearchTerm.toLowerCase()));
+
+                const matchesAction = auditActionFilter === 'ALL' || log.action === auditActionFilter;
+                const matchesJob = auditJobFilter === 'ALL' || log.jobId === auditJobFilter;
+
+                return matchesSearch && matchesAction && matchesJob;
+              });
+
+              if (filteredLogs.length === 0) {
+                return (
+                  <div className="p-12 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center mx-auto">
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-bold text-gray-800">No Payment Audit Logs Match Your Filters</p>
+                    <p className="text-xs text-gray-500 max-w-md mx-auto">
+                      Try clearing search queries or action filters. Payment changes are automatically recorded whenever installment payments are created, updated, or removed.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/80 text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                        <th className="py-3 px-4">Date & Time</th>
+                        <th className="py-3 px-4">Action</th>
+                        <th className="py-3 px-4">Order / Customer</th>
+                        <th className="py-3 px-4">Payment Delta & Details</th>
+                        <th className="py-3 px-4">Modified By</th>
+                        <th className="py-3 px-4 text-right">Log Verification</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 text-xs">
+                      {filteredLogs.map((log) => {
+                        const formattedDate = new Date(log.timestamp).toLocaleString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
+
+                        return (
+                          <tr key={log.id} className="hover:bg-purple-50/20 transition-colors">
+                            {/* Date & Time */}
+                            <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                              <div className="font-mono font-bold text-gray-800 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                                <span>{formattedDate}</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-gray-400 block mt-0.5">
+                                Log ID: {log.id}
+                              </span>
+                            </td>
+
+                            {/* Action Badge */}
+                            <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                              {log.action === 'CREATED' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md font-extrabold text-[10px] uppercase">
+                                  <PlusCircle className="w-3 h-3 text-emerald-600" /> CREATED
+                                </span>
+                              )}
+                              {log.action === 'UPDATED' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-md font-extrabold text-[10px] uppercase">
+                                  <Edit2 className="w-3 h-3 text-amber-600" /> MODIFIED
+                                </span>
+                              )}
+                              {log.action === 'DELETED' && (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-800 border border-red-200 rounded-md font-extrabold text-[10px] uppercase">
+                                  <Trash2 className="w-3 h-3 text-red-600" /> REMOVED
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Order / Customer */}
+                            <td className="py-3.5 px-4 align-top max-w-[220px]">
+                              <p className="font-extrabold text-wood-950 truncate" title={log.jobTitle}>
+                                {log.jobTitle}
+                              </p>
+                              <p className="text-[11px] text-gray-500 font-medium truncate">
+                                {log.customerName}
+                              </p>
+                              <span className="inline-block mt-1 text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                {log.paymentId}
+                              </span>
+                            </td>
+
+                            {/* Payment Delta & Details */}
+                            <td className="py-3.5 px-4 align-top">
+                              {log.action === 'CREATED' && (
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-black text-emerald-700 text-sm">
+                                      {formatCurrency(log.amount, 0)}
+                                    </span>
+                                    <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded uppercase">
+                                      {log.method}
+                                    </span>
+                                    <span className="text-[11px] font-mono text-gray-500">
+                                      ({log.date})
+                                    </span>
+                                  </div>
+                                  {log.note && (
+                                    <p className="text-[11px] text-gray-600 italic">
+                                      &quot;{log.note}&quot;
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {log.action === 'UPDATED' && (
+                                <div className="space-y-1">
+                                  {log.previousAmount !== undefined && log.previousAmount !== log.amount ? (
+                                    <div className="flex items-center gap-1.5 text-xs">
+                                      <span className="text-[11px] font-bold text-gray-400 uppercase">Amount:</span>
+                                      <span className="line-through font-mono text-red-500 font-bold">{formatCurrency(log.previousAmount, 0)}</span>
+                                      <span className="text-gray-400">&rarr;</span>
+                                      <span className="font-mono font-black text-emerald-700">{formatCurrency(log.amount, 0)}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="font-mono font-bold text-gray-800 text-xs">
+                                      Amount: {formatCurrency(log.amount, 0)}
+                                    </div>
+                                  )}
+
+                                  {log.previousMethod && log.previousMethod !== log.method && (
+                                    <div className="flex items-center gap-1.5 text-[11px]">
+                                      <span className="font-bold text-gray-400 uppercase text-[10px]">Method:</span>
+                                      <span className="line-through text-red-400">{log.previousMethod}</span>
+                                      <span className="text-gray-400">&rarr;</span>
+                                      <span className="font-bold text-emerald-700">{log.method}</span>
+                                    </div>
+                                  )}
+
+                                  {log.previousDate && log.previousDate !== log.date && (
+                                    <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                                      <span className="font-bold text-gray-400 uppercase text-[10px]">Date:</span>
+                                      <span className="line-through text-gray-400">{log.previousDate}</span>
+                                      <span className="text-gray-400">&rarr;</span>
+                                      <span className="font-bold text-gray-800">{log.date}</span>
+                                    </div>
+                                  )}
+
+                                  {log.note && (
+                                    <p className="text-[11px] text-gray-600 italic">
+                                      &quot;{log.note}&quot;
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {log.action === 'DELETED' && (
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-bold text-red-600 line-through text-xs">
+                                      {formatCurrency(log.amount, 0)}
+                                    </span>
+                                    <span className="px-1.5 py-0.2 bg-red-100 text-red-800 text-[10px] font-extrabold rounded uppercase">
+                                      {log.method}
+                                    </span>
+                                    <span className="text-[11px] font-mono text-gray-400">
+                                      ({log.date})
+                                    </span>
+                                  </div>
+                                  {log.note && (
+                                    <p className="text-[11px] text-red-600/80 italic">
+                                      Removed: &quot;{log.note}&quot;
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Modified By */}
+                            <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                              <span className="font-bold text-gray-800 block">
+                                {log.modifiedBy}
+                              </span>
+                              <span className="text-[10px] text-gray-400 font-medium block">
+                                Authorized User
+                              </span>
+                            </td>
+
+                            {/* Log Verification */}
+                            <td className="py-3.5 px-4 align-top text-right whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-black text-purple-700 bg-purple-50 px-2 py-1 rounded-md border border-purple-200 uppercase">
+                                <Lock className="w-3 h-3 text-purple-500" /> Read-Only
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       )}
 
@@ -2477,22 +2915,22 @@ export default function InvoiceReceiptManager({
                               </button>
                               {!isAuditor && (
                                 <button
+                                  type="button"
                                   onClick={() => handleOpenEditPaymentModal({ payment: p, job: selectedJob })}
-                                  className="p-1.5 text-gray-400 hover:text-wood-700 hover:bg-wood-50 rounded-lg transition cursor-pointer"
+                                  className="p-1.5 text-gray-500 hover:text-wood-800 hover:bg-wood-100/70 rounded-lg transition cursor-pointer border border-gray-200"
                                   title="Edit Payment Record"
+                                  aria-label="Edit Payment Record"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
                               )}
-                              {!isAuditor && onDeleteJobPayment && (
+                              {!isAuditor && (
                                 <button
-                                  onClick={() => {
-                                    if (window.confirm(`Are you sure you want to delete payment installment #${p.id} (${formatCurrency(p.amount)})?`)) {
-                                      onDeleteJobPayment(selectedJob.id, p.id);
-                                    }
-                                  }}
-                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                  type="button"
+                                  onClick={() => setPaymentToDelete({ payment: p, job: selectedJob })}
+                                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer border border-gray-200"
                                   title="Delete Payment Record"
+                                  aria-label="Delete Payment Record"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -2503,6 +2941,67 @@ export default function InvoiceReceiptManager({
                       </div>
                     </div>
                   )}
+
+                  {/* Order-Specific Installment Payment Modification Audit Trail */}
+                  {(() => {
+                    const jobLogs = (paymentAuditLogs || []).filter(l => l.jobId === selectedJob.id);
+                    if (jobLogs.length === 0) return null;
+
+                    return (
+                      <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-xs font-black text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-purple-600" />
+                            Order Payment Audit Trail ({jobLogs.length} Records)
+                          </h5>
+                          <button
+                            onClick={() => setSubTab('AUDIT_LOG')}
+                            className="text-[10px] text-purple-700 hover:text-purple-900 font-extrabold uppercase underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Open Full Audit Log</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        <div className="divide-y divide-purple-100 bg-white border border-purple-100 rounded-lg overflow-hidden">
+                          {jobLogs.slice(0, 5).map(log => (
+                            <div key={log.id} className="p-3 text-xs flex items-center justify-between gap-2">
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  {log.action === 'CREATED' && (
+                                    <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[9px] font-extrabold rounded uppercase">
+                                      Created
+                                    </span>
+                                  )}
+                                  {log.action === 'UPDATED' && (
+                                    <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-extrabold rounded uppercase">
+                                      Modified
+                                    </span>
+                                  )}
+                                  {log.action === 'DELETED' && (
+                                    <span className="px-1.5 py-0.2 bg-red-100 text-red-800 text-[9px] font-extrabold rounded uppercase">
+                                      Removed
+                                    </span>
+                                  )}
+                                  <span className="font-mono text-[10px] text-gray-500">
+                                    {new Date(log.timestamp).toLocaleDateString()} {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <p className="text-gray-800 font-medium text-[11px]">
+                                  {log.action === 'CREATED' && `Added payment ${formatCurrency(log.amount, 0)} (${log.method})`}
+                                  {log.action === 'UPDATED' && `Updated payment ${log.paymentId}: ${log.previousAmount !== undefined && log.previousAmount !== log.amount ? `${formatCurrency(log.previousAmount, 0)} → ${formatCurrency(log.amount, 0)}` : formatCurrency(log.amount, 0)}`}
+                                  {log.action === 'DELETED' && `Removed payment ${log.paymentId} of ${formatCurrency(log.amount, 0)} (${log.method})`}
+                                </p>
+                              </div>
+                              <span className="text-[10px] text-gray-500 font-bold shrink-0">
+                                By {log.modifiedBy}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -3190,28 +3689,12 @@ export default function InvoiceReceiptManager({
                       {/* Subtotal block on the right */}
                       <div className="md:col-span-5 flex flex-col justify-end">
                         <div className="border border-gray-400 bg-white rounded-xs overflow-hidden shadow-xs">
-                          <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-3 border-b border-gray-400">
-                            <span className="font-sans font-black text-xs uppercase tracking-wider">Subtotal</span>
+                          <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-3">
+                            <span className="font-sans font-black text-xs uppercase tracking-wider">Total Invoice Amount</span>
                             <span className="font-mono font-black text-sm">
                               SLL {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          {totals.totalPaid > 0 && (
-                            <div className="p-2.5 space-y-1.5 text-[11px] font-semibold text-[#1e3a8a] bg-[#e0f2fe]/40">
-                              <div className="flex justify-between text-gray-500">
-                                <span>Total Amount:</span>
-                                <span className="font-mono">SLL {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                              </div>
-                              <div className="flex justify-between text-emerald-800 font-bold">
-                                <span>Less Paid Deposits:</span>
-                                <span className="font-mono">-SLL {totals.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                              </div>
-                              <div className="border-t border-dashed border-gray-300 pt-1 flex justify-between text-red-700 font-black">
-                                <span>Balance Due:</span>
-                                <span className="font-mono">SLL {totals.outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -3659,16 +4142,6 @@ export default function InvoiceReceiptManager({
                           <span className="font-black text-sm uppercase tracking-wider text-wood-950">Grand Total Invoice:</span>
                           <span className="font-mono font-black text-sm text-wood-950">{formatCurrency(totals.finalTotal)}</span>
                         </div>
-
-                        <div className="flex justify-between text-emerald-800 bg-emerald-50/30 px-2 py-1 rounded-lg">
-                          <span className="text-[9px] uppercase font-bold">Less Paid Deposits:</span>
-                          <span className="font-mono font-bold">-{formatCurrency(totals.totalPaid)}</span>
-                        </div>
-
-                        <div className="border-t-2 border-dashed border-gray-300 pt-2 flex justify-between text-red-700">
-                          <span className="font-bold text-xs uppercase">Net Balance Due:</span>
-                          <span className="font-mono font-bold text-xs">{formatCurrency(totals.outstanding)}</span>
-                        </div>
                       </div>
                     </div>
                   </>
@@ -4045,6 +4518,74 @@ export default function InvoiceReceiptManager({
                       </table>
                     </div>
                   )}
+
+                  {/* All Captured Payments Ledger for This Woodwork Commission */}
+                  {activeReceipt && activeReceipt.job.payments && activeReceipt.job.payments.length > 0 && (
+                    <div className="border-t border-dashed border-emerald-200 pt-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] text-emerald-950 uppercase font-black tracking-wider block">
+                          Captured Payment Records:
+                        </span>
+                        <span className="text-[10px] text-emerald-800 font-bold font-mono">
+                          {activeReceipt.job.payments.length} Payments Captured
+                        </span>
+                      </div>
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-emerald-200 text-emerald-950 font-bold uppercase text-[9px] bg-emerald-100/50">
+                            <th className="py-1.5 px-2">#</th>
+                            <th className="py-1.5 px-2">Payment ID</th>
+                            <th className="py-1.5 px-2">Date</th>
+                            <th className="py-1.5 px-2">Method</th>
+                            <th className="py-1.5 px-2">Purpose / Note</th>
+                            <th className="py-1.5 px-2 text-right">Amount (Le)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-emerald-100/60">
+                          {activeReceipt.job.payments.map((pay, idx) => (
+                            <tr key={pay.id} className="text-[11px]">
+                              <td className="py-1.5 px-2 font-mono text-gray-500 font-bold">{idx + 1}</td>
+                              <td className="py-1.5 px-2 font-mono font-bold text-gray-700">{pay.id}</td>
+                              <td className="py-1.5 px-2 font-mono text-gray-600">{pay.date}</td>
+                              <td className="py-1.5 px-2 font-semibold text-wood-800">{pay.method}</td>
+                              <td className="py-1.5 px-2 text-gray-600">{pay.note || 'Installment Payment'}</td>
+                              <td className="py-1.5 px-2 text-right font-mono font-bold text-emerald-800">
+                                {formatCurrency(pay.amount, 0)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Financial Settlement Breakdown & Outstanding Balance Status */}
+                  {activeReceipt && (() => {
+                    const totalContract = activeReceipt.job.quoteAmount;
+                    const totalPaidCaptured = activeReceipt.job.payments.reduce((s, p) => s + p.amount, 0);
+                    const balanceRemaining = Math.max(0, totalContract - totalPaidCaptured);
+
+                    return (
+                      <div className="border-t border-emerald-200 pt-3 bg-emerald-50/40 rounded-xl p-3 space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-semibold text-gray-600">Total Contract Value:</span>
+                          <span className="font-mono font-bold text-gray-900">{formatCurrency(totalContract, 0)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-semibold text-emerald-800">Total Payments Captured to Date:</span>
+                          <span className="font-mono font-bold text-emerald-800">{formatCurrency(totalPaidCaptured, 0)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs pt-1.5 border-t border-emerald-200">
+                          <span className="font-black uppercase text-emerald-950 text-[11px] tracking-wide">
+                            {balanceRemaining > 0 ? 'Remaining Balance Due:' : 'Account Balance Status:'}
+                          </span>
+                          <span className={`font-mono font-black text-sm ${balanceRemaining > 0 ? 'text-amber-800' : 'text-emerald-700'}`}>
+                            {balanceRemaining > 0 ? formatCurrency(balanceRemaining, 0) : 'Le 0.00 (Fully Settled)'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Acknowledgment block */}
@@ -4293,6 +4834,13 @@ export default function InvoiceReceiptManager({
               </div>
 
               <form onSubmit={handleUpdatePaymentSubmit} className="p-6 space-y-4">
+                {editPaymentError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-bold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                    <span>{editPaymentError}</span>
+                  </div>
+                )}
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Payment Amount (Le) *</label>
                   <input
@@ -4301,7 +4849,10 @@ export default function InvoiceReceiptManager({
                     min={1}
                     step="any"
                     value={editPaymentAmount}
-                    onChange={(e) => setEditPaymentAmount(Number(e.target.value))}
+                    onChange={(e) => {
+                      setEditPaymentAmount(Number(e.target.value));
+                      setEditPaymentError(null);
+                    }}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-emerald-800 font-mono"
                   />
                 </div>
@@ -4345,7 +4896,10 @@ export default function InvoiceReceiptManager({
                 <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100">
                   <button 
                     type="button" 
-                    onClick={() => setShowEditPaymentModal(false)}
+                    onClick={() => {
+                      setShowEditPaymentModal(false);
+                      setEditPaymentError(null);
+                    }}
                     className="py-2.5 px-4 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-bold transition cursor-pointer"
                   >
                     Cancel
@@ -4359,6 +4913,85 @@ export default function InvoiceReceiptManager({
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* MODAL: Delete Payment Installment Confirmation */}
+        {paymentToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-red-200 shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="bg-red-900 p-5 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="w-5 h-5 text-red-300" />
+                  <h3 className="font-display font-bold text-base">Delete Installment Payment</h3>
+                </div>
+                <button
+                  onClick={() => setPaymentToDelete(null)}
+                  className="text-red-300 hover:text-white font-bold p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-700">
+                  Are you sure you want to delete payment installment{' '}
+                  <strong className="font-mono text-red-950 font-bold">#{paymentToDelete.payment.id}</strong>?
+                </p>
+
+                <div className="p-3 bg-red-50/70 border border-red-200 rounded-xl text-xs space-y-1.5 font-medium text-gray-700">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Amount:</span>
+                    <span className="font-mono font-bold text-red-900">{formatCurrency(paymentToDelete.payment.amount, 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Method:</span>
+                    <span className="font-bold text-gray-800">{paymentToDelete.payment.method}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Date:</span>
+                    <span className="font-mono">{paymentToDelete.payment.date}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Order / Client:</span>
+                    <span className="font-semibold text-gray-800 truncate max-w-[200px]">{paymentToDelete.job.customerName}</span>
+                  </div>
+                  {paymentToDelete.payment.note && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Note:</span>
+                      <span className="text-gray-600 truncate max-w-[200px]">{paymentToDelete.payment.note}</span>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-gray-500 italic">
+                  This will remove the payment record from this order and register an audit log entry for accounting transparency.
+                </p>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentToDelete(null)}
+                    className="py-2.5 px-4 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-bold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDeletePayment}
+                    className="py-2.5 px-5 rounded-xl bg-red-700 hover:bg-red-800 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Confirm & Delete</span>
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}
@@ -4677,36 +5310,9 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(0, 0, 0);
-    doc.text("Subtotal", 125, totY + 6.5);
+    doc.text("Total Invoice Amount", 125, totY + 6.5);
     const subtotalStr = `SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
     doc.text(subtotalStr, 191, totY + 6.5, { align: 'right' });
-    
-    if (totalPaid > 0) {
-      doc.setDrawColor(0, 0, 0);
-      doc.setFillColor(255, 255, 255);
-      doc.rect(122, totY + 9, 73, 13, 'FD');
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(0, 0, 0);
-      doc.text("Total Quoted Amount:", 125, totY + 13.5);
-      doc.text(subtotalStr, 191, totY + 13.5, { align: 'right' });
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text("Less Paid Deposits:", 125, totY + 17);
-      const paidStr = `- SLL ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-      doc.text(paidStr, 191, totY + 17, { align: 'right' });
-      
-      doc.setDrawColor(200, 200, 200);
-      doc.line(122, totY + 18.5, 195, totY + 18.5);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text("Balance Due:", 125, totY + 21);
-      const balanceStr = `SLL ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-      doc.text(balanceStr, 191, totY + 21, { align: 'right' });
-    }
   } else {
     // MODERN DIGITAL PROFESSIONAL TEMPLATE
     doc.setDrawColor(245, 245, 244);
@@ -4949,27 +5555,13 @@ export function buildInvoicePdfContent(
     
     doc.setDrawColor(229, 231, 235);
     doc.setFillColor(245, 245, 244);
-    doc.rect(calcX, botY, calcWidth, 24, 'FD');
+    doc.rect(calcX, botY, calcWidth, 10, 'FD');
     
     const quotePriceStr = `Le ${modernSubtotalVal.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(75, 85, 99);
-    doc.text("Total Value:", calcX + 3, botY + 5.5);
-    doc.text(quotePriceStr, calcX + calcWidth - 3, botY + 5.5, { align: 'right' });
-    
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(5, 150, 105);
-    doc.text("Paid Deposits:", calcX + 3, botY + 11.5);
-    const paidStrVal = `- Le ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
-    doc.text(paidStrVal, calcX + calcWidth - 3, botY + 11.5, { align: 'right' });
-    
-    doc.line(calcX, botY + 14.5, calcX + calcWidth, botY + 14.5);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(185, 28, 28);
-    doc.text("Outstanding:", calcX + 3, botY + 20);
-    const outStrVal = `Le ${outstanding.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
-    doc.text(outStrVal, calcX + calcWidth - 3, botY + 20, { align: 'right' });
+    doc.setFontSize(8.5);
+    doc.setTextColor(31, 41, 55);
+    doc.text("Total Invoice Value:", calcX + 3, botY + 6.5);
+    doc.text(quotePriceStr, calcX + calcWidth - 3, botY + 6.5, { align: 'right' });
   }
 }

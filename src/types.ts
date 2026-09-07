@@ -98,15 +98,33 @@ export interface Job {
   payments: JobPayment[];
 }
 
+export type FinancialInwardsCategory = 
+  | 'wood' 
+  | 'sofa' 
+  | 'Chair' 
+  | 'Bed' 
+  | 'Wood Construction' 
+  | 'others';
+
+export type FinancialOutwardsCategory = 
+  | 'Tools and generator' 
+  | 'Utilities' 
+  | 'Transportation' 
+  | 'Material Purchase' 
+  | 'Tools and Maintenance' 
+  | 'Cast' 
+  | 'Salary' 
+  | 'others';
+
 export type FinancialCategory = 
+  | FinancialInwardsCategory 
+  | FinancialOutwardsCategory 
   | 'Job Payment' 
   | 'Scrap wood sale' 
   | 'Custom Commission' 
-  | 'Material Purchase' 
   | 'Employee Wages' 
   | 'Rent' 
   | 'Tools & Maintenance' 
-  | 'Utilities' 
   | 'Overhead' 
   | 'Other';
 
@@ -186,6 +204,25 @@ export interface SavedInvoice {
   subtotal: number;
   createdAt: string;
   lastUpdated: string;
+}
+
+export interface PaymentAuditLogEntry {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  customerName: string;
+  paymentId: string;
+  action: 'CREATED' | 'UPDATED' | 'DELETED';
+  amount: number;
+  previousAmount?: number;
+  method: string;
+  previousMethod?: string;
+  date: string;
+  previousDate?: string;
+  note?: string;
+  previousNote?: string;
+  modifiedBy: string;
+  timestamp: string;
 }
 
 export function formatCurrency(amount: number, decimals: number = 2): string {

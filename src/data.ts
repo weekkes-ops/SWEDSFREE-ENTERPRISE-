@@ -1,4 +1,4 @@
-import { InventoryItem, InventoryTransaction, Customer, Employee, Job, FinancialTransaction, DailyWorkLog, RegistrationRequest, WarningLetter, SavedInvoice } from './types';
+import { InventoryItem, InventoryTransaction, Customer, Employee, Job, FinancialTransaction, DailyWorkLog, RegistrationRequest, WarningLetter, SavedInvoice, PaymentAuditLogEntry } from './types';
 
 export const INITIAL_INVENTORY: InventoryItem[] = [
   { id: 'inv-101', name: 'Mahogany Timber Planks (2x10x12)', category: 'Lumber', unit: 'Board Feet', currentStock: 450, minStockThreshold: 100, unitCost: 45, lastUpdated: '2026-08-04' },
@@ -177,5 +177,82 @@ export const INITIAL_SAVED_INVOICES: SavedInvoice[] = [
     items: [
       { id: 'item-1', description: 'Handcrafted Executive Mahogany Boardroom Table (16 Seater)', unitRate: '48,500', amount: 48500, quantity: 1, unitPrice: 48500 }
     ]
+  }
+];
+
+export const INITIAL_PAYMENT_AUDIT_LOGS: PaymentAuditLogEntry[] = [
+  {
+    id: 'audit-pay-101',
+    jobId: 'job-301',
+    jobTitle: 'Executive Mahogany Boardroom Table (16 Seater)',
+    customerName: 'Sierra Mining Corporation',
+    paymentId: 'pay-401',
+    action: 'CREATED',
+    amount: 25000,
+    method: 'Bank Transfer',
+    date: '2026-07-10',
+    note: '50% Initial deposit payment',
+    modifiedBy: 'Mr Paul Bindi (Admin)',
+    timestamp: '2026-07-10T09:30:00.000Z'
+  },
+  {
+    id: 'audit-pay-102',
+    jobId: 'job-301',
+    jobTitle: 'Executive Mahogany Boardroom Table (16 Seater)',
+    customerName: 'Sierra Mining Corporation',
+    paymentId: 'pay-402',
+    action: 'CREATED',
+    amount: 10000,
+    method: 'Bank Transfer',
+    date: '2026-08-02',
+    note: 'Milestone payment upon framework completion',
+    modifiedBy: 'Mr Paul Bindi (Admin)',
+    timestamp: '2026-08-02T11:15:00.000Z'
+  },
+  {
+    id: 'audit-pay-103',
+    jobId: 'job-302',
+    jobTitle: 'Solid Oak Entrance Doors & Paneling (Set of 12)',
+    customerName: 'Freetown Grand Hotel & Suites',
+    paymentId: 'pay-403',
+    action: 'CREATED',
+    amount: 31000,
+    method: 'Bank Transfer',
+    date: '2026-07-18',
+    note: 'Initial deposit',
+    modifiedBy: 'Mr Paul Bindi (Admin)',
+    timestamp: '2026-07-18T14:20:00.000Z'
+  },
+  {
+    id: 'audit-pay-104',
+    jobId: 'job-303',
+    jobTitle: 'Heavy Duty Wooden Classroom Student Desks (50 Units)',
+    customerName: 'Makeni Educational Complex',
+    paymentId: 'pay-404',
+    action: 'CREATED',
+    amount: 20000,
+    method: 'Check',
+    date: '2026-06-02',
+    note: 'Advance check deposit',
+    modifiedBy: 'Fatmata Sesay (Auditor)',
+    timestamp: '2026-06-02T10:00:00.000Z'
+  },
+  {
+    id: 'audit-pay-105',
+    jobId: 'job-303',
+    jobTitle: 'Heavy Duty Wooden Classroom Student Desks (50 Units)',
+    customerName: 'Makeni Educational Complex',
+    paymentId: 'pay-405',
+    action: 'UPDATED',
+    amount: 18000,
+    previousAmount: 15000,
+    method: 'Bank Transfer',
+    previousMethod: 'Cash',
+    date: '2026-07-28',
+    previousDate: '2026-07-25',
+    note: 'Final settlement payment upon delivery',
+    previousNote: 'Partial final settlement',
+    modifiedBy: 'David Mansaray (Manager)',
+    timestamp: '2026-07-28T16:45:00.000Z'
   }
 ];

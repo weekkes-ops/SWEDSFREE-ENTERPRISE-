@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { Employee, EmployeeRole, EmployeeStatus, Job, RegistrationRequest, WarningLetter } from '../types';
+import { Employee, EmployeeRole, EmployeeStatus, Job, RegistrationRequest, WarningLetter, formatCurrency } from '../types';
 import { 
   Plus, 
   Search, 
@@ -8,7 +8,7 @@ import {
   Mail, 
   ShieldCheck, 
   Briefcase, 
-  DollarSign, 
+  Banknote, 
   Calendar, 
   CheckCircle, 
   XCircle, 
@@ -580,14 +580,14 @@ export default function EmployeeManager({
                 {/* Compensation Package card */}
                 <div className="bg-wood-50/50 p-5 rounded-2xl border border-wood-100">
                   <h4 className="text-xs font-bold uppercase text-wood-800 mb-3 tracking-wider flex items-center gap-1">
-                    <DollarSign className="w-3.5 h-3.5" /> Wage & Compensation Settings
+                    <Banknote className="w-3.5 h-3.5" /> Wage & Compensation Settings
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-white p-4 rounded-xl border border-wood-100 flex items-center justify-between">
                       <div>
                         <span className="text-[10px] text-gray-400 font-bold uppercase">Monthly Base Salary</span>
                         <p className="text-lg font-bold font-mono text-gray-800 mt-1">
-                          ${selectedEmployee.baseSalary.toLocaleString()}
+                          {formatCurrency(selectedEmployee.baseSalary, 0)}
                         </p>
                       </div>
                       <span className="text-[10px] bg-wood-50 text-wood-700 font-extrabold px-2 py-1 rounded">FIXED</span>
@@ -597,7 +597,7 @@ export default function EmployeeManager({
                       <div>
                         <span className="text-[10px] text-gray-400 font-bold uppercase">Daily Overtime Rate</span>
                         <p className="text-lg font-bold font-mono text-gray-800 mt-1">
-                          ${selectedEmployee.dailyRate.toLocaleString()}
+                          {formatCurrency(selectedEmployee.dailyRate, 0)}/day
                         </p>
                       </div>
                       <span className="text-[10px] bg-wood-50 text-wood-700 font-extrabold px-2 py-1 rounded">WAGE/DAY</span>
@@ -760,14 +760,14 @@ export default function EmployeeManager({
                 {/* Payroll estimations based on role */}
                 <div className="bg-wood-50/50 p-5 rounded-2xl border border-wood-100">
                   <h4 className="text-xs font-bold uppercase text-wood-800 mb-3 tracking-wider flex items-center gap-1">
-                    <DollarSign className="w-3.5 h-3.5" /> Estimated Payroll Configuration
+                    <Banknote className="w-3.5 h-3.5" /> Estimated Payroll Configuration
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-white p-4 rounded-xl border border-wood-100 flex items-center justify-between">
                       <div>
                         <span className="text-[10px] text-gray-400 font-bold uppercase">Base Monthly Salary</span>
                         <p className="text-lg font-bold font-mono text-gray-800 mt-1">
-                          ${(
+                          {formatCurrency(
                             selectedReq.role === 'Admin' ? 9500 :
                             selectedReq.role === 'Manager' ? 8000 :
                             selectedReq.role === 'Auditor' ? 6500 :
@@ -775,8 +775,9 @@ export default function EmployeeManager({
                             selectedReq.role === 'Carpenter' ? 5200 :
                             selectedReq.role === 'Carver' ? 4800 :
                             selectedReq.role === 'Sander' ? 3200 :
-                            selectedReq.role === 'Polisher' ? 3800 : 3500
-                          ).toLocaleString()}
+                            selectedReq.role === 'Polisher' ? 3800 : 3500,
+                            0
+                          )}
                         </p>
                       </div>
                       <span className="text-[10px] bg-wood-50 text-wood-700 font-extrabold px-2 py-1 rounded">PROPOSED</span>
@@ -786,7 +787,7 @@ export default function EmployeeManager({
                       <div>
                         <span className="text-[10px] text-gray-400 font-bold uppercase">Daily Overtime Rate</span>
                         <p className="text-lg font-bold font-mono text-gray-800 mt-1">
-                          ${(
+                          {formatCurrency(
                             selectedReq.role === 'Admin' ? 350 :
                             selectedReq.role === 'Manager' ? 280 :
                             selectedReq.role === 'Auditor' ? 220 :
@@ -794,8 +795,9 @@ export default function EmployeeManager({
                             selectedReq.role === 'Carpenter' ? 190 :
                             selectedReq.role === 'Carver' ? 175 :
                             selectedReq.role === 'Sander' ? 110 :
-                            selectedReq.role === 'Polisher' ? 130 : 120
-                          ).toLocaleString()}
+                            selectedReq.role === 'Polisher' ? 130 : 120,
+                            0
+                          )}/day
                         </p>
                       </div>
                       <span className="text-[10px] bg-wood-50 text-wood-700 font-extrabold px-2 py-1 rounded">PROPOSED</span>
@@ -945,11 +947,11 @@ export default function EmployeeManager({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Monthly Base Salary ($)</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Monthly Base Salary (Le)</label>
                     <input
                       type="number"
                       required
-                      min={500}
+                      min={100}
                       value={editBaseSalary}
                       onChange={(e) => setEditBaseSalary(Number(e.target.value))}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
@@ -957,11 +959,11 @@ export default function EmployeeManager({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Daily Rate Overtime ($)</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Daily Rate Overtime (Le)</label>
                     <input
                       type="number"
                       required
-                      min={20}
+                      min={10}
                       value={editDailyRate}
                       onChange={(e) => setEditDailyRate(Number(e.target.value))}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
@@ -1160,7 +1162,7 @@ export default function EmployeeManager({
                     <input
                       type="tel"
                       required
-                      placeholder="+233 24 333 4444"
+                      placeholder="+232 76 333 444"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700"
@@ -1182,11 +1184,11 @@ export default function EmployeeManager({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Monthly Base Salary ($) *</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Monthly Base Salary (Le) *</label>
                     <input
                       type="number"
                       required
-                      min={500}
+                      min={100}
                       value={baseSalary}
                       onChange={(e) => setBaseSalary(Number(e.target.value))}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
@@ -1194,11 +1196,11 @@ export default function EmployeeManager({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Daily Rate Overtime ($) *</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Daily Rate Overtime (Le) *</label>
                     <input
                       type="number"
                       required
-                      min={20}
+                      min={10}
                       value={dailyRate}
                       onChange={(e) => setDailyRate(Number(e.target.value))}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"

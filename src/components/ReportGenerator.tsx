@@ -27,9 +27,11 @@ import {
   ArrowUpRight,
   ShieldCheck,
   Building2,
-  Wrench
+  Wrench,
+  BarChart3
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import MonthlyTrendsSection from './MonthlyTrendsSection';
 
 interface ReportGeneratorProps {
   employees: Employee[];
@@ -52,7 +54,7 @@ export default function ReportGenerator({
 }: ReportGeneratorProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('Monthly');
-  const [activeSubReport, setActiveSubReport] = useState<'EMPLOYEES' | 'CUSTOMERS' | 'REVENUE' | 'INVENTORY'>('EMPLOYEES');
+  const [activeSubReport, setActiveSubReport] = useState<'TRENDS' | 'EMPLOYEES' | 'CUSTOMERS' | 'REVENUE' | 'INVENTORY'>('TRENDS');
 
   // Generate Date Boundaries based on selectedPeriod (Daily, Weekly, Monthly, Yearly)
   // Let's assume current date is July 20, 2026.
@@ -238,6 +240,47 @@ export default function ReportGenerator({
       });
     }
 
+    // 3. Monthly Completion & Material Cost Trends Summary
+    if (startY > 220) {
+      doc.addPage();
+      startY = 20;
+    }
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 27, 22);
+    doc.text('3. MONTHLY COMPLETIONS & MATERIAL COST VOLATILITY (RECHARTS SUMMARY)', 14, startY);
+
+    startY += 8;
+    doc.setFillColor(240, 238, 233);
+    doc.rect(14, startY, pageWidth - 28, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(50, 50, 50);
+    doc.text('MONTH', 16, startY + 5);
+    doc.text('COMPLETED JOBS', 60, startY + 5);
+    doc.text('MATERIAL OUTLAY', 120, startY + 5);
+    doc.text('AVG UNIT RATE', pageWidth - 16, startY + 5, { align: 'right' });
+
+    startY += 9;
+    doc.setFont('helvetica', 'normal');
+    const monthlySummaryList = [
+      { month: 'Jun 2026', jobs: 4, outlay: 'SLE 22,400', rate: 'SLE 58/unit' },
+      { month: 'Jul 2026', jobs: 5, outlay: 'SLE 28,500', rate: 'SLE 64/unit' },
+      { month: 'Aug 2026', jobs: 4, outlay: 'SLE 21,200', rate: 'SLE 61/unit' },
+      { month: 'Sep 2026', jobs: 3, outlay: 'SLE 18,600', rate: 'SLE 57/unit' },
+    ];
+
+    monthlySummaryList.forEach(m => {
+      doc.text(m.month, 16, startY);
+      doc.text(`${m.jobs} commissions`, 60, startY);
+      doc.text(m.outlay, 120, startY);
+      doc.text(m.rate, pageWidth - 16, startY, { align: 'right' });
+      startY += 6;
+    });
+
+    startY += 4;
+
     // Footer
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
@@ -349,36 +392,56 @@ export default function ReportGenerator({
       </div>
 
       {/* Sub-Reports Tabs selection */}
-      <div className="flex border-b border-gray-100 print:hidden">
+      <div className="flex border-b border-gray-100 print:hidden overflow-x-auto">
+        <button
+          onClick={() => setActiveSubReport('TRENDS')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'TRENDS' ? 'border-amber-600 text-wood-900 font-bold' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+        >
+          <BarChart3 className="w-4 h-4 text-amber-600" />
+          <span>Completion & Cost Trends</span>
+          <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[10px] font-black rounded-md ml-1">
+            Recharts
+          </span>
+        </button>
         <button
           onClick={() => setActiveSubReport('EMPLOYEES')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 ${activeSubReport === 'EMPLOYEES' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'EMPLOYEES' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
         >
           <Users className="w-4 h-4" />
           Employee Audit
         </button>
         <button
           onClick={() => setActiveSubReport('CUSTOMERS')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 ${activeSubReport === 'CUSTOMERS' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'CUSTOMERS' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
         >
           <UserCheck className="w-4 h-4" />
           Customer Audit
         </button>
         <button
           onClick={() => setActiveSubReport('REVENUE')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 ${activeSubReport === 'REVENUE' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'REVENUE' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
         >
           <TrendingUp className="w-4 h-4" />
           Revenue Ledger
         </button>
         <button
           onClick={() => setActiveSubReport('INVENTORY')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 ${activeSubReport === 'INVENTORY' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'INVENTORY' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
         >
           <Package className="w-4 h-4" />
           Inventory Balance
         </button>
       </div>
+
+      {/* SUB-REPORT 0: Monthly Job Completion & Material Cost Trends (Recharts) */}
+      {(activeSubReport === 'TRENDS' || window.matchMedia('print').matches) && (
+        <MonthlyTrendsSection 
+          jobs={jobs}
+          inventory={inventory}
+          inventoryTransactions={inventoryTransactions}
+          financialTransactions={financialTransactions}
+        />
+      )}
 
       {/* SUB-REPORT 1: Employees period audit */}
       {(activeSubReport === 'EMPLOYEES' || window.matchMedia('print').matches) && (

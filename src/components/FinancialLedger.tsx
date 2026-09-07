@@ -53,7 +53,7 @@ export default function FinancialLedger({
 
   // Form states - Add Transaction
   const [type, setType] = useState<'INCOME' | 'EXPENDITURE'>('INCOME');
-  const [category, setCategory] = useState<FinancialCategory>('Job Payment');
+  const [category, setCategory] = useState<FinancialCategory>('wood');
   const [amount, setAmount] = useState(1500);
   const [date, setDate] = useState('2026-07-20');
   const [description, setDescription] = useState('');
@@ -61,7 +61,7 @@ export default function FinancialLedger({
   // Form states - Edit Transaction
   const [editingTransaction, setEditingTransaction] = useState<FinancialTransaction | null>(null);
   const [editType, setEditType] = useState<'INCOME' | 'EXPENDITURE'>('INCOME');
-  const [editCategory, setEditCategory] = useState<FinancialCategory>('Job Payment');
+  const [editCategory, setEditCategory] = useState<FinancialCategory>('wood');
   const [editAmount, setEditAmount] = useState(1500);
   const [editDate, setEditDate] = useState('2026-07-20');
   const [editDescription, setEditDescription] = useState('');
@@ -69,18 +69,18 @@ export default function FinancialLedger({
   const handleTypeChange = (newType: 'INCOME' | 'EXPENDITURE') => {
     setType(newType);
     if (newType === 'INCOME') {
-      setCategory('Job Payment');
+      setCategory('wood');
     } else {
-      setCategory('Material Purchase');
+      setCategory('Tools and generator');
     }
   };
 
   const handleEditTypeChange = (newType: 'INCOME' | 'EXPENDITURE') => {
     setEditType(newType);
     if (newType === 'INCOME') {
-      setEditCategory('Job Payment');
+      setEditCategory('wood');
     } else {
-      setEditCategory('Material Purchase');
+      setEditCategory('Tools and generator');
     }
   };
 
@@ -503,20 +503,23 @@ export default function FinancialLedger({
                     >
                       {type === 'INCOME' ? (
                         <>
-                          <option value="Job Payment">Job Payment</option>
-                          <option value="Custom Commission">Custom Commission</option>
-                          <option value="Scrap wood sale">Scrap wood sale</option>
-                          <option value="Other">Other Miscellaneous</option>
+                          <option value="wood">wood</option>
+                          <option value="sofa">sofa</option>
+                          <option value="Chair">Chair</option>
+                          <option value="Bed">Bed</option>
+                          <option value="Wood Construction">Wood Construction</option>
+                          <option value="others">others</option>
                         </>
                       ) : (
                         <>
-                          <option value="Material Purchase">Material Purchase</option>
-                          <option value="Employee Wages">Employee Wages</option>
-                          <option value="Rent">Rent</option>
-                          <option value="Tools & Maintenance">Tools & Maintenance</option>
+                          <option value="Tools and generator">Tools and generator</option>
                           <option value="Utilities">Utilities</option>
-                          <option value="Overhead">Overhead</option>
-                          <option value="Other">Other Expenses</option>
+                          <option value="Transportation">Transportation</option>
+                          <option value="Material Purchase">Material Purchase</option>
+                          <option value="Tools and Maintenance">Tools and Maintenance</option>
+                          <option value="Cast">Cast</option>
+                          <option value="Salary">Salary</option>
+                          <option value="others">others</option>
                         </>
                       )}
                     </select>
@@ -632,20 +635,23 @@ export default function FinancialLedger({
                     >
                       {editType === 'INCOME' ? (
                         <>
-                          <option value="Job Payment">Job Payment</option>
-                          <option value="Custom Commission">Custom Commission</option>
-                          <option value="Scrap wood sale">Scrap wood sale</option>
-                          <option value="Other">Other Miscellaneous</option>
+                          <option value="wood">wood</option>
+                          <option value="sofa">sofa</option>
+                          <option value="Chair">Chair</option>
+                          <option value="Bed">Bed</option>
+                          <option value="Wood Construction">Wood Construction</option>
+                          <option value="others">others</option>
                         </>
                       ) : (
                         <>
-                          <option value="Material Purchase">Material Purchase</option>
-                          <option value="Employee Wages">Employee Wages</option>
-                          <option value="Rent">Rent</option>
-                          <option value="Tools & Maintenance">Tools & Maintenance</option>
+                          <option value="Tools and generator">Tools and generator</option>
                           <option value="Utilities">Utilities</option>
-                          <option value="Overhead">Overhead</option>
-                          <option value="Other">Other Expenses</option>
+                          <option value="Transportation">Transportation</option>
+                          <option value="Material Purchase">Material Purchase</option>
+                          <option value="Tools and Maintenance">Tools and Maintenance</option>
+                          <option value="Cast">Cast</option>
+                          <option value="Salary">Salary</option>
+                          <option value="others">others</option>
                         </>
                       )}
                     </select>
