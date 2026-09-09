@@ -1648,7 +1648,7 @@ export default function InvoiceReceiptManager({
             visibility: visible !important;
             border: 2px solid #0f172a !important;
             border-radius: 3px !important;
-            background-color: #ffffff !important;
+            background-color: #0f172a !important;
             overflow: hidden !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
@@ -1658,11 +1658,10 @@ export default function InvoiceReceiptManager({
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
-            padding: 8px 12px !important;
+            padding: 9px 12px !important;
             background-color: #0f172a !important;
             background: #0f172a !important;
             color: #ffffff !important;
-            border-bottom: 2px solid #0f172a !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -3929,23 +3928,11 @@ export default function InvoiceReceiptManager({
 
                       {/* Subtotal block on the right */}
                       <div className="col-span-5 print:!col-span-5 flex flex-col justify-end print-totals-col">
-                        <div className="border-2 border-slate-900 bg-white rounded-xs overflow-hidden shadow-xs print:!border-slate-900 print:!border-2 print-total-card">
-                          <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-2.5 print:px-3 print:py-2 print:border-b-2 print:border-slate-900 print-total-card-header">
+                        <div className="border-2 border-slate-900 bg-slate-900 rounded-xs overflow-hidden shadow-xs print:!border-slate-900 print:!border-2 print-total-card">
+                          <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-3 print:px-3 print:py-2.5 print-total-card-header">
                             <span className="font-sans font-black text-xs uppercase tracking-wider !text-white print:!text-white">Total Invoice Amount</span>
-                            <span className="font-mono font-black text-sm !text-white print:!text-white">
+                            <span className="font-mono font-black text-sm md:text-base !text-white print:!text-white">
                               SLL {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                          {totals.totalPaid > 0 && (
-                            <div className="bg-white px-4 py-2 print:px-3 print:py-1.5 border-t border-gray-300 text-xs flex justify-between items-center text-emerald-800 font-semibold print-total-card-row">
-                              <span className="text-gray-800 print:text-black">Payments Cleared:</span>
-                              <span className="font-mono font-bold text-emerald-800 print:text-black">- SLL {totals.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                            </div>
-                          )}
-                          <div className="bg-slate-50 px-4 py-2 print:px-3 print:py-1.5 border-t border-gray-400 text-xs flex justify-between items-center font-black text-slate-900 print-total-card-row">
-                            <span className="text-slate-900 print:text-black font-black">Balance Due:</span>
-                            <span className={`font-mono font-black ${totals.outstanding > 0 ? 'text-amber-800 print:text-black' : 'text-emerald-800 print:text-black'}`}>
-                              {totals.outstanding > 0 ? `SLL ${totals.outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'PAID IN FULL'}
                             </span>
                           </div>
                         </div>
@@ -4405,25 +4392,9 @@ export default function InvoiceReceiptManager({
                         </div>
 
                         <div className="border-t-2 border-wood-950 pt-2 flex justify-between text-gray-800">
-                          <span className="font-black text-sm uppercase tracking-wider text-wood-950">Grand Total Invoice:</span>
+                          <span className="font-black text-sm uppercase tracking-wider text-wood-950">Total Invoice Amount:</span>
                           <span className="font-mono font-black text-sm text-wood-950">{formatCurrency(totals.finalTotal)}</span>
                         </div>
-
-                        {totals.totalPaid > 0 && (
-                          <>
-                            <div className="flex justify-between text-emerald-800 font-semibold">
-                              <span>Payments Cleared:</span>
-                              <span className="font-mono font-bold">-{formatCurrency(totals.totalPaid)}</span>
-                            </div>
-
-                            <div className="border-t border-gray-200 pt-1 flex justify-between font-black text-xs">
-                              <span className="uppercase text-wood-950">Balance Due:</span>
-                              <span className={`font-mono font-black ${totals.outstanding > 0 ? 'text-amber-800' : 'text-emerald-800'}`}>
-                                {totals.outstanding > 0 ? formatCurrency(totals.outstanding) : 'PAID IN FULL'}
-                              </span>
-                            </div>
-                          </>
-                        )}
                       </div>
                     </div>
                   </>

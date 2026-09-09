@@ -407,44 +407,20 @@ export function buildInvoicePdfContent(
     // Financial Calculation Summary on Right
     const sumX = 115;
     const sumW = 80;
-    const sumRowH = 6.5;
+    const sumRowH = 9;
 
-    // Subtotal Row
-    doc.setFillColor(245, 245, 245);
-    doc.setDrawColor(0, 0, 0);
+    // Total Invoice Amount Row
+    doc.setFillColor(15, 23, 42);
+    doc.setDrawColor(15, 23, 42);
     doc.rect(sumX, totY + 2, sumW, sumRowH, 'FD');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Total Invoice Amount:", sumX + 3, totY + 6.2);
-    doc.text(`SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, sumX + sumW - 3, totY + 6.2, { align: 'right' });
-
-    // Payments / Deposit Row
-    doc.setFillColor(255, 255, 255);
-    doc.rect(sumX, totY + 2 + sumRowH, sumW, sumRowH, 'FD');
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(0, 0, 0);
-    doc.text("Payments / Deposits Cleared:", sumX + 3, totY + 2 + sumRowH + 4.5);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`SLL ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, sumX + sumW - 3, totY + 2 + sumRowH + 4.5, { align: 'right' });
-
-    // Outstanding Balance Due Row
-    const isSettled = balanceDue <= 0;
-    doc.setFillColor(isSettled ? 240 : 254, isSettled ? 253 : 242, isSettled ? 244 : 242);
-    doc.rect(sumX, totY + 2 + (sumRowH * 2), sumW, sumRowH + 1, 'FD');
-    doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(isSettled ? 22 : 153, isSettled ? 101 : 27, isSettled ? 52 : 27);
-    doc.text(isSettled ? "Balance Status:" : "Balance Due:", sumX + 3, totY + 2 + (sumRowH * 2) + 5.2);
-    doc.text(
-      isSettled ? "PAID IN FULL" : `SLL ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-      sumX + sumW - 3,
-      totY + 2 + (sumRowH * 2) + 5.2,
-      { align: 'right' }
-    );
+    doc.setTextColor(255, 255, 255);
+    doc.text("TOTAL INVOICE AMOUNT:", sumX + 4, totY + 7.5);
+    doc.text(`SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, sumX + sumW - 4, totY + 7.5, { align: 'right' });
 
     // Bank Instructions & Swift Wire Clearance
-    const bankY = totY + 31;
+    const bankY = Math.min(totY + 24, 235);
     doc.setFillColor(248, 248, 248);
     doc.setDrawColor(200, 200, 200);
     doc.roundedRect(15, bankY, 110, 16, 1, 1, 'FD');
@@ -684,44 +660,20 @@ export function buildInvoicePdfContent(
     // Modern Totals Block
     const calcX = 120;
     const calcWidth = 75;
-    const sumRowH = 6.5;
+    const sumRowH = 8.5;
 
-    // Subtotal
+    // Total Invoice Amount
     doc.setFillColor(245, 245, 244);
-    doc.setDrawColor(229, 231, 235);
+    doc.setDrawColor(200, 200, 200);
     doc.rect(calcX, botY, calcWidth, sumRowH, 'FD');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(31, 41, 55);
-    doc.text("Total Invoice Value:", calcX + 3, botY + 4.5);
-    doc.text(`SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, calcX + calcWidth - 3, botY + 4.5, { align: 'right' });
-
-    // Paid
-    doc.setFillColor(255, 255, 255);
-    doc.rect(calcX, botY + sumRowH, calcWidth, sumRowH, 'FD');
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(75, 85, 99);
-    doc.text("Payments Captured:", calcX + 3, botY + sumRowH + 4.5);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`SLL ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, calcX + calcWidth - 3, botY + sumRowH + 4.5, { align: 'right' });
-
-    // Balance Due
-    const isSettled = balanceDue <= 0;
-    doc.setFillColor(isSettled ? 240 : 254, isSettled ? 253 : 242, isSettled ? 244 : 242);
-    doc.rect(calcX, botY + (sumRowH * 2), calcWidth, sumRowH + 1, 'FD');
-    doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(isSettled ? 22 : 153, isSettled ? 101 : 27, isSettled ? 52 : 27);
-    doc.text(isSettled ? "Status:" : "Balance Due:", calcX + 3, botY + (sumRowH * 2) + 5.2);
-    doc.text(
-      isSettled ? "FULLY CLEARED" : `SLL ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-      calcX + calcWidth - 3,
-      botY + (sumRowH * 2) + 5.2,
-      { align: 'right' }
-    );
+    doc.setTextColor(31, 41, 55);
+    doc.text("Total Invoice Amount:", calcX + 3, botY + 5.5);
+    doc.text(`SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, calcX + calcWidth - 3, botY + 5.5, { align: 'right' });
 
     // Signatory
-    const sigY = botY + 28;
+    const sigY = botY + 20;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(69, 26, 3);
