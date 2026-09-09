@@ -20,7 +20,8 @@ import {
   Download,
   Upload,
   HardDrive,
-  Settings
+  Settings,
+  BookOpen
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -36,8 +37,10 @@ import ReportGenerator from './components/ReportGenerator';
 import DailyWorkManager from './components/DailyWorkManager';
 import InvoiceReceiptManager from './components/InvoiceReceiptManager';
 import SettingsManager from './components/SettingsManager';
+import UserManualModal from './components/UserManualModal';
 import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
+import { downloadUserManualPdf } from './utils/userManualPdf';
 
 // Seed data & types
 import { 
@@ -101,6 +104,7 @@ export default function App() {
   const [quickActionTrigger, setQuickActionTrigger] = useState<string | null>(null);
   const [invoiceJobId, setInvoiceJobId] = useState<string | null>(null);
   const [invoiceInitialSubTab, setInvoiceInitialSubTab] = useState<'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT'>('INVOICE');
+  const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
 
   const handleTriggerInvoice = (jobId: string) => {
     setInvoiceJobId(jobId);
@@ -1297,6 +1301,7 @@ export default function App() {
       { id: 'reports', label: 'Audit Reports', icon: FileBarChart },
     ] : []),
     { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'manual', label: 'User Manual (PDF)', icon: BookOpen },
   ];
 
   if (!currentUser) {
@@ -1370,13 +1375,24 @@ export default function App() {
                 <button
                   key={tab.id}
                   onClick={() => {
+                    if (tab.id === 'manual') {
+                      setIsManualModalOpen(true);
+                      setMobileMenuOpen(false);
+                      return;
+                    }
                     setActiveTab(tab.id);
                     setMobileMenuOpen(false);
                     setQuickActionTrigger(null);
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${isActive ? 'bg-amber-500/10 border border-amber-500/30 text-amber-700 shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    tab.id === 'manual'
+                      ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-500/30'
+                      : isActive 
+                        ? 'bg-amber-500/10 border border-amber-500/30 text-amber-700 shadow-xs' 
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
                 >
-                  <TabIcon className={`w-4 h-4 ${isActive ? 'text-amber-600' : 'text-slate-500'}`} />
+                  <TabIcon className={`w-4 h-4 ${tab.id === 'manual' ? 'text-amber-600' : isActive ? 'text-amber-600' : 'text-slate-500'}`} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -1518,6 +1534,14 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsManualModalOpen(true)}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              title="View and download complete User Operating Manual (PDF)"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>User Manual (PDF)</span>
+            </button>
             {isOnline && (
               <button
                 onClick={performAutoOnlineSync}
@@ -1702,6 +1726,7 @@ export default function App() {
                 onRestoreAllDataTillToday={handleRestoreAllDataTillToday}
                 fileInputRef={fileInputRef}
                 onClearData={handleClearAllSystemDataForGoLive}
+                onOpenManual={() => setIsManualModalOpen(true)}
                 recordCounts={{
                   inventory: inventory.length,
                   customers: customers.length,
@@ -1718,9 +1743,88 @@ export default function App() {
                 }}
               />
             )}
+
+            {activeTab === 'manual' && (
+              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-3">
+                      <BookOpen className="w-7 h-7 text-amber-600" />
+                      <span>Official System Operating Manual</span>
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                      Comprehensive 15-chapter operating manual covering architecture, offline dual-storage, woodwork commissions, invoicing, and financial management.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <button
+                      onClick={() => setIsManualModalOpen(true)}
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>Open Interactive Reader</span>
+                    </button>
+                    <button
+                      onClick={() => downloadUserManualPdf()}
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 text-amber-400" />
+                      <span>Download PDF (15 Pages)</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div 
+                    onClick={() => setIsManualModalOpen(true)}
+                    className="p-4 rounded-2xl bg-amber-50 border border-amber-200 hover:border-amber-400 transition cursor-pointer"
+                  >
+                    <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-amber-600 text-white flex items-center justify-center text-xs">1</span>
+                      System Architecture
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-2">
+                      Dual-storage reliability with automatic Firestore synchronization and zero-loss offline caching.
+                    </p>
+                  </div>
+                  <div 
+                    onClick={() => setIsManualModalOpen(true)}
+                    className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-slate-400 transition cursor-pointer"
+                  >
+                    <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-slate-700 text-white flex items-center justify-center text-xs">2</span>
+                      Workshop & Invoicing
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-2">
+                      Complete guides for inventory depletion, multi-stage job quotes, branded invoices, and receipts.
+                    </p>
+                  </div>
+                  <div 
+                    onClick={() => setIsManualModalOpen(true)}
+                    className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-slate-400 transition cursor-pointer"
+                  >
+                    <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-slate-700 text-white flex items-center justify-center text-xs">3</span>
+                      Backup & Audit Trails
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-2">
+                      Financial reconciliation, tamper-evident payment audit logs, and complete disaster recovery.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* Official System User Operating Manual Modal */}
+      {isManualModalOpen && (
+        <UserManualModal
+          isOpen={isManualModalOpen}
+          onClose={() => setIsManualModalOpen(false)}
+        />
+      )}
 
     </div>
   );

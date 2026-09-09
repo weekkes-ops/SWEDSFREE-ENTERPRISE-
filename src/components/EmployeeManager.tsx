@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Employee, EmployeeRole, EmployeeStatus, Job, RegistrationRequest, WarningLetter, formatCurrency } from '../types';
 import { 
   Plus, 
@@ -100,11 +100,11 @@ export default function EmployeeManager({
   const [warnDate, setWarnDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Handle auto-triggering modal
-  useState(() => {
+  useEffect(() => {
     if (showRegisterModalOnLoad) {
       setShowRegisterModal(true);
     }
-  });
+  }, [showRegisterModalOnLoad]);
 
   const handleOpenEditModal = (emp: Employee) => {
     setEditName(emp.name);

@@ -263,6 +263,12 @@ button.bg-wood-700:hover {
   background-color: #f1f5f9 !important;
 }
 
+.print-only,
+.print-only-block,
+.print-only-inline {
+  display: none !important;
+}
+
 /* ==========================================================
    REFINE PROFESSIONAL PRINT STYLESHEET (STRICT PURE WHITE BACKGROUND)
    ========================================================== */
@@ -270,16 +276,19 @@ button.bg-wood-700:hover {
   /* Set document size and printable margins */
   @page {
     size: A4 portrait;
-    margin: 1.2cm !important;
+    margin: 1cm !important;
   }
 
-  /* Reset layout for clean pure white printout */
+  /* Reset layout for clean pure white printout and ensure complete pagination without clipping */
   html, 
   body, 
   #root, 
+  #root > div,
   main, 
   .fixed, 
   .absolute, 
+  div[class*="fixed"],
+  div[class*="inset-0"],
   #print-area, 
   .sweds-paper-invoice {
     background-color: #ffffff !important;
@@ -291,6 +300,11 @@ button.bg-wood-700:hover {
     padding: 0 !important;
     box-shadow: none !important;
     border-radius: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    position: static !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -398,15 +412,46 @@ button.bg-wood-700:hover {
     color: #000000 !important;
   }
 
+  /* Explicitly enforce display of print-only and print-visible elements */
+  .print-only,
+  .print-only-inline,
+  .print\:inline,
+  span[class*="print:inline"],
+  span.print\:inline {
+    display: inline !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .print-only-block,
+  .print\:block,
+  div[class*="print:block"],
+  p[class*="print:block"],
+  div.print\:block,
+  p.print\:block {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .print\:flex,
+  div[class*="print:flex"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
   /* Hide UI controls, buttons, forms, navigation on printout */
   .no-print,
   .print\:hidden,
+  *[class*="print:hidden"],
   button,
   select,
   aside,
   header:not(.print-header),
   footer:not(.print-footer) {
     display: none !important;
+    visibility: hidden !important;
   }
 
   /* Ensure the main print container lays out flat on white background */
@@ -445,9 +490,21 @@ button.bg-wood-700:hover {
     padding-top: 8px;
   }
 
-  /* Prevent page breaks inside tables and cards */
-  tr, .bg-white {
+  /* Prevent awkward page breaks inside individual rows, but allow containers to paginate freely across multiple pages */
+  tr {
     page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #print-area,
+  #print-area > div,
+  .sweds-paper-invoice,
+  .bg-white {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 }
 

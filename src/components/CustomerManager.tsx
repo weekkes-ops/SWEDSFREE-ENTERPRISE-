@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Customer, Job, Employee, JobPayment, formatCurrency } from '../types';
 import { 
   Plus, 
@@ -103,16 +103,18 @@ export default function CustomerManager({
   const [editNotes, setEditNotes] = useState('');
 
   // Auto-select first customer if selectedCustomer is missing or deleted
-  if (!selectedCustomer && customers.length > 0) {
-    setSelectedCustomer(customers[0]);
-  }
+  useEffect(() => {
+    if (!selectedCustomer && customers.length > 0) {
+      setSelectedCustomer(customers[0]);
+    }
+  }, [selectedCustomer, customers]);
 
   // Handle auto-triggering modal from dashboard action shortcuts
-  useState(() => {
+  useEffect(() => {
     if (showRegisterModalOnLoad) {
       setShowRegisterModal(true);
     }
-  });
+  }, [showRegisterModalOnLoad]);
 
   const handleCloseModal = () => {
     setShowRegisterModal(false);

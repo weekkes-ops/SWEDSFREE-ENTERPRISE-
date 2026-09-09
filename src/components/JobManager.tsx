@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Job, JobItem, JobStatus, Customer, Employee, InventoryItem, JobMaterial, JobPayment, formatCurrency } from '../types';
 import { 
   Plus, 
@@ -109,6 +109,16 @@ export default function JobManager({
   const [paymentAmount, setPaymentAmount] = useState(2500);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Check' | 'Mobile Money'>('Bank Transfer');
 
+  // Edit and Delete payment states
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<JobPayment | null>(null);
+  const [editPaymentAmount, setEditPaymentAmount] = useState<number>(0);
+  const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Cheque' | 'Mobile Money'>('Cash');
+  const [editPaymentDate, setEditPaymentDate] = useState<string>('');
+  const [editPaymentNote, setEditPaymentNote] = useState<string>('');
+  const [editPaymentError, setEditPaymentError] = useState<string | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<JobPayment | null>(null);
+
   // Multi-item helper handlers for Create Job
   const handleAddItem = () => {
     setItems(prev => [
@@ -188,11 +198,11 @@ export default function JobManager({
   };
 
   // Handle auto modal trigger
-  useState(() => {
+  useEffect(() => {
     if (showCreateModalOnLoad) {
       setShowCreateModal(true);
     }
-  });
+  }, [showCreateModalOnLoad]);
 
   const handleOpenEditModal = (job: Job) => {
     setEditJobTitle(job.title);
@@ -347,16 +357,6 @@ export default function JobManager({
       onTriggerReceipt(targetJobId);
     }
   };
-
-  // Edit and Delete payment states
-  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
-  const [editingPayment, setEditingPayment] = useState<JobPayment | null>(null);
-  const [editPaymentAmount, setEditPaymentAmount] = useState<number>(0);
-  const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Cheque' | 'Mobile Money'>('Cash');
-  const [editPaymentDate, setEditPaymentDate] = useState<string>('');
-  const [editPaymentNote, setEditPaymentNote] = useState<string>('');
-  const [editPaymentError, setEditPaymentError] = useState<string | null>(null);
-  const [paymentToDelete, setPaymentToDelete] = useState<JobPayment | null>(null);
 
   const handleOpenEditPaymentModal = (p: JobPayment) => {
     setEditingPayment(p);

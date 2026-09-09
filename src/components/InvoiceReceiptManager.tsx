@@ -44,6 +44,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
+import { buildInvoicePdfContent, buildReceiptPdfContent } from '../utils/pdfGenerator';
 
 export interface CustomInvoiceItem {
   id: string;
@@ -1368,6 +1369,36 @@ export default function InvoiceReceiptManager({
     doc.save(`Invoice_${invoiceNo || '042'}_${cleanName}.pdf`);
   };
 
+  const handleDownloadSingleReceiptPdf = async () => {
+    if (!activeReceipt) return;
+    const logoDataUrl = await getLogoDataUrl(invoiceLogoUrl);
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+    const customer = customers.find(c => c.id === activeReceipt.job.customerId);
+    buildReceiptPdfContent(
+      doc,
+      activeReceipt.job,
+      activeReceipt.payment,
+      customer,
+      customInvoiceItems,
+      receiptNo,
+      receiptDate,
+      receiptCustomer,
+      receiptMethod,
+      receiptProject,
+      receiptAmount,
+      receiptAcknowledge,
+      receiptCompany,
+      receiptCompanySub,
+      logoDataUrl
+    );
+    const cleanCust = (receiptCustomer || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
+    doc.save(`Receipt_${receiptNo || activeReceipt.payment.id}_${cleanCust}.pdf`);
+  };
+
   const handleBulkPdfExport = async () => {
     if (selectedBulkJobIds.length === 0) return;
     setIsExporting(true);
@@ -1447,25 +1478,42 @@ export default function InvoiceReceiptManager({
   return (
     <div className="space-y-6">
       
-      {/* Print styles override (Prints print-area on clean white paper with crisp dark text) */}
+      {/* Print styles override (Ensures print-area prints all pages cleanly on white paper with crisp dark text) */}
       <style>{`
         @media print {
-          body * {
-            visibility: hidden;
+          body {
+            visibility: hidden !important;
+            overflow: visible !important;
+            background: #ffffff !important;
           }
           #print-area, #print-area * {
-            visibility: visible;
+            visibility: visible !important;
+          }
+          html, body, #root, #root > div, main, .fixed, .absolute, div[class*="fixed"], div[class*="inset-0"] {
+            overflow: visible !important;
+            position: static !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
           }
           #print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+            position: relative !important;
+            display: block !important;
+            left: auto !important;
+            top: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
             background: #ffffff !important;
-            color: #0f172a !important;
-            padding: 0.5cm !important;
+            color: #000000 !important;
+            padding: 0 !important;
+            margin: 0 auto !important;
             box-shadow: none !important;
             border: none !important;
+            overflow: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -1476,14 +1524,28 @@ export default function InvoiceReceiptManager({
             background: transparent !important;
             box-shadow: none !important;
             outline: none !important;
-            color: #0f172a !important;
+            color: #000000 !important;
             font-weight: bold !important;
             appearance: none !important;
             -webkit-appearance: none !important;
             resize: none !important;
+            width: auto !important;
+            max-width: 100% !important;
           }
-          .no-print {
+          .print-only,
+          .print-only-inline {
+            display: inline !important;
+            visibility: visible !important;
+          }
+          .print-only-block {
+            display: block !important;
+            visibility: visible !important;
+          }
+          .no-print,
+          .print\:hidden,
+          *[class*="print:hidden"] {
             display: none !important;
+            visibility: hidden !important;
           }
         }
       `}</style>
@@ -4204,6 +4266,15 @@ export default function InvoiceReceiptManager({
                   </div>
 
                   <button
+                    onClick={handleDownloadSingleReceiptPdf}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+                    title="Generate and download high-resolution PDF receipt file"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download PDF</span>
+                  </button>
+
+                  <button
                     onClick={handlePrint}
                     className="px-4 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
                   >
@@ -5001,567 +5072,8 @@ export default function InvoiceReceiptManager({
   );
 }
 
+
 // ==========================================
 // PROGRAMMATIC HIGH-FIDELITY PDF GENERATOR
 // ==========================================
-export function buildInvoicePdfContent(
-  doc: any, // Use jsPDF instance
-  job: Job,
-  customer: Customer | undefined,
-  template: 'SWEDS_WOOD' | 'MODERN',
-  currentUser: Employee | null,
-  customItems?: CustomInvoiceItem[],
-  invoiceNoOverride?: string,
-  dateOverride?: string,
-  customerNameOverride?: string,
-  addressOverride?: string,
-  phoneOverride?: string,
-  emailOverride?: string,
-  customerMessageOverride?: string,
-  projectTitleOverride?: string,
-  projectDescriptionOverride?: string,
-  commissionAmountOverride?: number,
-  projectQtyOverride?: number | string,
-  logoDataUrl?: string | null
-) {
-  const isSwedsWood = template === 'SWEDS_WOOD';
-  const projectTitle = projectTitleOverride || job.title;
-  const projectDescription = projectDescriptionOverride || job.description;
-  const commissionAmount = commissionAmountOverride !== undefined ? commissionAmountOverride : job.quoteAmount;
-  
-  if (isSwedsWood) {
-    // SWEDS WOOD ENTERPRISE OFFICIAL PAPER STYLE (PURE WHITE BACKGROUND & BLACK FONTS)
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.3);
-    doc.rect(10, 10, 190, 277, 'S');
-
-    // System Official Logo image embedding
-    let logoDrawn = false;
-    if (logoDataUrl) {
-      try {
-        doc.addImage(logoDataUrl, 'PNG', 15, 13, 22, 20);
-        logoDrawn = true;
-      } catch (err) {
-        console.error('Error drawing logo in PDF:', err);
-      }
-    }
-
-    if (!logoDrawn) {
-      // Fallback vector logo disc
-      const logoX = 25;
-      const logoY = 27;
-      doc.setFillColor(155, 55, 31);
-      doc.circle(logoX, logoY, 9, 'F');
-
-      doc.setLineWidth(0.6);
-      doc.setDrawColor(255, 255, 255);
-      for (let angle = 0; angle < 360; angle += 45) {
-        const rad = (angle * Math.PI) / 180;
-        const startX = logoX + Math.cos(rad) * 3.5;
-        const startY = logoY + Math.sin(rad) * 3.5;
-        const endX = logoX + Math.cos(rad) * 7;
-        const endY = logoY + Math.sin(rad) * 7;
-        doc.line(startX, startY, endX, endY);
-      }
-
-      doc.setFillColor(255, 255, 255);
-      doc.circle(logoX, logoY, 2.5, 'F');
-    }
-
-    // Company Name (Crisp Black)
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(0, 0, 0);
-    doc.text("SWEDS WOOD ENTERPRISE", 40, 27);
-    
-    doc.setFillColor(0, 0, 0);
-    doc.rect(40, 30, 75, 1.2, 'F');
-    
-    // Invoice Badge Box (White Background with Black Outline & Black Bold Text)
-    doc.setFillColor(255, 255, 255);
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.8);
-    doc.rect(135, 18, 60, 16, 'FD');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0);
-    doc.text("INVOICE", 135 + 30, 18 + 10.5, { align: 'center' });
-
-    // Metadata Small Table
-    const tableX = 15;
-    const tableY = 44;
-    const col1Width = 30;
-    const col2Width = 65;
-    const rowHeight = 6.5;
-    
-    const invNoStr = invoiceNoOverride || `042`;
-    const invDateStr = dateOverride || job.startDate;
-
-    const metaData = [
-      { label: "Invoice No.", val: invNoStr },
-      { label: "Address", val: "2 Sweds free Avenue" },
-      { label: "Date", val: invDateStr },
-      { label: "Terms (days)", val: "COD / Standard" }
-    ];
-    
-    doc.setLineWidth(0.2);
-    doc.setDrawColor(0, 0, 0);
-    
-    for (let i = 0; i < 4; i++) {
-      const currentY = tableY + i * rowHeight;
-      doc.setFillColor(245, 245, 245);
-      doc.rect(tableX, currentY, col1Width, rowHeight, 'FD');
-      
-      doc.setFillColor(255, 255, 255);
-      doc.rect(tableX + col1Width, currentY, col2Width, rowHeight, 'FD');
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(0, 0, 0);
-      doc.text(metaData[i].label, tableX + 3, currentY + 4.5);
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(metaData[i].val, tableX + col1Width + 3, currentY + 4.5);
-    }
-
-    // Customer Information Box
-    const custY = 76;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9.5);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Invoice to:", 15, custY);
-    
-    const boxY = custY + 2;
-    const boxHeight = 22;
-    doc.setLineWidth(0.2);
-    doc.setDrawColor(0, 0, 0);
-    doc.setFillColor(255, 255, 255);
-    doc.rect(15, boxY, 180, boxHeight, 'FD');
-    
-    doc.setFillColor(245, 245, 245);
-    doc.rect(15, boxY, 180, 5, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(0, 0, 0);
-    doc.text("CUSTOMER INFORMATION", 18, boxY + 3.5);
-    
-    const cName = customerNameOverride || job.customerName;
-    const cPhone = phoneOverride !== undefined ? phoneOverride : (customer?.phone || "");
-    const cAddr = addressOverride || customer?.address || "";
-    const cEmail = emailOverride !== undefined ? emailOverride : (customer?.email || "");
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(0, 0, 0);
-    doc.text("NAME:", 18, boxY + 10);
-    doc.text(cName, 32, boxY + 10);
-    
-    doc.text("MOBILE:", 115, boxY + 10);
-    doc.text(cPhone, 130, boxY + 10);
-    
-    doc.text("ADDRESS:", 18, boxY + 16);
-    doc.text(cAddr, 32, boxY + 16);
-    
-    doc.text("EMAIL:", 115, boxY + 16);
-    doc.text(cEmail, 130, boxY + 16);
-
-    // Ledger Table
-    const ledY = 105;
-    const ledCol1 = 110;
-    const ledCol2 = 15;
-    const ledCol3 = 25;
-    const ledCol4 = 30;
-    
-    doc.setFillColor(245, 245, 245);
-    doc.setDrawColor(0, 0, 0);
-    doc.rect(15, ledY, 180, 8, 'FD');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Description", 15 + 4, ledY + 5.5);
-    doc.text("Qty", 15 + ledCol1 + 4, ledY + 5.5, { align: 'center' });
-    doc.text("Price", 15 + ledCol1 + ledCol2 + ledCol3 - 4, ledY + 5.5, { align: 'right' });
-    doc.text("Total", 15 + ledCol1 + ledCol2 + ledCol3 + ledCol4 - 4, ledY + 5.5, { align: 'right' });
-    
-    // Items rendering
-    let itemsToRender: { desc: string; qty: string; price: number; total: number }[] = [];
-    if (customItems && customItems.length > 0) {
-      itemsToRender = customItems.map(item => {
-        const qtyNum = item.quantity !== undefined ? item.quantity : (parseFloat(item.unitRate) || 1);
-        const unitPrice = item.unitPrice !== undefined ? item.unitPrice : item.amount;
-        const lineTotal = qtyNum * unitPrice;
-        return {
-          desc: item.description,
-          qty: String(qtyNum),
-          price: unitPrice,
-          total: lineTotal
-        };
-      });
-      if (commissionAmount > 0 && !customItems.some(i => i.description.includes(projectTitle))) {
-        const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
-        itemsToRender.unshift({
-          desc: projectTitle,
-          qty: String(projQtyNum),
-          price: commissionAmount,
-          total: commissionAmount * projQtyNum
-        });
-      }
-    } else if (job.items && job.items.length > 0) {
-      itemsToRender = job.items.map(item => ({
-        desc: item.description,
-        qty: String(item.quantity || 1),
-        price: item.unitCost,
-        total: item.totalCost || ((item.quantity || 1) * item.unitCost)
-      }));
-      if (commissionAmount > 0 && !itemsToRender.some(i => i.desc.includes(projectTitle))) {
-        const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
-        itemsToRender.unshift({
-          desc: projectTitle,
-          qty: String(projQtyNum),
-          price: commissionAmount,
-          total: commissionAmount * projQtyNum
-        });
-      }
-    } else {
-      const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
-      itemsToRender = [{
-        desc: projectTitle,
-        qty: String(projQtyNum),
-        price: commissionAmount,
-        total: commissionAmount * projQtyNum
-      }];
-    }
-
-    const tableRowHeight = 8;
-    const actualRowsCount = Math.max(itemsToRender.length, 6);
-    const tableBottomY = ledY + 8 + actualRowsCount * tableRowHeight;
-
-    let subtotalVal = 0;
-    itemsToRender.forEach((it, idx) => {
-      subtotalVal += it.total;
-      const currentY = ledY + 8 + idx * tableRowHeight;
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(0, 0, 0);
-      const cleanDesc = doc.splitTextToSize(it.desc, ledCol1 - 6)[0];
-      doc.text(cleanDesc, 19, currentY + 5.5);
-      
-      // Draw light gray badge box for Qty data
-      doc.setFillColor(240, 240, 240);
-      doc.setDrawColor(0, 0, 0);
-      doc.roundedRect(15 + ledCol1 + 2, currentY + 1.2, ledCol2 - 4, 5.5, 1, 1, 'FD');
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(0, 0, 0);
-      doc.text(it.qty, 15 + ledCol1 + (ledCol2 / 2), currentY + 5.2, { align: 'center' });
-      
-      doc.setFont('helvetica', 'bold');
-      const pStr = `SLL ${it.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-      const tStr = `SLL ${it.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-      doc.text(pStr, 15 + ledCol1 + ledCol2 + ledCol3 - 4, currentY + 5.5, { align: 'right' });
-      doc.text(tStr, 15 + ledCol1 + ledCol2 + ledCol3 + ledCol4 - 4, currentY + 5.5, { align: 'right' });
-    });
-    
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.15);
-    for (let r = 0; r <= actualRowsCount; r++) {
-      const currentY = ledY + 8 + r * tableRowHeight;
-      doc.line(15, currentY, 195, currentY);
-    }
-    
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.2);
-    doc.line(15, ledY, 15, tableBottomY);
-    doc.line(15 + ledCol1, ledY, 15 + ledCol1, tableBottomY);
-    doc.line(15 + ledCol1 + ledCol2, ledY, 15 + ledCol1 + ledCol2, tableBottomY);
-    doc.line(15 + ledCol1 + ledCol2 + ledCol3, ledY, 15 + ledCol1 + ledCol2 + ledCol3, tableBottomY);
-    doc.line(195, ledY, 195, tableBottomY);
-
-    // Footer Totals Section
-    const totY = Math.min(tableBottomY + 7, 215);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Customer Message", 15, totY);
-    
-    doc.setDrawColor(0, 0, 0);
-    doc.setFillColor(255, 255, 255);
-    doc.rect(15, totY + 2, 100, 20, 'FD');
-    
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8);
-    doc.setTextColor(0, 0, 0);
-    const msgText = customerMessageOverride !== undefined ? customerMessageOverride : "Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!";
-    const messageLines = doc.splitTextToSize(msgText, 94);
-    doc.text(messageLines, 18, totY + 7);
-    
-    const totalPaid = job.payments.reduce((sum, p) => sum + p.amount, 0);
-    const outstanding = subtotalVal - totalPaid;
-    
-    doc.setFillColor(245, 245, 245);
-    doc.setDrawColor(0, 0, 0);
-    doc.rect(122, totY + 2, 73, 7, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Total Invoice Amount", 125, totY + 6.5);
-    const subtotalStr = `SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    doc.text(subtotalStr, 191, totY + 6.5, { align: 'right' });
-  } else {
-    // MODERN DIGITAL PROFESSIONAL TEMPLATE
-    doc.setDrawColor(245, 245, 244);
-    doc.setLineWidth(0.3);
-    doc.rect(10, 10, 190, 277, 'S');
-
-    // Header Logo
-    let logoDrawn = false;
-    if (logoDataUrl) {
-      try {
-        doc.addImage(logoDataUrl, 'PNG', 15, 14, 12, 12);
-        logoDrawn = true;
-      } catch (err) {
-        console.error('Failed to add logo to modern PDF template:', err);
-      }
-    }
-
-    if (!logoDrawn) {
-      doc.setFillColor(69, 26, 3);
-      doc.rect(15, 15, 10, 10, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(255, 255, 255);
-      doc.text("W", 18.5, 21.5);
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(69, 26, 3);
-    doc.text("SWEDS WOOD ENTERPRISE", 28, 20);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(107, 114, 128);
-    doc.text("Corporate Carpentry, Woodwork, Timber Logistics & Design.", 28, 24);
-
-    doc.setFontSize(6.5);
-    const contactText = "Freetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 112 3344";
-    doc.text(contactText, 15, 30);
-
-    // Title
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(15);
-    doc.setTextColor(69, 26, 3);
-    doc.text("COMMERCIAL INVOICE", 195, 20, { align: 'right' });
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(55, 65, 81);
-    
-    const modernInvNo = invoiceNoOverride || `INV-${job.id.slice(4).toUpperCase()}`;
-    const modernInvDate = dateOverride || job.startDate;
-    const modernCustName = customerNameOverride || job.customerName;
-    const modernCustPhone = phoneOverride !== undefined ? phoneOverride : (customer?.phone || "N/A");
-    const modernCustEmail = emailOverride !== undefined ? emailOverride : (customer?.email || "N/A");
-    const modernCustAddr = addressOverride || customer?.address || "N/A";
-
-    doc.text(`Invoice No: ${modernInvNo}`, 195, 26, { align: 'right' });
-    doc.text(`Date: ${modernInvDate}`, 195, 31, { align: 'right' });
-    doc.text(`Terms: Payment Clear / Standard Log`, 195, 36, { align: 'right' });
-
-    doc.setDrawColor(229, 231, 235);
-    doc.setLineWidth(0.4);
-    doc.line(15, 46, 195, 46);
-
-    // Side-by-side containers
-    const blockWidth = 87;
-    const blockHeight = 28;
-    
-    // Client
-    doc.setFillColor(245, 245, 244);
-    doc.rect(15, 51, blockWidth, blockHeight, 'F');
-    doc.setDrawColor(229, 231, 235);
-    doc.rect(15, 51, blockWidth, blockHeight, 'S');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(69, 26, 3);
-    doc.text("CLIENT DEPOSITOR:", 18, 56);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(17, 24, 39);
-    doc.text(modernCustName, 18, 62);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`Phone: ${modernCustPhone}`, 18, 67);
-    doc.text(`Email: ${modernCustEmail}`, 18, 71);
-    doc.text(`Delivery: ${modernCustAddr}`, 18, 75);
-
-    // Project Details
-    doc.setFillColor(245, 245, 244);
-    doc.rect(108, 51, blockWidth, blockHeight, 'F');
-    doc.setDrawColor(229, 231, 235);
-    doc.rect(108, 51, blockWidth, blockHeight, 'S');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(69, 26, 3);
-    doc.text("PROJECT / DESIGN FOCUS:", 111, 56);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(17, 24, 39);
-    doc.text(projectTitle, 111, 62);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(75, 85, 99);
-    const splitProjDesc = doc.splitTextToSize(projectDescription || "Custom hand-crafted carpentry order.", blockWidth - 8);
-    doc.text(splitProjDesc, 111, 67);
-    doc.text(`Workshop Timeline: ${job.startDate} to ${job.dueDate}`, 111, 75);
-
-    // Items Table
-    let itemsToRender: { desc: string; qty: string; price: number; total: number }[] = [];
-    if (customItems && customItems.length > 0) {
-      itemsToRender = customItems.map(item => {
-        const q = item.quantity !== undefined ? item.quantity : (parseFloat(item.unitRate) || 1);
-        const p = item.unitPrice !== undefined ? item.unitPrice : item.amount;
-        return {
-          desc: item.description,
-          qty: String(q),
-          price: p,
-          total: q * p
-        };
-      });
-      if (commissionAmount > 0 && !itemsToRender.some(i => i.desc.includes(projectTitle))) {
-        const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
-        itemsToRender.unshift({
-          desc: projectTitle,
-          qty: String(projQtyNum),
-          price: commissionAmount,
-          total: commissionAmount * projQtyNum
-        });
-      }
-    } else if (job.items && job.items.length > 0) {
-      itemsToRender = job.items.map(item => ({
-        desc: item.description,
-        qty: String(item.quantity || 1),
-        price: item.unitCost,
-        total: item.totalCost || ((item.quantity || 1) * item.unitCost)
-      }));
-      if (commissionAmount > 0 && !itemsToRender.some(i => i.desc.includes(projectTitle))) {
-        const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
-        itemsToRender.unshift({
-          desc: projectTitle,
-          qty: String(projQtyNum),
-          price: commissionAmount,
-          total: commissionAmount * projQtyNum
-        });
-      }
-    } else {
-      const projQtyNum = parseFloat(String(projectQtyOverride)) || 1;
-      itemsToRender = [{
-        desc: projectTitle,
-        qty: String(projQtyNum),
-        price: commissionAmount,
-        total: commissionAmount * projQtyNum
-      }];
-    }
-
-    const tableY = 86;
-    doc.setFillColor(69, 26, 3);
-    doc.rect(15, tableY, 180, 8, 'F');
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(255, 255, 255);
-    doc.text("Itemized Production Scope & Timber Milling", 19, tableY + 5.5);
-    doc.text("Qty", 115, tableY + 5.5, { align: 'center' });
-    doc.text("Unit Rate", 145, tableY + 5.5);
-    doc.text("Cleared Value", 191, tableY + 5.5, { align: 'right' });
-
-    let modernSubtotalVal = 0;
-    const rowHeight = 8;
-    itemsToRender.forEach((it, idx) => {
-      modernSubtotalVal += it.total;
-      const currentY = tableY + 8 + idx * rowHeight;
-
-      if (idx % 2 === 1) {
-        doc.setFillColor(250, 248, 246);
-        doc.rect(15, currentY, 180, rowHeight, 'F');
-      }
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(31, 41, 55);
-      const splitDesc = doc.splitTextToSize(it.desc, 90)[0];
-      doc.text(splitDesc, 19, currentY + 5.5);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(69, 26, 3);
-      doc.text(it.qty, 115, currentY + 5.5, { align: 'center' });
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(75, 85, 99);
-      doc.text(`Le ${it.price.toLocaleString(undefined, { minimumFractionDigits: 0 })}`, 145, currentY + 5.5);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(31, 41, 55);
-      doc.text(`Le ${it.total.toLocaleString(undefined, { minimumFractionDigits: 0 })}`, 191, currentY + 5.5, { align: 'right' });
-
-      doc.setDrawColor(229, 231, 235);
-      doc.setLineWidth(0.2);
-      doc.line(15, currentY + rowHeight, 195, currentY + rowHeight);
-    });
-
-    const minRows = Math.max(itemsToRender.length, 4);
-    const tableBottomY = tableY + 8 + minRows * rowHeight;
-
-    doc.setDrawColor(209, 213, 219);
-    doc.setLineWidth(0.3);
-    doc.line(15, tableY, 15, tableBottomY);
-    doc.line(195, tableY, 195, tableBottomY);
-    doc.line(15, tableBottomY, 195, tableBottomY);
-
-    // Totals Section
-    const botY = Math.min(tableBottomY + 8, 215);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(69, 26, 3);
-    doc.text("Payment Instructions & Bank Log:", 15, botY);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(75, 85, 99);
-    const bankInstructionsText = `Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${job.id.slice(4).toUpperCase()}`;
-    doc.text(bankInstructionsText, 15, botY + 4.5);
-
-    const totalPaid = job.payments.reduce((sum, p) => sum + p.amount, 0);
-    const outstanding = modernSubtotalVal - totalPaid;
-
-    const calcX = 125;
-    const calcWidth = 70;
-    
-    doc.setDrawColor(229, 231, 235);
-    doc.setFillColor(245, 245, 244);
-    doc.rect(calcX, botY, calcWidth, 10, 'FD');
-    
-    const quotePriceStr = `Le ${modernSubtotalVal.toLocaleString(undefined, { minimumFractionDigits: 0 })}`;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(31, 41, 55);
-    doc.text("Total Invoice Value:", calcX + 3, botY + 6.5);
-    doc.text(quotePriceStr, calcX + calcWidth - 3, botY + 6.5, { align: 'right' });
-  }
-}
+export { buildInvoicePdfContent, buildReceiptPdfContent } from "../utils/pdfGenerator";

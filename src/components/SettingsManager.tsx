@@ -20,9 +20,12 @@ import {
   Wrench,
   Receipt,
   DollarSign,
-  Users
+  Users,
+  BookOpen,
+  ExternalLink
 } from 'lucide-react';
 import { Employee } from '../types';
+import { downloadUserManualPdf } from '../utils/userManualPdf';
 
 interface SettingsManagerProps {
   currentUser: Employee | null;
@@ -35,6 +38,7 @@ interface SettingsManagerProps {
   onRestoreAllDataTillToday: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onClearData: (silent?: boolean) => void;
+  onOpenManual?: () => void;
   recordCounts: {
     inventory: number;
     customers: number;
@@ -57,6 +61,7 @@ export default function SettingsManager({
   onRestoreAllDataTillToday,
   fileInputRef,
   onClearData,
+  onOpenManual,
   recordCounts
 }: SettingsManagerProps) {
   const isActiveUser = currentUser?.status === 'Active';
@@ -94,7 +99,7 @@ export default function SettingsManager({
               System Settings & Data Control
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-xl mt-1">
-              Configure system preferences, perform offline data backups, manage system updates, and monitor database synchronization.
+              Configure system preferences, perform offline data backups, manage system updates, access the official PDF user operating manual, and monitor database synchronization.
             </p>
           </div>
 
@@ -113,8 +118,75 @@ export default function SettingsManager({
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left 2 Columns: Data Backup & Restore Hub */}
+        {/* Left 2 Columns: Documentation Hub + Backup & Restore Hub */}
         <div className="lg:col-span-2 space-y-6">
+          
+          {/* USER MANUAL & SYSTEM DOCUMENTATION CARD */}
+          <div className="bg-gradient-to-br from-amber-900/90 via-slate-900 to-wood-950 p-6 sm:p-7 rounded-3xl border border-amber-500/30 text-white shadow-lg space-y-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+              <BookOpen className="w-40 h-40 text-amber-400" />
+            </div>
+
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30 shadow-xs">
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-display font-black text-lg text-white uppercase tracking-tight">
+                      System User Manual (PDF)
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40">
+                      15 Chapters
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Official operational handbook for Swedswood Enterprise (Freetown, Sierra Leone).
+                  </p>
+                </div>
+              </div>
+
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[10px] font-black uppercase tracking-wider w-fit">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Ready for Download</span>
+              </span>
+            </div>
+
+            <p className="relative z-10 text-xs text-slate-200 leading-relaxed">
+              Contains complete step-by-step guidance covering role permissions (Admin, Manager, Auditor, Staff), raw timber and hardware inventory management, client classification (Company, Institution, Private), commission quote pricing in Le, commercial invoicing without balances, payment installment receipts with full financial settlement breakdown, immutable audit logging, daily photo logs, and zero data loss offline recovery.
+            </p>
+
+            <div className="relative z-10 flex flex-wrap items-center gap-3 pt-1">
+              <button
+                onClick={() => downloadUserManualPdf()}
+                className="py-3 px-5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-md transition cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download PDF Manual (15 Pages)</span>
+              </button>
+
+              {onOpenManual && (
+                <button
+                  onClick={onOpenManual}
+                  className="py-3 px-4 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs flex items-center gap-2 border border-white/20 transition cursor-pointer"
+                >
+                  <BookOpen className="w-4 h-4 text-amber-400" />
+                  <span>Browse Manual In-App</span>
+                </button>
+              )}
+
+              <a
+                href="/Swedswood_Woodwork_System_User_Manual.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-3 px-4 text-slate-300 hover:text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer ml-auto"
+              >
+                <span>Open in Tab</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
           
           {/* EXCLUSIVE BACKUP & RESTORE SECTION */}
           <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-xs space-y-6 relative overflow-hidden">
