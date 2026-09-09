@@ -1615,6 +1615,75 @@ export default function InvoiceReceiptManager({
             break-inside: auto !important;
           }
 
+          .print-footer-summary {
+            display: grid !important;
+            grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+            gap: 12px !important;
+            padding-top: 8px !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+
+          .print-customer-message-col {
+            grid-column: span 7 / span 7 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+
+          .print-totals-col {
+            grid-column: span 5 / span 5 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: flex-end !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+
+          .print-total-card {
+            display: block !important;
+            visibility: visible !important;
+            border: 2px solid #0f172a !important;
+            border-radius: 3px !important;
+            background-color: #ffffff !important;
+            overflow: hidden !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+
+          .print-total-card-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding: 8px 12px !important;
+            background-color: #0f172a !important;
+            background: #0f172a !important;
+            color: #ffffff !important;
+            border-bottom: 2px solid #0f172a !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          .print-total-card-header span,
+          .print-total-card-header strong,
+          .print-total-card-header div {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            font-weight: 900 !important;
+          }
+
+          .print-total-card-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding: 5px 12px !important;
+            font-size: 11px !important;
+            border-top: 1px solid #cbd5e1 !important;
+          }
+
           #print-area input,
           #print-area textarea,
           #print-area select {
@@ -1627,7 +1696,7 @@ export default function InvoiceReceiptManager({
             appearance: none !important;
             -webkit-appearance: none !important;
             resize: none !important;
-            width: auto !important;
+            width: 100% !important;
             max-width: 100% !important;
           }
 
@@ -3178,8 +3247,8 @@ export default function InvoiceReceiptManager({
          ========================================== */}
       <AnimatePresence>
         {activeInvoice && (
-          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:p-0 print:bg-white">
-            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-4xl p-6 my-8 shadow-2xl relative print:my-0 print:shadow-none print:rounded-none print:bg-white print:p-0" id="print-area">
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white">
+            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-4xl p-6 my-8 shadow-2xl relative print:!static print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
               
               {/* TOP WORKSPACE TOOLBAR (Hides on standard print) */}
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-4 border-b border-gray-200/60 no-print">
@@ -3366,20 +3435,20 @@ export default function InvoiceReceiptManager({
                   })()}
                 </div>
               ) : (
-              <div className={`p-8 sm:p-12 border border-gray-200 rounded-xl shadow-xl space-y-6 print:p-0 print:border-none print:shadow-none print:rounded-none ${invoiceTemplate === 'SWEDS_WOOD' ? 'sweds-paper-invoice bg-white' : 'bg-white'}`}>
+              <div className={`p-8 sm:p-12 border border-gray-200 rounded-xl shadow-xl space-y-6 print:!p-0 print:!border-none print:!shadow-none print:!rounded-none print:!space-y-3 ${invoiceTemplate === 'SWEDS_WOOD' ? 'sweds-paper-invoice bg-white' : 'bg-white'}`}>
                 
                 {invoiceTemplate === 'SWEDS_WOOD' ? (
                   /* ==========================================
                      SWEDS WOOD ENTERPRISE OFFICIAL PAPER PATTERN
                      ========================================== */
-                  <div className="space-y-6 text-[#1e3a8a] font-sans antialiased">
+                  <div className="space-y-6 print:!space-y-3 text-[#1e3a8a] font-sans antialiased">
                     {/* Logo Header Banner */}
-                    <div className="flex flex-col md:flex-row md:items-stretch justify-between gap-6 pb-4 border-b-2 border-gray-300">
+                    <div className="flex flex-col md:flex-row md:items-stretch justify-between gap-6 pb-4 border-b-2 border-gray-300 print:!gap-2 print:!pb-2 print:!border-b">
                       <div className="flex flex-col justify-between">
                         {/* Company Logo and Name */}
                         <div className="flex items-center gap-3">
                           <div className="relative group shrink-0">
-                            <img src={invoiceLogoUrl || '/logo.svg'} alt="Swedswood Enterprise Official Logo" className="w-14 h-14 object-contain shrink-0" />
+                            <img src={invoiceLogoUrl || '/logo.svg'} alt="Swedswood Enterprise Official Logo" className="w-14 h-14 print:w-11 print:h-11 object-contain shrink-0" />
                             {invoicePdfMode === 'EDIT' && (
                               <label className="absolute -bottom-1 -right-1 bg-wood-950 text-white p-1 rounded-full text-[9px] cursor-pointer shadow-md hover:bg-amber-600 transition no-print" title="Click to replace logo image">
                                 <Upload className="w-3 h-3 text-amber-400" />
@@ -3388,7 +3457,7 @@ export default function InvoiceReceiptManager({
                             )}
                           </div>
                           <div className="flex flex-col">
-                            <h1 className="font-sans font-black text-2xl tracking-tight text-[#0f52ba] flex items-center gap-1.5 uppercase">
+                            <h1 className="font-sans font-black text-2xl print:text-xl tracking-tight text-[#0f52ba] flex items-center gap-1.5 uppercase">
                               Sweds Wood Enterprise
                             </h1>
                             <div className="w-full h-[3px] bg-[#0f52ba] mt-0.5" />
@@ -3396,12 +3465,12 @@ export default function InvoiceReceiptManager({
                         </div>
 
                         {/* Small Metadata Table */}
-                        <div className="mt-4 w-72 border border-gray-400 bg-white text-xs text-[#1e3a8a] rounded-xs shadow-xs overflow-hidden">
+                        <div className="mt-4 print:!mt-2 w-72 border border-gray-400 bg-white text-xs text-[#1e3a8a] rounded-xs shadow-xs overflow-hidden">
                           <table className="w-full border-collapse">
                             <tbody>
                               <tr className="border-b border-gray-300">
-                                <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 w-28 uppercase text-[10px]">Invoice No.</td>
-                                <td className="p-1.5 font-mono font-bold text-gray-800">
+                                <td className="p-1.5 print:p-1 font-bold bg-[#e0f2fe] border-r border-gray-300 w-28 uppercase text-[10px]">Invoice No.</td>
+                                <td className="p-1.5 print:p-1 font-mono font-bold text-gray-800">
                                   {invoicePdfMode === 'EDIT' ? (
                                     <>
                                       <span className="hidden print:inline font-mono font-bold">{invoiceNo}</span>
@@ -3418,8 +3487,8 @@ export default function InvoiceReceiptManager({
                                 </td>
                               </tr>
                               <tr className="border-b border-gray-300">
-                                <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Address</td>
-                                <td className="p-1.5 text-gray-700 font-semibold">
+                                <td className="p-1.5 print:p-1 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Address</td>
+                                <td className="p-1.5 print:p-1 text-gray-700 font-semibold">
                                   {invoicePdfMode === 'EDIT' ? (
                                     <>
                                       <span className="hidden print:inline font-semibold text-gray-700">{invoiceCompanyContact}</span>
@@ -3436,8 +3505,8 @@ export default function InvoiceReceiptManager({
                                 </td>
                               </tr>
                               <tr className="border-b border-gray-300">
-                                <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Date</td>
-                                <td className="p-1.5 font-mono text-gray-800">
+                                <td className="p-1.5 print:p-1 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Date</td>
+                                <td className="p-1.5 print:p-1 font-mono text-gray-800">
                                   {invoicePdfMode === 'EDIT' ? (
                                     <>
                                       <span className="hidden print:inline font-mono">{invoiceDate}</span>
@@ -3454,8 +3523,8 @@ export default function InvoiceReceiptManager({
                                 </td>
                               </tr>
                               <tr>
-                                <td className="p-1.5 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Terms (days)</td>
-                                <td className="p-1.5 text-gray-700 font-mono">
+                                <td className="p-1.5 print:p-1 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Terms (days)</td>
+                                <td className="p-1.5 print:p-1 text-gray-700 font-mono">
                                   {invoicePdfMode === 'EDIT' ? (
                                     <>
                                       <span className="hidden print:inline font-mono">{invoiceTerms}</span>
@@ -3478,7 +3547,7 @@ export default function InvoiceReceiptManager({
 
                       {/* Blue INVOICE Badge */}
                       <div className="flex flex-col justify-start md:items-end">
-                        <div className="bg-[#38bdf8] text-white py-4 px-12 rounded-xs border-2 border-[#0f52ba] text-center font-sans font-black text-3xl tracking-widest uppercase shadow-md md:w-64">
+                        <div className="bg-[#38bdf8] text-white py-4 px-12 print:!py-1.5 print:!px-6 print:!text-xl rounded-xs border-2 border-[#0f52ba] text-center font-sans font-black text-3xl tracking-widest uppercase shadow-md md:w-64 print:!w-44">
                           INVOICE
                         </div>
                       </div>
@@ -3487,7 +3556,7 @@ export default function InvoiceReceiptManager({
                     {/* "Invoice to:" Customer Information Box */}
                     <div className="space-y-1">
                       <span className="font-sans font-black text-xs uppercase text-[#0f52ba]">Invoice to:</span>
-                      <div className="border border-gray-400 bg-white rounded-xs p-4 space-y-2 text-xs">
+                      <div className="border border-gray-400 bg-white rounded-xs p-4 print:!p-2.5 space-y-2 print:!space-y-1 text-xs">
                         <div className="bg-[#e0f2fe] px-2 py-1 border-b border-gray-300 font-bold uppercase text-[10px] text-[#0f52ba] tracking-wider">
                           Customer Information
                         </div>
@@ -3752,7 +3821,7 @@ export default function InvoiceReceiptManager({
 
                           {/* Empty Ledger Padding Rows to replicate the paper pad style perfectly! */}
                           {Array.from({ length: Math.max(1, 3 - (Number(invoiceCommissionAmount) > 0 ? 1 : 0) - customInvoiceItems.length) }).map((_, idx) => (
-                            <tr key={`empty-${idx}`} className="h-8">
+                            <tr key={`empty-${idx}`} className="h-8 print:hidden">
                               <td className="border-r border-gray-400"></td>
                               <td className="border-r border-gray-400"></td>
                               <td className="border-r border-gray-400"></td>
@@ -3760,35 +3829,15 @@ export default function InvoiceReceiptManager({
                             </tr>
                           ))}
                         </tbody>
-                        <tfoot className="border-t-2 border-gray-600 bg-slate-100 font-black text-xs">
-                          <tr className="border-b border-gray-400 bg-slate-100">
-                            <td colSpan={3} className="py-2.5 px-3 text-right font-black uppercase text-xs border-r border-gray-400 text-slate-900">
-                              Total Invoice Amount:
+                        <tfoot className="border-t-2 border-gray-600 bg-slate-50 font-bold text-xs">
+                          <tr className="border-b border-gray-400 bg-slate-50">
+                            <td colSpan={3} className="py-2 px-3 text-right font-bold uppercase text-[10.5px] border-r border-gray-400 text-slate-700">
+                              Ledger Subtotal:
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono font-black text-sm text-slate-950 bg-slate-200">
+                            <td className="py-2 px-3 text-right font-mono font-bold text-xs text-slate-900 bg-slate-100">
                               SLL {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
-                          {totals.totalPaid > 0 && (
-                            <>
-                              <tr className="border-b border-gray-400 text-emerald-800 bg-emerald-50/60">
-                                <td colSpan={3} className="py-1.5 px-3 text-right font-bold uppercase text-[11px] border-r border-gray-400">
-                                  Payments / Deposits Cleared:
-                                </td>
-                                <td className="py-1.5 px-3 text-right font-mono font-bold text-xs">
-                                  - SLL {totals.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </td>
-                              </tr>
-                              <tr className="bg-slate-100 font-black">
-                                <td colSpan={3} className="py-2 px-3 text-right font-black uppercase text-xs border-r border-gray-400 text-slate-900">
-                                  Net Balance Due:
-                                </td>
-                                <td className={`py-2 px-3 text-right font-mono font-black text-sm ${totals.outstanding > 0 ? 'text-amber-900 bg-amber-50' : 'text-emerald-900 bg-emerald-50'}`}>
-                                  {totals.outstanding > 0 ? `SLL ${totals.outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'PAID IN FULL'}
-                                </td>
-                              </tr>
-                            </>
-                          )}
                         </tfoot>
                       </table>
                     </div>
@@ -3852,21 +3901,26 @@ export default function InvoiceReceiptManager({
                     )}
 
                     {/* Footer Summary Blocks */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
+                    <div id="invoice-footer-summary" className="grid grid-cols-12 gap-3 md:gap-4 pt-3 print:!pt-2 print:!grid-cols-12 page-break-inside-avoid print:!break-inside-avoid print-footer-summary">
                       {/* Customer Message on the left */}
-                      <div className="md:col-span-7 flex flex-col justify-stretch">
-                        <span className="text-[10px] uppercase font-black text-gray-400 block mb-1">Customer Message</span>
-                        <div className="border border-gray-400 bg-white rounded-xs p-3 min-h-[64px] flex-1 text-xs">
+                      <div className="col-span-7 print:!col-span-7 flex flex-col justify-stretch print-customer-message-col">
+                        <span className="text-[10px] uppercase font-black text-gray-500 block mb-1">Customer Message</span>
+                        <div className="border border-gray-400 bg-white rounded-xs p-3 min-h-[64px] flex-1 text-xs print:!min-h-[56px] print:!p-2 print:!border-gray-500">
                           {invoicePdfMode === 'EDIT' ? (
-                            <textarea
-                              rows={2}
-                              value={invoiceCustomerMessage}
-                              onChange={(e) => setInvoiceCustomerMessage(e.target.value)}
-                              placeholder="e.g. Thank you for your woodwork order!"
-                              className="w-full text-xs text-gray-700 bg-amber-50 border border-amber-200 rounded p-1.5 outline-hidden"
-                            />
+                            <>
+                              <p className="hidden print:block text-gray-800 italic leading-normal whitespace-pre-line font-medium text-xs">
+                                {invoiceCustomerMessage || "Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!"}
+                              </p>
+                              <textarea
+                                rows={2}
+                                value={invoiceCustomerMessage}
+                                onChange={(e) => setInvoiceCustomerMessage(e.target.value)}
+                                placeholder="e.g. Thank you for your woodwork order!"
+                                className="w-full text-xs text-gray-700 bg-amber-50 border border-amber-200 rounded p-1.5 outline-hidden print:hidden"
+                              />
+                            </>
                           ) : (
-                            <p className="text-gray-700 italic leading-normal whitespace-pre-line font-medium">
+                            <p className="text-gray-800 italic leading-normal whitespace-pre-line font-medium text-xs">
                               {invoiceCustomerMessage || "Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!"}
                             </p>
                           )}
@@ -3874,23 +3928,23 @@ export default function InvoiceReceiptManager({
                       </div>
 
                       {/* Subtotal block on the right */}
-                      <div className="md:col-span-5 flex flex-col justify-end">
-                        <div className="border-2 border-slate-900 bg-white rounded-xs overflow-hidden shadow-xs">
-                          <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-3 print:bg-white print:text-black print:border-b print:border-slate-900">
-                            <span className="font-sans font-black text-xs uppercase tracking-wider">Total Invoice Amount</span>
-                            <span className="font-mono font-black text-sm">
+                      <div className="col-span-5 print:!col-span-5 flex flex-col justify-end print-totals-col">
+                        <div className="border-2 border-slate-900 bg-white rounded-xs overflow-hidden shadow-xs print:!border-slate-900 print:!border-2 print-total-card">
+                          <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-2.5 print:px-3 print:py-2 print:border-b-2 print:border-slate-900 print-total-card-header">
+                            <span className="font-sans font-black text-xs uppercase tracking-wider !text-white print:!text-white">Total Invoice Amount</span>
+                            <span className="font-mono font-black text-sm !text-white print:!text-white">
                               SLL {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </span>
                           </div>
                           {totals.totalPaid > 0 && (
-                            <div className="bg-white px-4 py-2 border-t border-gray-300 text-xs flex justify-between items-center text-emerald-800 font-semibold">
-                              <span>Payments Cleared:</span>
-                              <span className="font-mono font-bold">- SLL {totals.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <div className="bg-white px-4 py-2 print:px-3 print:py-1.5 border-t border-gray-300 text-xs flex justify-between items-center text-emerald-800 font-semibold print-total-card-row">
+                              <span className="text-gray-800 print:text-black">Payments Cleared:</span>
+                              <span className="font-mono font-bold text-emerald-800 print:text-black">- SLL {totals.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                           )}
-                          <div className="bg-slate-50 px-4 py-2 border-t border-gray-400 text-xs flex justify-between items-center font-black text-slate-900">
-                            <span>Balance Due:</span>
-                            <span className={`font-mono font-black ${totals.outstanding > 0 ? 'text-amber-800' : 'text-emerald-800'}`}>
+                          <div className="bg-slate-50 px-4 py-2 print:px-3 print:py-1.5 border-t border-gray-400 text-xs flex justify-between items-center font-black text-slate-900 print-total-card-row">
+                            <span className="text-slate-900 print:text-black font-black">Balance Due:</span>
+                            <span className={`font-mono font-black ${totals.outstanding > 0 ? 'text-amber-800 print:text-black' : 'text-emerald-800 print:text-black'}`}>
                               {totals.outstanding > 0 ? `SLL ${totals.outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'PAID IN FULL'}
                             </span>
                           </div>
@@ -4320,14 +4374,17 @@ export default function InvoiceReceiptManager({
                       <div className="max-w-md text-gray-400 font-semibold leading-relaxed whitespace-pre-line">
                         <h5 className="font-extrabold text-wood-950 uppercase tracking-widest text-[9px] mb-1.5">SWEDS WOOD ENTERPRISE CLEARANCE INSTRUCTIONS:</h5>
                         {invoicePdfMode === 'EDIT' ? (
-                          <textarea
-                            rows={3}
-                            value={invoiceBankInstructions}
-                            onChange={(e) => setInvoiceBankInstructions(e.target.value)}
-                            className="w-full p-2 text-xs bg-amber-50/50 border border-amber-200 rounded outline-hidden text-gray-700"
-                          />
+                          <>
+                            <p className="hidden print:block text-gray-700 text-xs">{invoiceBankInstructions}</p>
+                            <textarea
+                              rows={3}
+                              value={invoiceBankInstructions}
+                              onChange={(e) => setInvoiceBankInstructions(e.target.value)}
+                              className="w-full p-2 text-xs bg-amber-50/50 border border-amber-200 rounded outline-hidden text-gray-700 print:hidden"
+                            />
+                          </>
                         ) : (
-                          <p>{invoiceBankInstructions}</p>
+                          <p className="text-gray-700 text-xs">{invoiceBankInstructions}</p>
                         )}
                       </div>
 
@@ -4385,8 +4442,8 @@ export default function InvoiceReceiptManager({
          ========================================== */}
       <AnimatePresence>
         {activeReceipt && (
-          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:p-0 print:bg-white">
-            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-2xl p-6 my-8 shadow-2xl relative print:my-0 print:shadow-none print:rounded-none print:bg-white print:p-0" id="print-area">
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white">
+            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-2xl p-6 my-8 shadow-2xl relative print:!static print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
               
               {/* TOP WORKSPACE TOOLBAR (Hides on standard print) */}
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-4 border-b border-gray-200/60 no-print">

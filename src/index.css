@@ -273,10 +273,10 @@ button.bg-wood-700:hover {
    REFINE PROFESSIONAL PRINT STYLESHEET (STRICT PURE WHITE BACKGROUND)
    ========================================================== */
 @media print {
-  /* Set document size and printable margins */
+  /* Set document size and printable margins with optimal vertical clearance */
   @page {
     size: A4 portrait;
-    margin: 1cm !important;
+    margin: 8mm 10mm !important;
   }
 
   /* Reset layout for clean pure white printout and ensure complete pagination without clipping */
@@ -291,11 +291,12 @@ button.bg-wood-700:hover {
   div[class*="inset-0"],
   #print-area, 
   .sweds-paper-invoice {
+    display: block !important;
     background-color: #ffffff !important;
     background: #ffffff !important;
     color: #000000 !important;
-    font-size: 11pt !important;
-    line-height: 1.4 !important;
+    font-size: 10.5pt !important;
+    line-height: 1.35 !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
@@ -316,10 +317,9 @@ button.bg-wood-700:hover {
     text-shadow: none !important;
   }
 
-  /* Ensure print-area content and containers strictly use white background */
+  /* Ensure print-area content and containers strictly use clean background */
   .bg-white,
   .bg-slate-950,
-  .bg-slate-900,
   .bg-slate-800,
   .bg-slate-700,
   .bg-slate-100,
@@ -349,6 +349,76 @@ button.bg-wood-700:hover {
     box-shadow: none !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+  }
+
+  /* Dedicated rules for the invoice summary and total invoice amount cards */
+  .print-footer-summary {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    padding-top: 8px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .print-customer-message-col {
+    grid-column: span 7 / span 7 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .print-totals-col {
+    grid-column: span 5 / span 5 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-end !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .print-total-card {
+    display: block !important;
+    visibility: visible !important;
+    border: 2px solid #0f172a !important;
+    border-radius: 3px !important;
+    background-color: #ffffff !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-total-card-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 8px 12px !important;
+    background-color: #0f172a !important;
+    background: #0f172a !important;
+    color: #ffffff !important;
+    border-bottom: 2px solid #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-total-card-header span,
+  .print-total-card-header strong,
+  .print-total-card-header div {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    font-weight: 900 !important;
+  }
+
+  .print-total-card-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 5px 12px !important;
+    font-size: 11px !important;
+    border-top: 1px solid #cbd5e1 !important;
   }
 
   /* Table headers and metadata banners get a subtle clean off-white background */
