@@ -850,7 +850,7 @@ export default function InvoiceReceiptManager({
 
   // Sync Invoice local editable states when an activeInvoice is selected/opened
   useEffect(() => {
-    if (activeInvoice) {
+    if (activeInvoice && !editingSavedInvoiceId) {
       if (invoiceTemplate === 'SWEDS_WOOD') {
         setInvoiceCompany("Sweds Wood Enterprise");
         setInvoiceCompanyContact("2 Sweds free Avenue");
@@ -894,13 +894,15 @@ export default function InvoiceReceiptManager({
         }));
         setInvoiceCommissionAmount(0);
       } else {
-        setInvoiceCommissionAmount(activeInvoice.quoteAmount);
-        setCustomInvoiceItems([]);
+        setInvoiceCommissionAmount(activeInvoice.quoteAmount || 0);
+        if (customInvoiceItems.length === 0) {
+          setCustomInvoiceItems([]);
+        }
       }
       
       setInvoicePreparedBy("");
     }
-  }, [activeInvoice, customers, currentUser, invoiceTemplate]);
+  }, [activeInvoice, editingSavedInvoiceId, customers, currentUser, invoiceTemplate]);
 
   // Sync Receipt local editable states when an activeReceipt is selected/opened
   useEffect(() => {
@@ -1068,7 +1070,10 @@ export default function InvoiceReceiptManager({
       const price = item.unitPrice !== undefined ? item.unitPrice : item.amount;
       return sum + (qty * price);
     }, 0);
-    const subtotal = baseComm + baseCustom;
+    let subtotal = baseComm + baseCustom;
+    if (subtotal === 0 && activeInvoice?.quoteAmount && activeInvoice.quoteAmount > 0) {
+      subtotal = activeInvoice.quoteAmount;
+    }
     
     const discountAmount = 0;
     const taxableAmount = subtotal;
@@ -1076,7 +1081,7 @@ export default function InvoiceReceiptManager({
     const finalTotal = taxableAmount + taxAmount;
     
     const totalPaid = activeInvoice ? activeInvoice.payments.reduce((sum, p) => sum + p.amount, 0) : 0;
-    const outstanding = finalTotal - totalPaid;
+    const outstanding = Math.max(0, finalTotal - totalPaid);
 
     return {
       subtotal,
@@ -1286,6 +1291,7 @@ export default function InvoiceReceiptManager({
       payments: []
     };
 
+    setEditingSavedInvoiceId(saved.id);
     setActiveInvoice(job);
     setInvoiceNo(saved.invoiceNo);
     setInvoiceDate(saved.date);
@@ -1298,11 +1304,70 @@ export default function InvoiceReceiptManager({
     setInvoicePreparedBy(saved.preparedBy);
     setInvoiceTemplate(saved.template);
     setInvoiceLogoUrl(saved.logoUrl || '/logo.svg');
-    setCustomInvoiceItems(saved.items);
-    setEditingSavedInvoiceId(saved.id);
+    setCustomInvoiceItems(saved.items || []);
+    setInvoiceCommissionAmount(0);
+    setInvoiceProjectQty(1);
+    setInvoiceProjectTitle(saved.items[0]?.description || 'Custom Woodwork Order');
     setInvoiceStatus(saved.status);
     setSubTab('INVOICE');
     setInvoicePdfMode('VIEW');
+  };
+
+  const handleDownloadSavedInvoicePdf = async (inv: SavedInvoice) => {
+    const job: Job = jobs.find(j => j.id === inv.jobId) || {
+      id: inv.jobId,
+      customerId: 'c-custom',
+      customerName: inv.customerName,
+      title: inv.items[0]?.description || 'Custom Woodwork Order',
+      description: inv.customerMessage,
+      assignedEmployees: [],
+      status: 'In Progress',
+      startDate: inv.date,
+      dueDate: inv.date,
+      quoteAmount: inv.subtotal,
+      materialsUsed: [],
+      laborCost: 0,
+      otherCosts: 0,
+      payments: []
+    };
+    const logoDataUrl = await getLogoDataUrl(inv.logoUrl || '/logo.svg');
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+    const customer = customers.find(c => c.id === job.customerId) || {
+      id: 'c-custom',
+      name: inv.customerName,
+      phone: inv.customerPhone,
+      email: inv.customerEmail,
+      address: inv.customerAddress,
+      company: '',
+      notes: '',
+      registrationDate: inv.date
+    };
+    buildInvoicePdfContent(
+      doc,
+      job,
+      customer,
+      inv.template || 'SWEDS_WOOD',
+      currentUser,
+      inv.items,
+      inv.invoiceNo,
+      inv.date,
+      inv.customerName,
+      inv.customerAddress,
+      inv.customerPhone,
+      inv.customerEmail,
+      inv.customerMessage,
+      inv.items[0]?.description || 'Custom Woodwork Order',
+      inv.customerMessage,
+      0,
+      1,
+      logoDataUrl
+    );
+    const cleanName = (inv.customerName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
+    doc.save(`Invoice_${inv.invoiceNo || '042'}_${cleanName}.pdf`);
   };
 
   const handleDeleteSavedInvoice = (id: string) => {
@@ -1481,42 +1546,75 @@ export default function InvoiceReceiptManager({
       {/* Print styles override (Ensures print-area prints all pages cleanly on white paper with crisp dark text) */}
       <style>{`
         @media print {
-          body {
+          /* Hide non-print elements completely from document flow */
+          aside,
+          nav,
+          header:not(.print-header),
+          footer:not(.print-footer),
+          .no-print,
+          .print\\:hidden,
+          *[class*="print:hidden"] {
+            display: none !important;
             visibility: hidden !important;
-            overflow: visible !important;
-            background: #ffffff !important;
-          }
-          #print-area, #print-area * {
-            visibility: visible !important;
-          }
-          html, body, #root, #root > div, main, .fixed, .absolute, div[class*="fixed"], div[class*="inset-0"] {
-            overflow: visible !important;
-            position: static !important;
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: none !important;
-            width: 100% !important;
+            height: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
+          }
+
+          html, body {
+            background-color: #ffffff !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          #root, #root > div, main {
+            display: block !important;
+            position: static !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
             background: #ffffff !important;
           }
-          #print-area {
-            position: relative !important;
+
+          /* Ensure modal backdrop wrapper does not create blank space or overlays */
+          div[class*="fixed"][class*="inset-0"] {
+            position: static !important;
             display: block !important;
-            left: auto !important;
-            top: auto !important;
+            background: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+            height: auto !important;
+            min-height: 0 !important;
+          }
+
+          #print-area {
+            position: static !important;
+            display: block !important;
             width: 100% !important;
             max-width: 100% !important;
             background: #ffffff !important;
             color: #000000 !important;
             padding: 0 !important;
-            margin: 0 auto !important;
+            margin: 0 !important;
             box-shadow: none !important;
             border: none !important;
             overflow: visible !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+            page-break-inside: auto !important;
+            break-inside: auto !important;
           }
+
           #print-area input,
           #print-area textarea,
           #print-area select {
@@ -1532,6 +1630,7 @@ export default function InvoiceReceiptManager({
             width: auto !important;
             max-width: 100% !important;
           }
+
           .print-only,
           .print-only-inline {
             display: inline !important;
@@ -1541,11 +1640,10 @@ export default function InvoiceReceiptManager({
             display: block !important;
             visibility: visible !important;
           }
-          .no-print,
-          .print\:hidden,
-          *[class*="print:hidden"] {
-            display: none !important;
-            visibility: hidden !important;
+
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
@@ -1988,7 +2086,7 @@ export default function InvoiceReceiptManager({
                             <div className="text-[10px] text-gray-400">{inv.items.length} item(s) • Prepared by {inv.preparedBy}</div>
                           </td>
                           <td className="py-3.5 px-4 text-right">
-                            <div className="font-mono font-black text-gray-900 text-sm">Le {inv.subtotal.toLocaleString()}</div>
+                            <div className="font-mono font-black text-gray-900 text-sm">SLL {inv.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                           </td>
                           <td className="py-3.5 px-4 text-center">
                             <select
@@ -2015,7 +2113,7 @@ export default function InvoiceReceiptManager({
                               <button
                                 onClick={() => {
                                   handleLoadSavedInvoice(inv);
-                                  setTimeout(() => window.print(), 100);
+                                  setTimeout(() => window.print(), 200);
                                 }}
                                 className="p-1.5 bg-gray-100 hover:bg-blue-600 hover:text-white text-gray-700 rounded-lg transition cursor-pointer"
                                 title="Print Invoice"
@@ -2023,10 +2121,7 @@ export default function InvoiceReceiptManager({
                                 <Printer className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => {
-                                  handleLoadSavedInvoice(inv);
-                                  setTimeout(() => handleDownloadSinglePdf(), 100);
-                                }}
+                                onClick={() => handleDownloadSavedInvoicePdf(inv)}
                                 className="p-1.5 bg-gray-100 hover:bg-emerald-600 hover:text-white text-gray-700 rounded-lg transition cursor-pointer"
                                 title="Download PDF"
                               >
@@ -3656,7 +3751,7 @@ export default function InvoiceReceiptManager({
                           })}
 
                           {/* Empty Ledger Padding Rows to replicate the paper pad style perfectly! */}
-                          {Array.from({ length: Math.max(1, 10 - (Number(invoiceCommissionAmount) > 0 ? 1 : 0) - customInvoiceItems.length) }).map((_, idx) => (
+                          {Array.from({ length: Math.max(1, 3 - (Number(invoiceCommissionAmount) > 0 ? 1 : 0) - customInvoiceItems.length) }).map((_, idx) => (
                             <tr key={`empty-${idx}`} className="h-8">
                               <td className="border-r border-gray-400"></td>
                               <td className="border-r border-gray-400"></td>
@@ -3665,6 +3760,36 @@ export default function InvoiceReceiptManager({
                             </tr>
                           ))}
                         </tbody>
+                        <tfoot className="border-t-2 border-gray-600 bg-slate-100 font-black text-xs">
+                          <tr className="border-b border-gray-400 bg-slate-100">
+                            <td colSpan={3} className="py-2.5 px-3 text-right font-black uppercase text-xs border-r border-gray-400 text-slate-900">
+                              Total Invoice Amount:
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-black text-sm text-slate-950 bg-slate-200">
+                              SLL {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                          {totals.totalPaid > 0 && (
+                            <>
+                              <tr className="border-b border-gray-400 text-emerald-800 bg-emerald-50/60">
+                                <td colSpan={3} className="py-1.5 px-3 text-right font-bold uppercase text-[11px] border-r border-gray-400">
+                                  Payments / Deposits Cleared:
+                                </td>
+                                <td className="py-1.5 px-3 text-right font-mono font-bold text-xs">
+                                  - SLL {totals.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </td>
+                              </tr>
+                              <tr className="bg-slate-100 font-black">
+                                <td colSpan={3} className="py-2 px-3 text-right font-black uppercase text-xs border-r border-gray-400 text-slate-900">
+                                  Net Balance Due:
+                                </td>
+                                <td className={`py-2 px-3 text-right font-mono font-black text-sm ${totals.outstanding > 0 ? 'text-amber-900 bg-amber-50' : 'text-emerald-900 bg-emerald-50'}`}>
+                                  {totals.outstanding > 0 ? `SLL ${totals.outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'PAID IN FULL'}
+                                </td>
+                              </tr>
+                            </>
+                          )}
+                        </tfoot>
                       </table>
                     </div>
 
@@ -3750,11 +3875,23 @@ export default function InvoiceReceiptManager({
 
                       {/* Subtotal block on the right */}
                       <div className="md:col-span-5 flex flex-col justify-end">
-                        <div className="border border-gray-400 bg-white rounded-xs overflow-hidden shadow-xs">
-                          <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-3">
+                        <div className="border-2 border-slate-900 bg-white rounded-xs overflow-hidden shadow-xs">
+                          <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-3 print:bg-white print:text-black print:border-b print:border-slate-900">
                             <span className="font-sans font-black text-xs uppercase tracking-wider">Total Invoice Amount</span>
                             <span className="font-mono font-black text-sm">
                               SLL {totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          {totals.totalPaid > 0 && (
+                            <div className="bg-white px-4 py-2 border-t border-gray-300 text-xs flex justify-between items-center text-emerald-800 font-semibold">
+                              <span>Payments Cleared:</span>
+                              <span className="font-mono font-bold">- SLL {totals.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+                          <div className="bg-slate-50 px-4 py-2 border-t border-gray-400 text-xs flex justify-between items-center font-black text-slate-900">
+                            <span>Balance Due:</span>
+                            <span className={`font-mono font-black ${totals.outstanding > 0 ? 'text-amber-800' : 'text-emerald-800'}`}>
+                              {totals.outstanding > 0 ? `SLL ${totals.outstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'PAID IN FULL'}
                             </span>
                           </div>
                         </div>
@@ -4107,6 +4244,16 @@ export default function InvoiceReceiptManager({
                             );
                           })}
                         </tbody>
+                        <tfoot className="border-t-2 border-wood-950 bg-stone-100 font-black text-xs">
+                          <tr className="border-b border-gray-300">
+                            <td colSpan={2} className="py-2.5 px-3 text-right uppercase tracking-wider text-xs text-wood-950">
+                              Total Invoice Amount:
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-black text-sm text-wood-950 bg-stone-200">
+                              {formatCurrency(totals.finalTotal)}
+                            </td>
+                          </tr>
+                        </tfoot>
                       </table>
 
                       {/* Inline interface to add a new custom invoice line item (only visible in EDIT mode) */}
@@ -4200,10 +4347,26 @@ export default function InvoiceReceiptManager({
                           <span className="font-mono font-bold">+{formatCurrency(totals.taxAmount)}</span>
                         </div>
 
-                        <div className="border-t border-gray-200 pt-2 flex justify-between text-gray-800">
+                        <div className="border-t-2 border-wood-950 pt-2 flex justify-between text-gray-800">
                           <span className="font-black text-sm uppercase tracking-wider text-wood-950">Grand Total Invoice:</span>
                           <span className="font-mono font-black text-sm text-wood-950">{formatCurrency(totals.finalTotal)}</span>
                         </div>
+
+                        {totals.totalPaid > 0 && (
+                          <>
+                            <div className="flex justify-between text-emerald-800 font-semibold">
+                              <span>Payments Cleared:</span>
+                              <span className="font-mono font-bold">-{formatCurrency(totals.totalPaid)}</span>
+                            </div>
+
+                            <div className="border-t border-gray-200 pt-1 flex justify-between font-black text-xs">
+                              <span className="uppercase text-wood-950">Balance Due:</span>
+                              <span className={`font-mono font-black ${totals.outstanding > 0 ? 'text-amber-800' : 'text-emerald-800'}`}>
+                                {totals.outstanding > 0 ? formatCurrency(totals.outstanding) : 'PAID IN FULL'}
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </>

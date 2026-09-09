@@ -85,7 +85,13 @@ export function buildInvoicePdfContent(
     }];
   }
 
-  const subtotalVal = itemsToRender.reduce((sum, item) => sum + item.total, 0);
+  let subtotalVal = itemsToRender.reduce((sum, item) => sum + item.total, 0);
+  if (subtotalVal === 0 && commissionAmount > 0) {
+    subtotalVal = commissionAmount;
+  }
+  if (subtotalVal === 0 && job.quoteAmount > 0) {
+    subtotalVal = job.quoteAmount;
+  }
   const totalPaid = job.payments ? job.payments.reduce((sum, p) => sum + p.amount, 0) : 0;
   const balanceDue = Math.max(0, subtotalVal - totalPaid);
 
@@ -346,18 +352,33 @@ export function buildInvoicePdfContent(
       currentY += rowHeight;
     });
 
-    // Check if totals section fits on the current page; if not, add page
-    if (currentY + 65 > 275) {
+    // Table Total Summary Row anchored directly to the ledger table
+    const tableTotalH = 7.5;
+    doc.setFillColor(242, 244, 246);
+    doc.rect(15, currentY, 180, tableTotalH, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.text("TOTAL INVOICE AMOUNT (SLL):", 15 + ledCol1 + ledCol2 + ledCol3 - 4, currentY + 5, { align: 'right' });
+    doc.setFontSize(8.5);
+    doc.text(`SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 195 - 4, currentY + 5, { align: 'right' });
+    currentY += tableTotalH;
+
+    // Bottom border of table
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.line(15, currentY, 195, currentY);
+
+    // Outer Table Vertical Borders
+    doc.line(15, startY, 15, currentY);
+    doc.line(195, startY, 195, currentY);
+
+    // Check if totals & footer summary fits on current page (requires ~55mm clearance before footer at 283)
+    if (currentY + 55 > 280) {
       doc.addPage();
       const nextHeaderY = drawSwedsHeader(true);
       currentY = nextHeaderY;
     }
-
-    // Outer Table Borders
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.2);
-    doc.line(15, startY, 15, currentY);
-    doc.line(195, startY, 195, currentY);
 
     // ==========================================
     // INVOICE TOTALS & FINANCIAL SUMMARY
@@ -623,7 +644,24 @@ export function buildInvoicePdfContent(
       currentY += rowHeight;
     });
 
-    if (currentY + 65 > 275) {
+    // Modern Table Total Row
+    const modernTableTotalH = 7.5;
+    doc.setFillColor(245, 245, 244);
+    doc.rect(15, currentY, 180, modernTableTotalH, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(69, 26, 3);
+    doc.text("TOTAL INVOICE AMOUNT (SLL):", 140, currentY + 5, { align: 'right' });
+    doc.setFontSize(8.5);
+    doc.setTextColor(31, 41, 55);
+    doc.text(`SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 191, currentY + 5, { align: 'right' });
+    currentY += modernTableTotalH;
+
+    doc.setDrawColor(69, 26, 3);
+    doc.setLineWidth(0.4);
+    doc.line(15, currentY, 195, currentY);
+
+    if (currentY + 55 > 280) {
       doc.addPage();
       const nextHeaderY = drawModernHeader(true);
       currentY = nextHeaderY;
@@ -656,7 +694,7 @@ export function buildInvoicePdfContent(
     doc.setFontSize(8);
     doc.setTextColor(31, 41, 55);
     doc.text("Total Invoice Value:", calcX + 3, botY + 4.5);
-    doc.text(`Le ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 0 })}`, calcX + calcWidth - 3, botY + 4.5, { align: 'right' });
+    doc.text(`SLL ${subtotalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, calcX + calcWidth - 3, botY + 4.5, { align: 'right' });
 
     // Paid
     doc.setFillColor(255, 255, 255);
@@ -665,7 +703,7 @@ export function buildInvoicePdfContent(
     doc.setTextColor(75, 85, 99);
     doc.text("Payments Captured:", calcX + 3, botY + sumRowH + 4.5);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Le ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 0 })}`, calcX + calcWidth - 3, botY + sumRowH + 4.5, { align: 'right' });
+    doc.text(`SLL ${totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, calcX + calcWidth - 3, botY + sumRowH + 4.5, { align: 'right' });
 
     // Balance Due
     const isSettled = balanceDue <= 0;
@@ -676,7 +714,7 @@ export function buildInvoicePdfContent(
     doc.setTextColor(isSettled ? 22 : 153, isSettled ? 101 : 27, isSettled ? 52 : 27);
     doc.text(isSettled ? "Status:" : "Balance Due:", calcX + 3, botY + (sumRowH * 2) + 5.2);
     doc.text(
-      isSettled ? "FULLY CLEARED" : `Le ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 0 })}`,
+      isSettled ? "FULLY CLEARED" : `SLL ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
       calcX + calcWidth - 3,
       botY + (sumRowH * 2) + 5.2,
       { align: 'right' }
