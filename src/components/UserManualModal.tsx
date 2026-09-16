@@ -316,7 +316,7 @@ const CHAPTERS: ManualChapter[] = [
     content: [
       {
         heading: 'Workshop Support & Enquiries',
-        text: 'Swedswood Enterprise IT Support Desk\n2 Sweds free Avenue, Sussex, Freetown, Sierra Leone\nEmail: info@swedwoodwork.com | support@swedwoodwork.com\nTel: +232 76 112 3344 / +232 88 554 9900'
+        text: 'Swedswood Enterprise IT Support Desk\n2 Sweds free Avenue, Sussex, Freetown, Sierra Leone\nEmail: info@swedwoodwork.com | support@swedwoodwork.com\nTel: +232 76 442590'
       }
     ]
   }

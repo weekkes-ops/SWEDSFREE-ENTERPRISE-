@@ -72,7 +72,7 @@ const LIVE_ADMIN_EMPLOYEE: Employee = {
   id: 'emp-01',
   name: 'Mr Paul Bindi',
   role: 'Admin',
-  phone: '+232 76 111 2222',
+  phone: '+232 76 442590',
   email: 'paul.bindi@swedsfree.com',
   status: 'Active',
   baseSalary: 9500,
@@ -354,7 +354,14 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<Employee | null>(() => {
     try {
       const localUser = localStorage.getItem('swedsfree_current_user');
-      return localUser ? JSON.parse(localUser) : null;
+      if (localUser) {
+        const parsed = JSON.parse(localUser);
+        if (parsed && (parsed.id === 'emp-01' || parsed.name === 'Mr Paul Bindi')) {
+          parsed.phone = '+232 76 442590';
+        }
+        return parsed;
+      }
+      return null;
     } catch {
       return null;
     }

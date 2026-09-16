@@ -20,7 +20,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
 ];
 
 export const INITIAL_EMPLOYEES: Employee[] = [
-  { id: 'emp-01', name: 'Mr Paul Bindi', role: 'Admin', phone: '+232 76 111 2222', email: 'paul.bindi@swedsfree.com', status: 'Active', baseSalary: 9500, dailyRate: 350, hireDate: '2024-01-10', password: 'admin' },
+  { id: 'emp-01', name: 'Mr Paul Bindi', role: 'Admin', phone: '+232 76 442590', email: 'paul.bindi@swedsfree.com', status: 'Active', baseSalary: 9500, dailyRate: 350, hireDate: '2024-01-10', password: 'admin' },
   { id: 'emp-02', name: 'David Mansaray', role: 'Manager', phone: '+232 78 222 3333', email: 'david.m@swedsfree.com', status: 'Active', baseSalary: 7500, dailyRate: 280, hireDate: '2024-03-15', password: 'manager' },
   { id: 'emp-03', name: 'Fatmata Sesay', role: 'Auditor', phone: '+232 30 444 5555', email: 'fatmata.s@swedsfree.com', status: 'Active', baseSalary: 6800, dailyRate: 250, hireDate: '2024-06-01', password: 'auditor' },
   { id: 'emp-04', name: 'Ibrahim Bangura', role: 'Carpenter', phone: '+232 77 666 7777', email: 'ibrahim.b@swedsfree.com', status: 'Active', baseSalary: 5200, dailyRate: 200, hireDate: '2024-08-20', password: 'emp' },
@@ -177,6 +177,61 @@ export const INITIAL_SAVED_INVOICES: SavedInvoice[] = [
     items: [
       { id: 'item-1', description: 'Handcrafted Executive Mahogany Boardroom Table (16 Seater)', unitRate: '48,500', amount: 48500, quantity: 1, unitPrice: 48500 }
     ]
+  },
+  {
+    id: 'proforma-doc-2001',
+    jobId: 'job-proforma-2001',
+    invoiceNo: 'PRO-2026-8842',
+    date: '2026-08-10',
+    validityDays: 30,
+    validUntil: '2026-09-09',
+    terms: '50% Advance Deposit on approval, 50% Balance upon Delivery & Site Inspection',
+    leadTime: '2 - 3 Weeks from deposit confirmation',
+    paymentTerms: '50% Advance Deposit on approval, 50% Balance upon Delivery & Site Inspection',
+    depositPercent: 50,
+    discountPercent: 0,
+    taxPercent: 0,
+    customerName: 'Freetown Grand Hotel & Suites',
+    customerCompany: 'Freetown Grand Hotel',
+    customerAddress: 'Cape Road, Aberdeen, Freetown',
+    customerPhone: '+232 76 444 202',
+    customerEmail: 'management@freetowngrand.com',
+    customerMessage: 'Handcrafted solid teak entrance portal doors and bespoke mahogany reception suite.',
+    projectTitle: 'Luxury Hotel Entrance & Reception Suite',
+    projectDescription: 'Kiln-dried Burma Teak and African Mahogany joinery with hand-rubbed brass hardware.',
+    preparedBy: 'Mr Paul Bindi (Admin)',
+    template: 'PROFORMA',
+    docType: 'PROFORMA',
+    status: 'Issued',
+    subtotal: 62000,
+    logoUrl: '/logo.svg',
+    createdAt: '2026-08-10',
+    lastUpdated: '2026-08-10',
+    items: [
+      {
+        id: 'p-item-1',
+        description: 'Solid Teak Double Grand Entrance Door & Heavy Duty Frame',
+        woodSpecies: 'Burma Teak Hardwood • Weather-Sealed • Custom Brass Hinges',
+        dimensions: '2400mm (H) x 2000mm (W) x 55mm (Thick)',
+        quantity: 2,
+        unitPrice: 18500,
+        amount: 37000,
+        unitRate: '18500',
+        total: 37000
+      },
+      {
+        id: 'p-item-2',
+        description: 'Executive Curved Mahogany Reception Counter with Carved Paneling',
+        woodSpecies: 'African Mahogany • Polyurethane Clear Satin Lacquer',
+        dimensions: '3600mm (L) x 900mm (D) x 1100mm (H)',
+        quantity: 1,
+        unitPrice: 25000,
+        amount: 25000,
+        unitRate: '25000',
+        total: 25000
+      }
+    ],
+    notes: '1. Moisture Content Guarantee: Kiln-dried to <12%.\n2. Structural Guarantee: 5-year warranty on all structural timber joinery.\n3. Price Validity: Fixed for 30 days.'
   }
 ];
 

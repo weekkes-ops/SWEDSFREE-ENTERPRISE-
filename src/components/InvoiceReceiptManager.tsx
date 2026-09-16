@@ -423,7 +423,7 @@ export default function InvoiceReceiptManager({
   const [invoiceLogoUrl, setInvoiceLogoUrl] = useState<string>('/logo.svg');
   const [invoiceLogoSize, setInvoiceLogoSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [invoiceCompany, setInvoiceCompany] = useState("SWEDS WOOD ENTERPRISE");
-  const [invoiceCompanyContact, setInvoiceCompanyContact] = useState("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 112 3344");
+  const [invoiceCompanyContact, setInvoiceCompanyContact] = useState("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 442590");
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [invoiceTerms, setInvoiceTerms] = useState("Payment Clear / Standard Log");
@@ -851,7 +851,7 @@ export default function InvoiceReceiptManager({
         setInvoiceCustomerMessage("Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!");
       } else {
         setInvoiceCompany("SWEDS WOOD ENTERPRISE");
-        setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 112 3344");
+        setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 442590");
         setInvoiceTerms("Payment Clear / Standard Log");
         setInvoiceBankInstructions(`Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${activeInvoice.id.slice(4).toUpperCase()}`);
         setInvoiceCustomerMessage("");

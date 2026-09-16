@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Customer, Job, Employee, SavedInvoice, SavedInvoiceItem, formatCurrency } from '../types';
-import { saveDocument } from '../lib/firestoreService';
+import { saveDocument, deleteDocument, subscribeToCollection } from '../lib/firestoreService';
+import { INITIAL_SAVED_INVOICES } from '../data';
 import { buildProformaInvoicePdfContent, ProformaPdfItem, getLogoDataUrl } from '../utils/pdfGenerator';
 import { jsPDF } from 'jspdf';
 import { 
@@ -35,7 +36,14 @@ import {
   Layers,
   Image as ImageIcon,
   Upload,
-  Loader2
+  Loader2,
+  Search,
+  Filter,
+  FolderOpen,
+  X,
+  SlidersHorizontal,
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -45,8 +53,10 @@ interface ProformaInvoiceDeskProps {
   currentUser: Employee | null;
   initialCustomerId?: string | null;
   initialJobId?: string | null;
+  initialProformaRecord?: SavedInvoice | null;
   onClearInitialParams?: () => void;
   onSaveInvoiceRecord?: (invoice: SavedInvoice) => void;
+  onDeleteInvoiceRecord?: (id: string) => void;
   onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   onSwitchToSavedInvoices?: () => void;
 }
@@ -110,16 +120,31 @@ export default function ProformaInvoiceDesk({
   currentUser,
   initialCustomerId,
   initialJobId,
+  initialProformaRecord,
   onClearInitialParams,
   onSaveInvoiceRecord,
+  onDeleteInvoiceRecord,
   onCreateJob,
   onSwitchToSavedInvoices
 }: ProformaInvoiceDeskProps) {
-  // Mode: Editor vs Preview
-  const [viewMode, setViewMode] = useState<'EDIT' | 'PREVIEW'>('PREVIEW');
+  // Mode: Editor vs Preview vs Manage & Archive
+  const [viewMode, setViewMode] = useState<'EDIT' | 'PREVIEW' | 'MANAGE'>('PREVIEW');
+  const [editingProformaId, setEditingProformaId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'Draft' | 'Issued' | 'Accepted' | 'Expired' | 'Paid' | 'Cancelled'>('ALL');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [copiedNotification, setCopiedNotification] = useState<string | null>(null);
   const [isConvertingJob, setIsConvertingJob] = useState(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  // Archive & Database Persistence State
+  const [allSavedInvoices, setAllSavedInvoices] = useState<SavedInvoice[]>(() => {
+    try {
+      const raw = localStorage.getItem('swedswood_saved_invoices');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return INITIAL_SAVED_INVOICES;
+  });
 
   // Client Selection State
   const [clientType, setClientType] = useState<'EXISTING' | 'PROSPECT'>('EXISTING');
@@ -268,6 +293,261 @@ export default function ProformaInvoiceDesk({
       }
     }
   }, [initialJobId, jobs]);
+
+  // Real-time Firestore synchronization for all saved invoices
+  useEffect(() => {
+    const unsub = subscribeToCollection<SavedInvoice>('savedInvoices', (items) => {
+      if (items && items.length > 0) {
+        setAllSavedInvoices(items);
+        try {
+          localStorage.setItem('swedswood_saved_invoices', JSON.stringify(items));
+        } catch (e) {}
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Admin & Authorization Privileges
+  const isAdmin = currentUser?.role === 'Admin' || currentUser?.name === 'Mr Paul Bindi' || currentUser?.id === 'emp-01';
+  const isManager = currentUser?.role === 'Manager';
+  const canManage = isAdmin || isManager;
+
+  // Proforma Invoices subset
+  const proformaRecords = allSavedInvoices.filter(
+    (inv) => inv.template === 'PROFORMA' || inv.docType === 'PROFORMA' || inv.invoiceNo.startsWith('PRO-')
+  );
+
+  // Filtered Proformas for Manage & Archive Mode
+  const filteredProformas = proformaRecords.filter((inv) => {
+    const matchesStatus = statusFilter === 'ALL' || inv.status === statusFilter;
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return matchesStatus;
+    const matchesSearch =
+      inv.invoiceNo.toLowerCase().includes(q) ||
+      inv.customerName.toLowerCase().includes(q) ||
+      (inv.customerCompany || '').toLowerCase().includes(q) ||
+      (inv.customerPhone || '').toLowerCase().includes(q) ||
+      (inv.projectTitle || '').toLowerCase().includes(q) ||
+      (inv.items || []).some((it) => it.description.toLowerCase().includes(q));
+    return matchesStatus && matchesSearch;
+  });
+
+  // Handler: Start New Proforma
+  const handleStartNewProforma = () => {
+    setEditingProformaId(null);
+    const year = new Date().getFullYear();
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    setProformaNo(`PRO-${year}-${rand}`);
+    setIssueDate(new Date().toISOString().split('T')[0]);
+    setValidityDays(30);
+    setLeadTime('2 - 3 Weeks from deposit confirmation');
+    setPaymentTerms('50% Advance Deposit on approval, 50% Balance upon Delivery & Site Inspection');
+    setDepositPercent(50);
+    setDiscountPercent(0);
+    setTaxPercent(0);
+    setProjectTitle('Custom Bespoke Architectural Woodwork');
+    setProjectDescription('Kiln-dried hardwood joinery, structural mortise-and-tenon construction, and hand-rubbed protective finishing.');
+    setNotes('1. Moisture Content Guarantee: All timber is kiln-dried to <12% moisture content to prevent warping.\n2. Structural Guarantee: 5-year warranty on all structural timber joinery.\n3. Site Preparation: Final dimensions confirmed on site prior to timber breakdown.\n4. Price Validity: This proforma quotation remains fixed for the validity period indicated.');
+    setClientType('EXISTING');
+    if (customers[0]?.id) setSelectedCustomerId(customers[0].id);
+    setProspectName('');
+    setProspectCompany('');
+    setProspectPhone('');
+    setProspectEmail('');
+    setProspectAddress('Freetown, Sierra Leone');
+    setItems([
+      {
+        id: 'p-item-1',
+        description: 'Solid Teak Double Front Entrance Door & Matching Frame',
+        woodSpecies: 'Burma Teak Hardwood • Weather-Sealed • Custom Brass Hinges',
+        dimensions: '2100mm (H) x 1800mm (W) x 50mm (Thick)',
+        quantity: 1,
+        unitPrice: 14200000,
+        total: 14200000
+      }
+    ]);
+    setViewMode('EDIT');
+    setSaveToast('Ready to draft new Proforma quotation!');
+    setTimeout(() => setSaveToast(null), 2500);
+  };
+
+  // Handler: Edit an Existing Proforma
+  const handleEditSavedProforma = (record: SavedInvoice) => {
+    setEditingProformaId(record.id);
+    setProformaNo(record.invoiceNo);
+    setIssueDate(record.date || new Date().toISOString().split('T')[0]);
+    if (record.validityDays) setValidityDays(record.validityDays);
+    if (record.leadTime) setLeadTime(record.leadTime);
+    if (record.paymentTerms || record.terms) setPaymentTerms(record.paymentTerms || record.terms || '');
+    if (record.depositPercent !== undefined) setDepositPercent(record.depositPercent);
+    if (record.discountPercent !== undefined) setDiscountPercent(record.discountPercent);
+    if (record.taxPercent !== undefined) setTaxPercent(record.taxPercent);
+    if (record.projectTitle) setProjectTitle(record.projectTitle);
+    if (record.projectDescription || record.customerMessage) {
+      setProjectDescription(record.projectDescription || record.customerMessage || '');
+    }
+    if (record.notes) setNotes(record.notes);
+    if (record.logoUrl) setLogoUrl(record.logoUrl);
+
+    // Match existing customer if present
+    const matched = customers.find(
+      (c) => c.id === record.customerId || c.name.toLowerCase() === record.customerName.toLowerCase()
+    );
+    if (matched) {
+      setClientType('EXISTING');
+      setSelectedCustomerId(matched.id);
+    } else {
+      setClientType('PROSPECT');
+      setProspectName(record.customerName || '');
+      setProspectCompany(record.customerCompany || '');
+      setProspectPhone(record.customerPhone || '');
+      setProspectEmail(record.customerEmail || '');
+      setProspectAddress(record.customerAddress || 'Freetown, Sierra Leone');
+    }
+
+    if (record.items && record.items.length > 0) {
+      setItems(
+        record.items.map((it, idx) => ({
+          id: it.id || `p-item-${idx + 1}`,
+          description: it.description,
+          woodSpecies: it.woodSpecies || 'Kiln-Dried Hardwood',
+          dimensions: it.dimensions || 'Bespoke workshop specs',
+          quantity: it.quantity || 1,
+          unitPrice: it.unitPrice || it.amount || 0,
+          total: it.total || it.amount || (it.quantity || 1) * (it.unitPrice || 0)
+        }))
+      );
+    }
+
+    setViewMode('EDIT');
+    setSaveToast(`Loaded Proforma ${record.invoiceNo} into Form Editor.`);
+    setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  // Handler: Cancel Edit
+  const handleCancelEdit = () => {
+    setEditingProformaId(null);
+    handleStartNewProforma();
+  };
+
+  // Handler: Preview a Saved Proforma
+  const handlePreviewSavedProforma = (record: SavedInvoice) => {
+    handleEditSavedProforma(record);
+    setViewMode('PREVIEW');
+  };
+
+  // Handler: Delete Proforma
+  const handleDeleteProforma = async (id: string) => {
+    try {
+      await deleteDocument('savedInvoices', id);
+    } catch (e) {
+      console.warn('Firestore delete notice:', e);
+    }
+
+    setAllSavedInvoices((prev) => {
+      const filtered = prev.filter((inv) => inv.id !== id);
+      try {
+        localStorage.setItem('swedswood_saved_invoices', JSON.stringify(filtered));
+      } catch (e) {}
+      return filtered;
+    });
+
+    if (onDeleteInvoiceRecord) {
+      onDeleteInvoiceRecord(id);
+    }
+
+    if (editingProformaId === id) {
+      setEditingProformaId(null);
+      handleStartNewProforma();
+    }
+
+    setDeleteConfirmId(null);
+    setSaveToast('Proforma invoice removed from archive.');
+    setTimeout(() => setSaveToast(null), 3000);
+  };
+
+  // Handler: Quick Update Proforma Status
+  const handleUpdateProformaStatus = async (id: string, newStatus: SavedInvoice['status']) => {
+    const target = allSavedInvoices.find((s) => s.id === id);
+    if (!target) return;
+    const updated: SavedInvoice = {
+      ...target,
+      status: newStatus,
+      lastUpdated: new Date().toISOString()
+    };
+    try {
+      await saveDocument('savedInvoices', updated);
+    } catch (e) {}
+
+    setAllSavedInvoices((prev) => {
+      const mapped = prev.map((inv) => (inv.id === id ? updated : inv));
+      try {
+        localStorage.setItem('swedswood_saved_invoices', JSON.stringify(mapped));
+      } catch (e) {}
+      return mapped;
+    });
+
+    setSaveToast(`Status updated to "${newStatus}" for ${target.invoiceNo}`);
+    setTimeout(() => setSaveToast(null), 2500);
+  };
+
+  // Handler: Direct PDF download for any proforma from archive list
+  const handleDownloadSingleProformaPdf = async (inv: SavedInvoice) => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      const logoDataUrl = await getLogoDataUrl(inv.logoUrl || '/logo.svg');
+      const pdfItems: ProformaPdfItem[] = (inv.items || []).map((it, idx) => ({
+        index: idx + 1,
+        description: it.description,
+        woodSpecies: it.woodSpecies,
+        dimensions: it.dimensions,
+        quantity: it.quantity || 1,
+        price: it.unitPrice || 0,
+        total: it.total || it.amount || (it.quantity || 1) * (it.unitPrice || 0)
+      }));
+
+      buildProformaInvoicePdfContent(doc, {
+        proformaNo: inv.invoiceNo,
+        date: new Date(inv.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        validUntil: inv.validUntil || '',
+        leadTime: inv.leadTime || '2 - 3 Weeks from deposit confirmation',
+        paymentTerms: inv.paymentTerms || '50% Advance Deposit on approval, 50% Balance upon Delivery & Site Inspection',
+        customerName: inv.customerName,
+        customerCompany: inv.customerCompany,
+        customerPhone: inv.customerPhone,
+        customerEmail: inv.customerEmail,
+        customerAddress: inv.customerAddress,
+        projectTitle: inv.projectTitle || inv.items[0]?.description || 'Custom Bespoke Architectural Woodwork',
+        projectDescription: inv.projectDescription || inv.customerMessage || '',
+        items: pdfItems,
+        subtotal: inv.subtotal,
+        discountPercent: inv.discountPercent || 0,
+        taxPercent: inv.taxPercent || 0,
+        depositPercent: inv.depositPercent !== undefined ? inv.depositPercent : 50,
+        bankDetails:
+          'Sierra Leone Commercial Bank (SLCB) • A/C: 003001099234 • SWIFT: SLCBSLFR\nRokel Commercial Bank • A/C: 0140293849\nOrange Money Merchant: #882910 (SWEDS WOOD)\nAfricell Money: #449201',
+        notes: inv.notes || '',
+        preparedBy: inv.preparedBy || (currentUser ? `${currentUser.name} (${currentUser.role})` : 'Mr Paul Bindi (Admin)'),
+        logoDataUrl
+      });
+
+      const cleanCust = (inv.customerName || 'Client').replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`Proforma_Invoice_${inv.invoiceNo}_${cleanCust}.pdf`);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+    }
+  };
+
+  // Sync if initialProformaRecord provided
+  useEffect(() => {
+    if (initialProformaRecord) {
+      handleEditSavedProforma(initialProformaRecord);
+    }
+  }, [initialProformaRecord]);
 
   // Compute Active Customer Profile
   const activeCustomer: {
@@ -437,17 +717,20 @@ export default function ProformaInvoiceDesk({
     window.print();
   };
 
-  // Save Record
-  const handleSaveRecord = () => {
+  // Save / Update Record
+  const handleSaveRecord = async () => {
+    const isEditing = Boolean(editingProformaId);
+    const existing = isEditing ? allSavedInvoices.find((s) => s.id === editingProformaId) : null;
+
     const record: SavedInvoice = {
-      id: `proforma-${Date.now()}`,
-      jobId: linkedJobId || 'job-proforma',
+      id: editingProformaId || `proforma-${Date.now()}`,
+      jobId: linkedJobId || existing?.jobId || 'job-proforma',
       invoiceNo: proformaNo,
       docType: 'PROFORMA',
       terms: paymentTerms,
       customerMessage: projectDescription,
-      preparedBy: currentUser?.name || 'Master Joiner / Commercial Director',
-      customerId: clientType === 'EXISTING' ? selectedCustomerId : `prospect-${Date.now()}`,
+      preparedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : (existing?.preparedBy || 'Mr Paul Bindi (Admin)'),
+      customerId: clientType === 'EXISTING' ? selectedCustomerId : (existing?.customerId || `prospect-${Date.now()}`),
       customerName: activeCustomer.name,
       customerCompany: activeCustomer.company,
       customerPhone: activeCustomer.phone,
@@ -466,29 +749,37 @@ export default function ProformaInvoiceDesk({
       paymentTerms,
       depositPercent,
       template: 'PROFORMA',
-      status: 'Issued',
+      status: existing?.status || 'Issued',
       logoUrl: logoUrl || '/logo.svg',
       notes,
-      createdAt: new Date().toISOString(),
+      createdAt: existing?.createdAt || new Date().toISOString(),
       lastUpdated: new Date().toISOString()
     };
 
-    saveDocument('savedInvoices', record);
-
-    // Also update localStorage
     try {
-      const existing = JSON.parse(localStorage.getItem('swedswood_saved_invoices') || '[]');
-      const filtered = existing.filter((inv: SavedInvoice) => inv.id !== record.id);
-      localStorage.setItem('swedswood_saved_invoices', JSON.stringify([record, ...filtered]));
+      await saveDocument('savedInvoices', record);
     } catch (e) {
-      console.error(e);
+      console.warn('Firestore proforma save notice:', e);
     }
+
+    setAllSavedInvoices((prev) => {
+      const filtered = prev.filter((inv: SavedInvoice) => inv.id !== record.id);
+      const updated = [record, ...filtered];
+      try {
+        localStorage.setItem('swedswood_saved_invoices', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
 
     if (onSaveInvoiceRecord) {
       onSaveInvoiceRecord(record);
     }
 
-    setSaveToast(`Proforma Invoice ${proformaNo} successfully saved!`);
+    setSaveToast(
+      isEditing
+        ? `Proforma ${proformaNo} successfully updated in archive!`
+        : `Proforma ${proformaNo} successfully saved to archive!`
+    );
     setTimeout(() => setSaveToast(null), 3000);
   };
 
@@ -514,7 +805,7 @@ Sierra Leone Commercial Bank (SLCB)
 A/C: 003001099234 | SWEDS WOOD LTD
 Orange Money Merchant: #882910
 
-_For questions or deposit confirmation, please contact Sweds Wood Workshop (+232 76 123 456)._`;
+_For questions or deposit confirmation, please contact Sweds Wood Workshop (+232 76 442590)._`;
 
     const encoded = encodeURIComponent(text);
     const cleanPhone = (activeCustomer.phone || '').replace(/[^0-9]/g, '');
@@ -590,7 +881,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
       <div className="bg-gradient-to-r from-slate-950 via-wood-950 to-slate-900 text-white p-5 sm:p-6 rounded-2xl border border-amber-500/30 shadow-xl no-print">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 rounded-full flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
                 Modern Luxury
@@ -598,17 +889,31 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
               <span className="text-amber-400/80 text-xs font-mono font-bold tracking-widest uppercase">
                 Official Commercial Quotation
               </span>
+              <span className="px-2.5 py-0.5 text-[10px] font-bold bg-slate-800 text-amber-300 border border-amber-500/30 rounded-full flex items-center gap-1">
+                <Phone className="w-3 h-3 text-amber-400" />
+                <span>Contact: +232 76 442590</span>
+              </span>
+              {isAdmin && (
+                <span className="px-2.5 py-0.5 text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full">
+                  Admin: Mr Paul Bindi
+                </span>
+              )}
             </div>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
               <FileSpreadsheet className="w-7 h-7 text-amber-400" />
               <span>Proforma Invoice Desk</span>
+              {editingProformaId && (
+                <span className="text-xs font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-lg">
+                  Editing {proformaNo}
+                </span>
+              )}
             </h2>
             <p className="text-xs text-amber-200/80 max-w-2xl leading-relaxed">
               Generate exquisite, itemized woodworking proforma invoices for prospective and registered clients. Complete with timber species specifications, 50% advance deposit terms, 5-year joinery warranty, and formal master craftsman clearance seals.
             </p>
           </div>
 
-          {/* Quick Actions */}
+          {/* Quick Actions & Navigation */}
           <div className="flex flex-wrap items-center gap-2">
             {/* View Mode Toggle */}
             <div className="bg-slate-900 p-1 rounded-xl border border-amber-500/30 flex items-center">
@@ -634,16 +939,58 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                 <Eye className="w-3.5 h-3.5" />
                 <span>A4 Live Preview</span>
               </button>
+              <button
+                onClick={() => setViewMode('MANAGE')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  viewMode === 'MANAGE'
+                    ? 'bg-amber-400 text-slate-950 shadow-sm'
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span>Manage & Archive</span>
+                <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
+                  viewMode === 'MANAGE' ? 'bg-slate-950 text-amber-300' : 'bg-slate-800 text-gray-300'
+                }`}>
+                  {proformaRecords.length}
+                </span>
+              </button>
             </div>
 
+            {/* Start New Proforma Button */}
+            <button
+              onClick={handleStartNewProforma}
+              className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="Start a fresh new Proforma Invoice"
+            >
+              <Plus className="w-4 h-4 text-amber-400" />
+              <span>+ New Proforma</span>
+            </button>
+
+            {/* Save / Update Record */}
             <button
               onClick={handleSaveRecord}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition cursor-pointer"
-              title="Save to database archive"
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                editingProformaId
+                  ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-md font-black'
+                  : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
+              }`}
+              title={editingProformaId ? 'Update this existing Proforma record' : 'Save to database archive'}
             >
-              <Save className="w-4 h-4 text-amber-400" />
-              <span>Save Record</span>
+              <Save className={`w-4 h-4 ${editingProformaId ? 'text-slate-950' : 'text-amber-400'}`} />
+              <span>{editingProformaId ? 'Update Record' : 'Save Record'}</span>
             </button>
+
+            {editingProformaId && (
+              <button
+                onClick={handleCancelEdit}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-gray-300 rounded-xl text-xs font-bold flex items-center gap-1 border border-slate-700 transition cursor-pointer"
+                title="Cancel editing and create a new proforma instead"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Cancel</span>
+              </button>
+            )}
 
             <button
               onClick={handleDownloadPdf}
@@ -661,10 +1008,10 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
 
             <button
               onClick={handlePrint}
-              className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition cursor-pointer"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
             >
-              <Printer className="w-4 h-4" />
-              <span>Print Proforma</span>
+              <Printer className="w-4 h-4 text-amber-400" />
+              <span>Print</span>
             </button>
 
             <button
@@ -683,11 +1030,41 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                 title="Convert this accepted quote into an active Workshop Job"
               >
                 <Award className="w-4 h-4 text-slate-950" />
-                <span>Convert to Active Job</span>
+                <span>Convert to Job</span>
               </button>
             )}
           </div>
         </div>
+
+        {/* Active Edit Alert Banner */}
+        {editingProformaId && (
+          <div className="mt-3 p-3 bg-amber-500/20 border border-amber-500/40 text-amber-200 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Edit3 className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>Administrator Editing Mode:</strong> Currently updating Proforma{' '}
+                <span className="font-mono font-bold text-white bg-slate-900 px-1.5 py-0.5 rounded">
+                  {proformaNo}
+                </span>{' '}
+                for <span className="font-bold text-white">{activeCustomer.name}</span>.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleSaveRecord}
+                className="px-2.5 py-1 bg-amber-400 text-slate-950 rounded-lg text-xs font-black hover:bg-amber-300 transition cursor-pointer"
+              >
+                Update Now
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="px-2.5 py-1 bg-slate-800 text-gray-300 hover:text-white rounded-lg text-xs font-bold transition cursor-pointer"
+              >
+                Exit Edit
+              </button>
+            </div>
+          </div>
+        )}
 
         {copiedNotification && (
           <div className="mt-3 p-2.5 bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs flex items-center gap-2">
@@ -1288,7 +1665,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
 
                 <div className="text-[11px] text-gray-600 leading-relaxed font-medium">
                   <p>Workshop: 42 Timber Yard Industrial Layout, Off Bai Bureh Road</p>
-                  <p>Freetown, Sierra Leone • Tel: +232 76 123 456 / +232 88 654 321</p>
+                  <p>Freetown, Sierra Leone • Tel: +232 76 442590 / +232 88 654 321</p>
                   <p>Web: www.swedswood.com • Email: workshop@swedswood.com</p>
                 </div>
               </div>
@@ -1514,6 +1891,358 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
           </div>
         </div>
       )}
+
+      {/* Management & Archive Mode */}
+      {viewMode === 'MANAGE' && (
+        <div className="space-y-6 no-print">
+          {/* Admin Identity & Capabilities Banner */}
+          <div className="bg-gradient-to-r from-wood-950 via-slate-900 to-amber-950 text-white p-6 rounded-2xl border border-amber-500/30 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-amber-400 text-slate-950 rounded-2xl shadow-md">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black rounded-full uppercase tracking-wider">
+                    Authorized Administrator Control
+                  </span>
+                  <span className="text-amber-400 text-xs font-mono font-bold">
+                    Official System Contact: +232 76 442590
+                  </span>
+                </div>
+                <h3 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                  <span>Proforma Quotation Management Console</span>
+                </h3>
+                <p className="text-xs text-amber-200/80 max-w-xl">
+                  {currentUser?.name || 'Mr Paul Bindi'} (Administrator) has full clearance to create, edit, re-quote, issue, and convert woodwork proforma invoices.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={handleStartNewProforma}
+                className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Create New Proforma</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-2xl border border-wood-100 shadow-xs">
+              <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">
+                <span>Total Proformas</span>
+                <Layers className="w-4 h-4 text-amber-600" />
+              </div>
+              <p className="text-2xl font-mono font-black text-wood-950">{proformaRecords.length}</p>
+              <p className="text-[10px] text-gray-400 mt-1">Archived quotations in system</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-wood-100 shadow-xs">
+              <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">
+                <span>Total Pipeline Value</span>
+                <DollarSign className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="text-2xl font-mono font-black text-emerald-700">
+                {formatCurrency(proformaRecords.reduce((sum, p) => sum + (p.subtotal || 0), 0))}
+              </p>
+              <p className="text-[10px] text-emerald-600 font-medium mt-1">Combined commercial quotations</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-wood-100 shadow-xs">
+              <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">
+                <span>Accepted / Converted</span>
+                <CheckCircle2 className="w-4 h-4 text-blue-600" />
+              </div>
+              <p className="text-2xl font-mono font-black text-blue-800">
+                {proformaRecords.filter(p => p.status === 'Accepted' || p.status === 'Paid').length}
+              </p>
+              <p className="text-[10px] text-blue-600 font-medium mt-1">
+                {formatCurrency(proformaRecords.filter(p => p.status === 'Accepted' || p.status === 'Paid').reduce((sum, p) => sum + (p.subtotal || 0), 0))}
+              </p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-wood-100 shadow-xs">
+              <div className="flex items-center justify-between text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">
+                <span>Pending / Open</span>
+                <Clock className="w-4 h-4 text-amber-600" />
+              </div>
+              <p className="text-2xl font-mono font-black text-amber-700">
+                {proformaRecords.filter(p => p.status === 'Issued' || p.status === 'Draft').length}
+              </p>
+              <p className="text-[10px] text-amber-600 font-medium mt-1">Awaiting client deposit confirmation</p>
+            </div>
+          </div>
+
+          {/* Search, Filter & List Section */}
+          <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search by Proforma #, client name, phone, or scope..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-amber-500 outline-none font-medium text-gray-800"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(['ALL', 'Issued', 'Accepted', 'Draft', 'Expired', 'Paid', 'Cancelled'] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setStatusFilter(st)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      statusFilter === st
+                        ? 'bg-wood-950 text-amber-400 shadow-xs'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* List / Cards */}
+            {filteredProformas.length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <div className="w-12 h-12 bg-amber-50 text-amber-800 rounded-2xl flex items-center justify-center mx-auto">
+                  <FileSpreadsheet className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-gray-900">No Proforma Invoices Found</h4>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  {searchQuery || statusFilter !== 'ALL'
+                    ? 'Try adjusting your search query or status filter.'
+                    : 'Get started by creating your first official woodworking proforma invoice quotation.'}
+                </p>
+                <button
+                  onClick={handleStartNewProforma}
+                  className="mt-2 px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create First Proforma</span>
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {filteredProformas.map((inv) => (
+                  <div
+                    key={inv.id}
+                    className={`p-4 sm:p-5 hover:bg-amber-50/40 transition flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${
+                      editingProformaId === inv.id ? 'bg-amber-50/70 border-l-4 border-amber-500' : ''
+                    }`}
+                  >
+                    {/* Left: Metadata & Client */}
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono font-black text-sm text-wood-950 bg-wood-50 px-2.5 py-0.5 rounded-md border border-wood-200">
+                          {inv.invoiceNo}
+                        </span>
+                        <span className="text-[11px] text-gray-500 font-mono flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-gray-400" />
+                          <span>{inv.date}</span>
+                        </span>
+                        {inv.validUntil && (
+                          <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full font-bold">
+                            Valid until {inv.validUntil}
+                          </span>
+                        )}
+                        {/* Status selector */}
+                        <select
+                          value={inv.status}
+                          onChange={(e) => handleUpdateProformaStatus(inv.id, e.target.value as SavedInvoice['status'])}
+                          className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border cursor-pointer outline-none ${
+                            inv.status === 'Accepted'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : inv.status === 'Issued'
+                              ? 'bg-blue-100 text-blue-800 border-blue-300'
+                              : inv.status === 'Paid'
+                              ? 'bg-purple-100 text-purple-800 border-purple-300'
+                              : inv.status === 'Draft'
+                              ? 'bg-gray-100 text-gray-800 border-gray-300'
+                              : 'bg-red-100 text-red-800 border-red-300'
+                          }`}
+                          title="Click to update quotation status"
+                        >
+                          <option value="Draft">Draft</option>
+                          <option value="Issued">Issued</option>
+                          <option value="Accepted">Accepted</option>
+                          <option value="Paid">Paid</option>
+                          <option value="Expired">Expired</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-amber-600" />
+                          <span>{inv.customerName}</span>
+                          {inv.customerCompany && (
+                            <span className="text-xs text-gray-500 font-normal">({inv.customerCompany})</span>
+                          )}
+                        </p>
+                        {inv.customerPhone && (
+                          <span className="text-xs text-gray-500 font-mono flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-gray-400" />
+                            <span>{inv.customerPhone}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-gray-700 font-medium line-clamp-1">
+                        <strong>Project:</strong> {inv.projectTitle || inv.items[0]?.description || 'Custom Joinery Order'}
+                      </p>
+
+                      {/* Items Preview */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {(inv.items || []).slice(0, 3).map((item, idx) => (
+                          <span
+                            key={idx}
+                            className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-700 rounded-md border border-gray-200"
+                          >
+                            {item.quantity}x {item.description.slice(0, 30)}...
+                          </span>
+                        ))}
+                        {(inv.items || []).length > 3 && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-gray-50 text-gray-500 rounded-md font-bold">
+                            +{(inv.items || []).length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Middle: Financials */}
+                    <div className="text-left lg:text-right space-y-0.5 border-t lg:border-t-0 pt-2 lg:pt-0">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                        Total Quotation Value
+                      </span>
+                      <span className="text-lg font-mono font-black text-emerald-800 block">
+                        {formatCurrency(inv.subtotal)}
+                      </span>
+                      <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md inline-block">
+                        50% Advance: {formatCurrency(Math.round(inv.subtotal * (inv.depositPercent !== undefined ? inv.depositPercent / 100 : 0.5)))}
+                      </span>
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-2 lg:pt-0">
+                      {/* Edit Button */}
+                      <button
+                        onClick={() => handleEditSavedProforma(inv)}
+                        className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-400 text-amber-950 rounded-xl transition cursor-pointer flex items-center gap-1 text-xs font-bold shadow-xs"
+                        title="Edit this Proforma in Form Editor"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+
+                      {/* Preview Button */}
+                      <button
+                        onClick={() => handlePreviewSavedProforma(inv)}
+                        className="px-2.5 py-1.5 bg-gray-100 hover:bg-wood-950 hover:text-white text-gray-700 rounded-xl transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                        title="View A4 Live Preview"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Preview</span>
+                      </button>
+
+                      {/* Download PDF Button */}
+                      <button
+                        onClick={() => handleDownloadSingleProformaPdf(inv)}
+                        className="p-2 bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-800 rounded-xl transition cursor-pointer"
+                        title="Download official PDF with system logo"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+
+                      {/* WhatsApp Share Button */}
+                      <button
+                        onClick={() => {
+                          handlePreviewSavedProforma(inv);
+                          setTimeout(() => handleShareWhatsApp(), 100);
+                        }}
+                        className="p-2 bg-emerald-100 hover:bg-emerald-500 hover:text-white text-emerald-900 rounded-xl transition cursor-pointer"
+                        title="Share via WhatsApp"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+
+                      {/* Delete Button (Admin / Manager) */}
+                      {canManage && (
+                        <button
+                          onClick={() => setDeleteConfirmId(inv.id)}
+                          className="p-2 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 rounded-xl transition cursor-pointer"
+                          title="Delete Proforma permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Proforma Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirmId && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-red-200"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-red-100 text-red-700 rounded-xl">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Delete Proforma Invoice?</h3>
+                  <p className="text-xs text-gray-500">This action will remove the record from both local cache and Firestore database.</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-600">
+                Are you sure you want to delete this proforma quotation? This cannot be undone.
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setDeleteConfirmId(null)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteProforma(deleteConfirmId)}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete Record</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Convert to Job Confirmation Modal */}
       <AnimatePresence>
