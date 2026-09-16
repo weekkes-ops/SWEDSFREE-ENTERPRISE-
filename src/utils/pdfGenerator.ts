@@ -1,5 +1,35 @@
 import { Job, Customer, Employee, JobPayment } from '../types';
 
+// Helper to rasterize logo URL (e.g. /logo.svg or custom upload) into PNG Data URL for jsPDF
+export async function getLogoDataUrl(logoUrl?: string): Promise<string | null> {
+  const url = logoUrl || '/logo.svg';
+  if (url.startsWith('data:image/png') || url.startsWith('data:image/jpeg')) {
+    return url;
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 400;
+        canvas.height = img.naturalHeight || 360;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/png'));
+          return;
+        }
+      } catch (e) {
+        console.error('Error rasterizing logo for PDF:', e);
+      }
+      resolve(null);
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 export interface CustomInvoiceItem {
   id: string;
   description: string;
@@ -1148,7 +1178,9 @@ export function buildProformaInvoicePdfContent(
     let logoDrawn = false;
     if (logoDataUrl) {
       try {
-        doc.addImage(logoDataUrl, 'PNG', 14, 13, 20, 20);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(13, 12.5, 21, 21, 2, 2, 'F');
+        doc.addImage(logoDataUrl, 'PNG', 14, 13.5, 19, 19);
         logoDrawn = true;
       } catch (err) {
         console.error('Failed to draw logo on Proforma PDF:', err);

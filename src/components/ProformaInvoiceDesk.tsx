@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Customer, Job, Employee, SavedInvoice, SavedInvoiceItem, formatCurrency } from '../types';
 import { saveDocument } from '../lib/firestoreService';
-import { buildProformaInvoicePdfContent, ProformaPdfItem } from '../utils/pdfGenerator';
+import { buildProformaInvoicePdfContent, ProformaPdfItem, getLogoDataUrl } from '../utils/pdfGenerator';
 import { jsPDF } from 'jspdf';
 import { 
   FileSpreadsheet, 
@@ -32,7 +32,10 @@ import {
   AlertCircle,
   RefreshCw,
   Award,
-  Layers
+  Layers,
+  Image as ImageIcon,
+  Upload,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -138,6 +141,36 @@ export default function ProformaInvoiceDesk({
     const rand = Math.floor(1000 + Math.random() * 9000);
     return `PRO-${year}-${rand}`;
   });
+
+  // Official System Logo
+  const [logoUrl, setLogoUrl] = useState<string>(() => {
+    return localStorage.getItem('swedswood_proforma_logo_url') || '/logo.svg';
+  });
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const newUrl = event.target.result as string;
+          setLogoUrl(newUrl);
+          localStorage.setItem('swedswood_proforma_logo_url', newUrl);
+          setSaveToast('Proforma invoice logo updated!');
+          setTimeout(() => setSaveToast(null), 2500);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleResetLogo = () => {
+    setLogoUrl('/logo.svg');
+    localStorage.removeItem('swedswood_proforma_logo_url');
+    setSaveToast('Reset to default system logo');
+    setTimeout(() => setSaveToast(null), 2000);
+  };
 
   const [issueDate, setIssueDate] = useState(() => {
     return new Date().toISOString().split('T')[0];
@@ -343,49 +376,60 @@ export default function ProformaInvoiceDesk({
   };
 
   // PDF Export
-  const handleDownloadPdf = () => {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+  const handleDownloadPdf = async () => {
+    try {
+      setIsDownloadingPdf(true);
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
 
-    const pdfItems: ProformaPdfItem[] = items.map((it, idx) => ({
-      index: idx + 1,
-      description: it.description,
-      woodSpecies: it.woodSpecies,
-      dimensions: it.dimensions,
-      quantity: it.quantity,
-      price: it.unitPrice,
-      total: it.total
-    }));
+      const pdfItems: ProformaPdfItem[] = items.map((it, idx) => ({
+        index: idx + 1,
+        description: it.description,
+        woodSpecies: it.woodSpecies,
+        dimensions: it.dimensions,
+        quantity: it.quantity,
+        price: it.unitPrice,
+        total: it.total
+      }));
 
-    buildProformaInvoicePdfContent(doc, {
-      proformaNo,
-      date: new Date(issueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-      validUntil: validUntilDate,
-      leadTime,
-      paymentTerms,
-      customerName: activeCustomer.name,
-      customerCompany: activeCustomer.company,
-      customerPhone: activeCustomer.phone,
-      customerEmail: activeCustomer.email,
-      customerAddress: activeCustomer.address,
-      projectTitle,
-      projectDescription,
-      items: pdfItems,
-      subtotal,
-      discountPercent,
-      taxPercent,
-      depositPercent,
-      bankDetails:
-        'Sierra Leone Commercial Bank (SLCB) • A/C: 003001099234 • SWIFT: SLCBSLFR\nRokel Commercial Bank • A/C: 0140293849\nOrange Money Merchant: #882910 (SWEDS WOOD)\nAfricell Money: #449201',
-      notes,
-      preparedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'Master Joiner / Commercial Director'
-    });
+      // Rasterize system logo to PNG Data URL for high-fidelity vector/canvas embedding
+      const logoDataUrl = await getLogoDataUrl(logoUrl || '/logo.svg');
 
-    const cleanCust = activeCustomer.name.replace(/[^a-zA-Z0-9]/g, '_');
-    doc.save(`Proforma_Invoice_${proformaNo}_${cleanCust}.pdf`);
+      buildProformaInvoicePdfContent(doc, {
+        proformaNo,
+        date: new Date(issueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        validUntil: validUntilDate,
+        leadTime,
+        paymentTerms,
+        customerName: activeCustomer.name,
+        customerCompany: activeCustomer.company,
+        customerPhone: activeCustomer.phone,
+        customerEmail: activeCustomer.email,
+        customerAddress: activeCustomer.address,
+        projectTitle,
+        projectDescription,
+        items: pdfItems,
+        subtotal,
+        discountPercent,
+        taxPercent,
+        depositPercent,
+        bankDetails:
+          'Sierra Leone Commercial Bank (SLCB) • A/C: 003001099234 • SWIFT: SLCBSLFR\nRokel Commercial Bank • A/C: 0140293849\nOrange Money Merchant: #882910 (SWEDS WOOD)\nAfricell Money: #449201',
+        notes,
+        preparedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'Master Joiner / Commercial Director',
+        logoDataUrl
+      });
+
+      const cleanCust = activeCustomer.name.replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`Proforma_Invoice_${proformaNo}_${cleanCust}.pdf`);
+    } catch (err) {
+      console.error('Error generating Proforma PDF:', err);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   // Print Proforma
@@ -423,6 +467,7 @@ export default function ProformaInvoiceDesk({
       depositPercent,
       template: 'PROFORMA',
       status: 'Issued',
+      logoUrl: logoUrl || '/logo.svg',
       notes,
       createdAt: new Date().toISOString(),
       lastUpdated: new Date().toISOString()
@@ -602,11 +647,16 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
 
             <button
               onClick={handleDownloadPdf}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition cursor-pointer"
-              title="Download print-ready PDF"
+              disabled={isDownloadingPdf}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition cursor-pointer"
+              title="Download print-ready PDF with System Logo"
             >
-              <Download className="w-4 h-4" />
-              <span>Download PDF</span>
+              {isDownloadingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>{isDownloadingPdf ? 'Generating PDF...' : 'Download PDF'}</span>
             </button>
 
             <button
@@ -786,6 +836,46 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* System Logo & Branding Controls */}
+            <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                <span className="text-xs font-black uppercase text-wood-950 tracking-wider flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-amber-600" />
+                  <span>Proforma System Logo</span>
+                </span>
+                {logoUrl !== '/logo.svg' && (
+                  <button
+                    type="button"
+                    onClick={handleResetLogo}
+                    className="text-[10px] text-amber-700 hover:text-amber-900 font-bold underline cursor-pointer"
+                  >
+                    Reset to Default Logo
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-xl bg-white p-1.5 shadow-sm border border-amber-500/40 flex items-center justify-center shrink-0">
+                  <img
+                    src={logoUrl || '/logo.svg'}
+                    alt="System Logo Preview"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="space-y-1 flex-1 min-w-0">
+                  <p className="text-xs font-bold text-gray-800">Swedswood Official Crest</p>
+                  <p className="text-[11px] text-gray-500">Appears on the Proforma header, watermark, and PDF download.</p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <label className="px-2.5 py-1 bg-wood-950 hover:bg-wood-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition shadow-2xs shrink-0">
+                      <Upload className="w-3 h-3 text-amber-400" />
+                      <span>Change Logo</span>
+                      <input type="file" accept="image/*" onChange={handleLogoFileUpload} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Proforma Quotation Terms */}
@@ -1155,13 +1245,13 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
             className="w-full max-w-[850px] bg-white text-slate-900 shadow-2xl rounded-2xl p-8 sm:p-12 border border-amber-900/20 relative overflow-hidden"
             style={{ minHeight: '1100px' }}
           >
-            {/* Watermark Crest Seal in Center Background */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
-              <div className="w-[500px] h-[500px] rounded-full border-[20px] border-wood-950 flex items-center justify-center text-center p-10">
-                <span className="text-6xl font-serif font-black tracking-widest text-wood-950">
-                  SWEDS WOOD
-                </span>
-              </div>
+            {/* Watermark Crest in Center Background */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-[0.035] pointer-events-none select-none">
+              <img 
+                src={logoUrl || '/logo.svg'} 
+                alt="Watermark Logo" 
+                className="w-96 h-96 object-contain grayscale"
+              />
             </div>
 
             {/* Top Border Gold/Navy Accent Stripe */}
@@ -1171,9 +1261,20 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
             <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b-2 border-slate-900 pb-6 mb-8">
               {/* Left: Sweds Wood Branding */}
               <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-wood-950 text-amber-400 flex items-center justify-center font-serif text-2xl font-black shadow-md border border-amber-500/40">
-                    SW
+                <div className="flex items-center gap-3.5">
+                  <div className="relative group w-16 h-16 rounded-xl bg-white p-1.5 shadow-md border border-amber-500/40 flex items-center justify-center shrink-0">
+                    <img 
+                      src={logoUrl || '/logo.svg'} 
+                      alt="SWEDSFREE Woodwork Enterprise Official Logo" 
+                      className="w-full h-full object-contain"
+                    />
+                    <label 
+                      className="absolute -bottom-1 -right-1 bg-wood-950 text-white p-1 rounded-full text-[9px] cursor-pointer shadow-md hover:bg-amber-600 transition no-print" 
+                      title="Change Proforma Logo"
+                    >
+                      <Upload className="w-2.5 h-2.5" />
+                      <input type="file" accept="image/*" onChange={handleLogoFileUpload} className="hidden" />
+                    </label>
                   </div>
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-serif font-black tracking-tight text-wood-950">

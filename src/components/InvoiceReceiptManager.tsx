@@ -75,35 +75,9 @@ export const DEFAULT_300X300_SIGNATURE = `data:image/svg+xml;utf8,<svg xmlns="ht
 // Default 300x300 Pixel Official Stamp / Seal (SVG Data URL)
 export const DEFAULT_300X300_STAMP = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="none"/><g transform="rotate(-10 150 150)"><circle cx="150" cy="150" r="138" fill="none" stroke="%23991b1b" stroke-width="6"/><circle cx="150" cy="150" r="126" fill="none" stroke="%23991b1b" stroke-width="2.5" stroke-dasharray="8 5"/><path id="stampTopArc" d="M 35 150 A 115 115 0 0 1 265 150" fill="none"/><text font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="900" fill="%23991b1b" letter-spacing="2.5"><textPath href="%23stampTopArc" startOffset="50%" text-anchor="middle">SWED WOOD WORK</textPath></text><path id="stampBotArc" d="M 265 150 A 115 115 0 0 1 35 150" fill="none"/><text font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="800" fill="%23991b1b" letter-spacing="1.5"><textPath href="%23stampBotArc" startOffset="50%" text-anchor="middle">FREETOWN • SIERRA LEONE</textPath></text><circle cx="150" cy="150" r="88" fill="none" stroke="%23991b1b" stroke-width="3"/><rect x="35" y="122" width="230" height="56" fill="%23991b1b" rx="6"/><text x="150" y="157" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="900" fill="%23ffffff" text-anchor="middle" letter-spacing="2">OFFICIAL STAMP</text><text x="65" y="112" font-family="sans-serif" font-size="16" fill="%23991b1b">★</text><text x="220" y="112" font-family="sans-serif" font-size="16" fill="%23991b1b">★</text><text x="150" y="206" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="800" fill="%23991b1b" text-anchor="middle" letter-spacing="1">AUDITED & CLEARED</text><text x="150" y="222" font-family="monospace" font-size="10" font-weight="bold" fill="%23991b1b" text-anchor="middle">300x300 OFFICIAL SEAL</text></g></svg>`;
 
-// Helper to rasterize logo URL (e.g. /logo.svg or custom upload) into PNG Data URL for jsPDF
-export async function getLogoDataUrl(logoUrl?: string): Promise<string | null> {
-  const url = logoUrl || '/logo.svg';
-  if (url.startsWith('data:image/png') || url.startsWith('data:image/jpeg')) {
-    return url;
-  }
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || 400;
-        canvas.height = img.naturalHeight || 360;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/png'));
-          return;
-        }
-      } catch (e) {
-        console.error('Error rasterizing logo for PDF:', e);
-      }
-      resolve(null);
-    };
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
-}
+// Import and re-export rasterize logo URL helper from shared pdfGenerator utility
+import { getLogoDataUrl } from '../utils/pdfGenerator';
+export { getLogoDataUrl };
 
 export interface IntelliSenseResult {
   id: string;
