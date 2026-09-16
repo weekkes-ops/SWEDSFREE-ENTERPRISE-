@@ -23,7 +23,8 @@ import {
   Edit2,
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -45,6 +46,7 @@ interface JobManagerProps {
   onCloseCreateModal?: () => void;
   currentUser?: Employee | null;
   onTriggerInvoice?: (jobId: string) => void;
+  onTriggerProforma?: (jobId: string) => void;
   onTriggerReceipt?: (jobId: string) => void;
 }
 
@@ -66,6 +68,7 @@ export default function JobManager({
   onCloseCreateModal,
   currentUser,
   onTriggerInvoice,
+  onTriggerProforma,
   onTriggerReceipt
 }: JobManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
@@ -546,6 +549,41 @@ export default function JobManager({
                       <span>Val: {formatCurrency(job.quoteAmount, 0)}</span>
                       <span>Paid: {completePercent}%</span>
                     </div>
+
+                    {/* Proforma Invoice & Quick Doc Actions */}
+                    <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-100 w-full" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[9px] font-extrabold uppercase text-gray-400">Documents</span>
+                      <div className="flex items-center gap-1.5">
+                        {onTriggerProforma && (
+                          <button
+                            type="button"
+                            onClick={(evt) => {
+                              evt.stopPropagation();
+                              onTriggerProforma(job.id);
+                            }}
+                            className="px-2.5 py-1 text-[10px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer"
+                            title={`Create or view Proforma Invoice for ${job.title}`}
+                          >
+                            <FileSpreadsheet className="w-3 h-3 text-amber-900" />
+                            <span>PROFORMA INVOICE</span>
+                          </button>
+                        )}
+                        {onTriggerInvoice && (
+                          <button
+                            type="button"
+                            onClick={(evt) => {
+                              evt.stopPropagation();
+                              onTriggerInvoice(job.id);
+                            }}
+                            className="px-2 py-1 text-[10px] font-bold uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-lg transition flex items-center gap-1 cursor-pointer"
+                            title={`Generate Invoice for ${job.title}`}
+                          >
+                            <FileText className="w-3 h-3 text-wood-700" />
+                            <span>Invoice</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 );
               })
@@ -579,6 +617,16 @@ export default function JobManager({
                         >
                           <FileText className="w-3 h-3 text-amber-700" />
                           <span>Create Invoice</span>
+                        </button>
+                      )}
+                      {onTriggerProforma && (
+                        <button
+                          onClick={() => onTriggerProforma(activeSelectedJob.id)}
+                          className="px-3 py-1 text-xs font-black uppercase text-amber-950 bg-amber-300 hover:bg-amber-400 border border-amber-500 rounded-lg transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                          title="Generate a modern stunning Proforma Invoice for this client"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-amber-950" />
+                          <span>PROFORMA INVOICE</span>
                         </button>
                       )}
                       {onTriggerReceipt && (
@@ -753,6 +801,16 @@ export default function JobManager({
                       >
                         <FileText className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Print Invoice</span>
+                      </button>
+                    )}
+                    {onTriggerProforma && (
+                      <button
+                        onClick={() => onTriggerProforma(activeSelectedJob.id)}
+                        className="flex items-center gap-1.5 text-xs font-black uppercase text-amber-950 bg-amber-300 px-3 py-1.5 rounded-lg border border-amber-500 hover:bg-amber-400 transition cursor-pointer shadow-xs"
+                        title="Generate a modern stunning Proforma Invoice for this client"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-amber-950" />
+                        <span>PROFORMA INVOICE</span>
                       </button>
                     )}
                   </div>

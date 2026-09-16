@@ -183,6 +183,9 @@ export interface SavedInvoiceItem {
   amount: number;
   quantity?: number;
   unitPrice?: number;
+  total?: number;
+  woodSpecies?: string;
+  dimensions?: string;
 }
 
 export interface SavedInvoice {
@@ -197,11 +200,24 @@ export interface SavedInvoice {
   customerEmail: string;
   customerMessage: string;
   preparedBy: string;
-  template: 'SWEDS_WOOD' | 'MODERN';
-  status: 'Draft' | 'Issued' | 'Paid' | 'Overdue' | 'Cancelled';
+  template: 'SWEDS_WOOD' | 'MODERN' | 'PROFORMA';
+  docType?: 'INVOICE' | 'PROFORMA';
+  status: 'Draft' | 'Issued' | 'Paid' | 'Overdue' | 'Cancelled' | 'Accepted' | 'Expired';
   logoUrl?: string;
   items: SavedInvoiceItem[];
   subtotal: number;
+  validityDays?: number;
+  validUntil?: string;
+  leadTime?: string;
+  paymentTerms?: string;
+  notes?: string;
+  depositPercent?: number;
+  discountPercent?: number;
+  taxPercent?: number;
+  customerId?: string;
+  customerCompany?: string;
+  projectTitle?: string;
+  projectDescription?: string;
   createdAt: string;
   lastUpdated: string;
 }

@@ -39,12 +39,14 @@ import {
   ShieldCheck,
   Lock,
   PlusCircle,
-  ArrowRight
+  ArrowRight,
+  FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
-import { buildInvoicePdfContent, buildReceiptPdfContent } from '../utils/pdfGenerator';
+import { buildInvoicePdfContent, buildReceiptPdfContent, buildProformaInvoicePdfContent } from '../utils/pdfGenerator';
+import ProformaInvoiceDesk from './ProformaInvoiceDesk';
 
 export interface CustomInvoiceItem {
   id: string;
@@ -125,11 +127,15 @@ interface InvoiceReceiptManagerProps {
   customers: Customer[];
   currentUser: Employee | null;
   invoiceJobId?: string | null;
-  initialSubTab?: 'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT' | 'AUDIT_LOG';
+  initialSubTab?: 'INVOICE' | 'PROFORMA' | 'SAVED_INVOICES' | 'RECEIPT' | 'AUDIT_LOG';
+  proformaCustomerId?: string | null;
+  proformaJobId?: string | null;
   onClearInvoiceJobId?: () => void;
+  onClearProformaParams?: () => void;
   onUpdateJob?: (updatedJob: Job) => void;
   onUpdateJobPayment?: (jobId: string, payment: JobPayment) => void;
   onDeleteJobPayment?: (jobId: string, paymentId: string) => void;
+  onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   paymentAuditLogs?: PaymentAuditLogEntry[];
 }
 
@@ -139,18 +145,22 @@ export default function InvoiceReceiptManager({
   currentUser,
   invoiceJobId,
   initialSubTab = 'INVOICE',
+  proformaCustomerId,
+  proformaJobId,
   onClearInvoiceJobId,
+  onClearProformaParams,
   onUpdateJob,
   onUpdateJobPayment,
   onDeleteJobPayment,
+  onCreateJob,
   paymentAuditLogs = []
 }: InvoiceReceiptManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(jobs[0]?.id || null);
   
-  // Top level tabs: Invoice Workspace vs Saved Invoices Directory vs Receipt Workspace vs Payment Audit Log
-  const [subTab, setSubTab] = useState<'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT' | 'AUDIT_LOG'>('INVOICE');
+  // Top level tabs: Invoice Workspace vs Proforma Desk vs Saved Invoices Directory vs Receipt Workspace vs Payment Audit Log
+  const [subTab, setSubTab] = useState<'INVOICE' | 'PROFORMA' | 'SAVED_INVOICES' | 'RECEIPT' | 'AUDIT_LOG'>('INVOICE');
 
   // Payment Audit Log Filters State
   const [auditSearchTerm, setAuditSearchTerm] = useState('');
@@ -409,8 +419,8 @@ export default function InvoiceReceiptManager({
     );
   };
 
-  // Template format selection: 'SWEDS_WOOD' (scanned paper style) or 'MODERN' (original template)
-  const [invoiceTemplate, setInvoiceTemplate] = useState<'SWEDS_WOOD' | 'MODERN'>('SWEDS_WOOD');
+  // Template format selection: 'SWEDS_WOOD' (scanned paper style), 'MODERN' (original template), or 'PROFORMA' (modern bespoke quotation)
+  const [invoiceTemplate, setInvoiceTemplate] = useState<'SWEDS_WOOD' | 'MODERN' | 'PROFORMA'>('SWEDS_WOOD');
   const [invoiceCustomerMessage, setInvoiceCustomerMessage] = useState<string>("");
 
   // Custom states for Invoice customization prior to print
@@ -820,6 +830,14 @@ export default function InvoiceReceiptManager({
 
   // Sync to outer invoice / receipt creation request (e.g. from Jobs tracker)
   useEffect(() => {
+    if (initialSubTab === 'PROFORMA') {
+      setSubTab('PROFORMA');
+      if (invoiceJobId) {
+        setSelectedJobId(invoiceJobId);
+      }
+      return;
+    }
+
     if (invoiceJobId) {
       setSelectedJobId(invoiceJobId);
       const job = jobs.find(j => j.id === invoiceJobId);
@@ -1336,6 +1354,44 @@ export default function InvoiceReceiptManager({
       unit: 'mm',
       format: 'a4'
     });
+
+    if (inv.template === 'PROFORMA' || inv.docType === 'PROFORMA') {
+      buildProformaInvoicePdfContent(doc, {
+        proformaNo: inv.invoiceNo,
+        date: inv.date,
+        validUntil: inv.validUntil || '',
+        leadTime: inv.leadTime || '2 - 3 Weeks from deposit confirmation',
+        paymentTerms: inv.paymentTerms || '50% Advance Deposit on approval, 50% Balance upon Delivery & Site Inspection',
+        customerName: inv.customerName,
+        customerCompany: inv.customerCompany || '',
+        customerPhone: inv.customerPhone,
+        customerEmail: inv.customerEmail,
+        customerAddress: inv.customerAddress,
+        projectTitle: inv.projectTitle || inv.items[0]?.description || 'Bespoke Woodwork Commission',
+        projectDescription: inv.projectDescription || inv.customerMessage || '',
+        items: inv.items.map((it, idx) => ({
+          index: idx + 1,
+          description: it.description,
+          woodSpecies: it.woodSpecies,
+          dimensions: it.dimensions,
+          quantity: it.quantity,
+          price: it.unitPrice,
+          total: it.total
+        })),
+        subtotal: inv.subtotal,
+        discountPercent: inv.discountPercent || 0,
+        taxPercent: inv.taxPercent || 0,
+        depositPercent: inv.depositPercent || 50,
+        bankDetails: 'Sierra Leone Commercial Bank (SLCB) • A/C: 003001099234\nRokel Commercial Bank • A/C: 0140293849\nOrange Money: #882910',
+        notes: inv.notes,
+        preparedBy: inv.preparedBy || 'Master Joiner / Commercial Director',
+        logoDataUrl
+      });
+      const cleanName = (inv.customerName || 'Client').replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`Proforma_Invoice_${inv.invoiceNo}_${cleanName}.pdf`);
+      return;
+    }
+
     const customer = customers.find(c => c.id === job.customerId) || {
       id: 'c-custom',
       name: inv.customerName,
@@ -1410,6 +1466,46 @@ export default function InvoiceReceiptManager({
       format: 'a4'
     });
     const customer = customers.find(c => c.id === activeInvoice.customerId);
+
+    if (invoiceTemplate === 'PROFORMA') {
+      const items = customInvoiceItems.map((it, idx) => ({
+        index: idx + 1,
+        description: it.description,
+        woodSpecies: 'Kiln-Dried Hardwood',
+        quantity: it.quantity || 1,
+        price: it.unitPrice || it.amount,
+        total: it.amount
+      }));
+      const subtotalVal = customInvoiceItems.length > 0 
+        ? customInvoiceItems.reduce((sum, item) => sum + (item.amount || 0), 0)
+        : (invoiceCommissionAmount || activeInvoice.quoteAmount);
+
+      buildProformaInvoicePdfContent(doc, {
+        proformaNo: invoiceNo || 'PRO-001',
+        date: invoiceDate,
+        validUntil: '',
+        leadTime: '2 - 3 Weeks from deposit confirmation',
+        paymentTerms: '50% Advance Deposit on approval, 50% Balance upon Delivery & Site Inspection',
+        customerName: invoiceCustomerName,
+        customerCompany: customer?.company || '',
+        customerPhone: invoiceCustomerPhone,
+        customerEmail: invoiceCustomerEmail,
+        customerAddress: invoiceCustomerAddress,
+        projectTitle: invoiceProjectTitle || activeInvoice.title,
+        projectDescription: invoiceProjectDescription || activeInvoice.description,
+        items,
+        subtotal: subtotalVal,
+        depositPercent: 50,
+        bankDetails: 'Sierra Leone Commercial Bank (SLCB) • A/C: 003001099234\nRokel Commercial Bank • A/C: 0140293849\nOrange Money: #882910',
+        notes: invoiceCustomerMessage || 'All timber is kiln-dried to <12% moisture content. 5-year structural joinery warranty.',
+        preparedBy: currentUser?.name || 'Master Joiner',
+        logoDataUrl
+      });
+      const cleanName = (invoiceCustomerName || 'Client').replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`Proforma_Invoice_${invoiceNo || 'PRO-001'}_${cleanName}.pdf`);
+      return;
+    }
+
     buildInvoicePdfContent(
       doc,
       activeInvoice,
@@ -1745,12 +1841,12 @@ export default function InvoiceReceiptManager({
           )}
         </AnimatePresence>
 
-        {/* Sub-tab Switcher: Invoices vs Saved Invoices vs Receipts & Bulk Export */}
+        {/* Sub-tab Switcher: Invoices vs Proforma vs Saved Invoices vs Receipts & Bulk Export */}
         <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
-          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+          <div className="flex flex-wrap bg-gray-100 p-1 rounded-xl border border-gray-200 gap-1">
             <button
               onClick={() => setSubTab('INVOICE')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 subTab === 'INVOICE' 
                   ? 'bg-white text-wood-950 shadow-xs' 
                   : 'text-gray-500 hover:text-gray-800'
@@ -1761,8 +1857,23 @@ export default function InvoiceReceiptManager({
             </button>
 
             <button
+              onClick={() => setSubTab('PROFORMA')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                subTab === 'PROFORMA' 
+                  ? 'bg-wood-950 text-white shadow-xs' 
+                  : 'text-gray-700 hover:text-wood-950 hover:bg-gray-200/60'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-amber-400" />
+              <span>Proforma Invoice</span>
+              <span className="px-1.5 py-0.2 bg-amber-400 text-slate-950 text-[9px] font-black rounded-full uppercase tracking-wider">
+                Stunning
+              </span>
+            </button>
+
+            <button
               onClick={() => setSubTab('SAVED_INVOICES')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 subTab === 'SAVED_INVOICES' 
                   ? 'bg-white text-wood-950 shadow-xs' 
                   : 'text-gray-500 hover:text-gray-800'
@@ -1779,7 +1890,7 @@ export default function InvoiceReceiptManager({
 
             <button
               onClick={() => setSubTab('RECEIPT')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 subTab === 'RECEIPT' 
                   ? 'bg-white text-emerald-950 shadow-xs' 
                   : 'text-gray-500 hover:text-gray-800'
@@ -1791,7 +1902,7 @@ export default function InvoiceReceiptManager({
 
             <button
               onClick={() => setSubTab('AUDIT_LOG')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 subTab === 'AUDIT_LOG' 
                   ? 'bg-white text-purple-950 shadow-xs' 
                   : 'text-gray-500 hover:text-gray-800'
@@ -2070,13 +2181,23 @@ export default function InvoiceReceiptManager({
               </div>
             </div>
 
-            <button
-              onClick={handleCreateNewBlankInvoice}
-              className="px-4 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-xs transition cursor-pointer shrink-0"
-            >
-              <Plus className="w-4 h-4 text-amber-400" />
-              <span>+ Create Blank Custom Invoice</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                onClick={() => setSubTab('PROFORMA')}
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-xs transition cursor-pointer"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-slate-950" />
+                <span>+ New Proforma Invoice</span>
+              </button>
+
+              <button
+                onClick={handleCreateNewBlankInvoice}
+                className="px-4 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-xs transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-amber-400" />
+                <span>+ Create Blank Custom Invoice</span>
+              </button>
+            </div>
           </div>
 
           {/* Directory Table */}
@@ -2140,8 +2261,15 @@ export default function InvoiceReceiptManager({
                       return (
                         <tr key={inv.id} className="hover:bg-gray-50/80 transition">
                           <td className="py-3.5 px-4">
-                            <div className="font-mono font-black text-gray-900 text-sm">{inv.invoiceNo}</div>
-                            <div className="text-[10px] text-gray-400 font-medium">{inv.date} • {inv.terms}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-gray-900 text-sm">{inv.invoiceNo}</span>
+                              {(inv.docType === 'PROFORMA' || inv.template === 'PROFORMA') && (
+                                <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black rounded-md uppercase">
+                                  Proforma
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-gray-400 font-medium">{inv.date} {inv.terms ? `• ${inv.terms}` : ''}</div>
                           </td>
                           <td className="py-3.5 px-4">
                             <div className="font-bold text-gray-800">{inv.customerName}</div>
@@ -2660,12 +2788,14 @@ export default function InvoiceReceiptManager({
                 const outstanding = job.quoteAmount - totalPaid;
 
                 return (
-                  <button
+                  <div
                     key={job.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       setSelectedJobId(job.id);
                     }}
-                    className={`w-full text-left p-4 hover:bg-wood-50/10 transition flex flex-col gap-1.5 ${
+                    className={`w-full text-left p-4 hover:bg-wood-50/10 transition flex flex-col gap-1.5 cursor-pointer ${
                       isActive ? 'bg-wood-50/50 border-r-4 border-wood-600 font-bold' : ''
                     }`}
                   >
@@ -2684,7 +2814,23 @@ export default function InvoiceReceiptManager({
                       <span>Price: {formatCurrency(job.quoteAmount, 0)}</span>
                       <span className="font-sans text-gray-500 font-bold">Paid: {formatCurrency(totalPaid, 0)}</span>
                     </div>
-                  </button>
+
+                    <div className="flex items-center justify-end pt-1.5 mt-1 border-t border-gray-100/80 w-full" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedJobId(job.id);
+                          setSubTab('PROFORMA');
+                        }}
+                        className="px-2 py-0.5 text-[9px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
+                        title={`Switch to Proforma Invoice for ${job.title}`}
+                      >
+                        <FileSpreadsheet className="w-2.5 h-2.5 text-amber-900" />
+                        <span>PROFORMA INVOICE</span>
+                      </button>
+                    </div>
+                  </div>
                 );
               })
             )}
@@ -2710,9 +2856,19 @@ export default function InvoiceReceiptManager({
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <span className="text-[8px] font-bold uppercase text-gray-400">Quote Valuation</span>
-                    <p className="text-base font-bold text-wood-900 font-mono">{formatCurrency(selectedJob.quoteAmount, 0)}</p>
+                  <div className="text-right flex flex-col items-end gap-1.5">
+                    <div>
+                      <span className="text-[8px] font-bold uppercase text-gray-400 block">Quote Valuation</span>
+                      <p className="text-base font-bold text-wood-900 font-mono">{formatCurrency(selectedJob.quoteAmount, 0)}</p>
+                    </div>
+                    <button
+                      onClick={() => setSubTab('PROFORMA')}
+                      className="px-2.5 py-1 text-[10px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer"
+                      title="Switch to Proforma Invoice Workspace"
+                    >
+                      <FileSpreadsheet className="w-3 h-3 text-amber-900" />
+                      <span>PROFORMA INVOICE</span>
+                    </button>
                   </div>
                 </div>
 
@@ -3239,6 +3395,27 @@ export default function InvoiceReceiptManager({
           )}
         </div>
       </div>
+      )}
+
+      {/* ==========================================
+         PROFORMA INVOICE DESK
+         ========================================== */}
+      {subTab === 'PROFORMA' && (
+        <ProformaInvoiceDesk
+          customers={customers}
+          jobs={jobs}
+          currentUser={currentUser}
+          initialCustomerId={proformaCustomerId}
+          initialJobId={proformaJobId || invoiceJobId}
+          onClearInitialParams={onClearProformaParams}
+          onSaveInvoiceRecord={(savedRecord) => {
+            setSavedInvoices(prev => [savedRecord, ...prev.filter(inv => inv.id !== savedRecord.id)]);
+            setSaveToast(`Proforma invoice ${savedRecord.invoiceNo} saved to database.`);
+            setTimeout(() => setSaveToast(null), 3000);
+          }}
+          onCreateJob={onCreateJob}
+          onSwitchToSavedInvoices={() => setSubTab('SAVED_INVOICES')}
+        />
       )}
 
       {/* ==========================================

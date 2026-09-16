@@ -1029,3 +1029,512 @@ export function buildReceiptPdfContent(
   doc.setTextColor(140, 140, 140);
   doc.text("Sweds Wood Enterprise — Official Carpentry & Woodwork Clearance Receipt — 2 Sweds free Avenue, Sussex Freetown", 105, 283, { align: 'center' });
 }
+
+// ==========================================
+// PROGRAMMATIC HIGH-FIDELITY PROFORMA INVOICE PDF GENERATOR
+// ==========================================
+export interface ProformaPdfItem {
+  desc?: string;
+  description?: string;
+  woodSpecies?: string;
+  dimensions?: string;
+  index?: number;
+  qty?: string | number;
+  quantity?: number;
+  price: number;
+  total: number;
+}
+
+export interface ProformaPdfOptions {
+  proformaNo: string;
+  date: string;
+  validUntil: string;
+  leadTime: string;
+  paymentTerms: string;
+  customerName: string;
+  customerCompany?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerAddress?: string;
+  projectTitle: string;
+  projectDescription?: string;
+  items: ProformaPdfItem[];
+  subtotal: number;
+  discountPercent?: number;
+  taxPercent?: number;
+  depositPercent?: number;
+  bankDetails?: string;
+  notes?: string;
+  preparedBy?: string;
+  logoDataUrl?: string | null;
+}
+
+export function buildProformaInvoicePdfContent(
+  doc: any,
+  options: ProformaPdfOptions
+) {
+  const {
+    proformaNo,
+    date,
+    validUntil,
+    leadTime,
+    paymentTerms,
+    customerName,
+    customerCompany,
+    customerPhone,
+    customerEmail,
+    customerAddress,
+    projectTitle,
+    projectDescription,
+    items,
+    subtotal,
+    discountPercent = 0,
+    taxPercent = 0,
+    depositPercent = 50,
+    bankDetails,
+    notes,
+    preparedBy,
+    logoDataUrl
+  } = options;
+
+  // Calculate pricing breakdown
+  const discountVal = discountPercent > 0 ? (subtotal * discountPercent) / 100 : 0;
+  const afterDiscount = subtotal - discountVal;
+  const taxVal = taxPercent > 0 ? (afterDiscount * taxPercent) / 100 : 0;
+  const grandTotal = afterDiscount + taxVal;
+  const depositVal = (grandTotal * (depositPercent || 50)) / 100;
+
+  const drawCircularProformaSeal = (x: number, y: number) => {
+    doc.setDrawColor(217, 119, 6); // amber-600
+    doc.setLineWidth(0.5);
+    doc.circle(x, y, 10, 'S');
+    doc.circle(x, y, 8.5, 'S');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(5);
+    doc.setTextColor(217, 119, 6);
+    doc.text("SWEDS WOOD ENTERPRISE", x, y - 4, { align: 'center' });
+    doc.setFontSize(6.5);
+    doc.text("PROFORMA", x, y + 0.5, { align: 'center' });
+    doc.setFontSize(4.5);
+    doc.text("OFFICIAL ESTIMATE", x, y + 4.5, { align: 'center' });
+  };
+
+  const drawHeader = (isContinuation: boolean = false) => {
+    // Outer border
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.setLineWidth(0.3);
+    doc.rect(10, 10, 190, 277, 'S');
+
+    if (isContinuation) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(`SWEDS WOOD ENTERPRISE — PROFORMA INVOICE #${proformaNo} (CONTINUED)`, 15, 20);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Client: ${customerName} | Issued: ${date} | Valid Until: ${validUntil}`, 15, 25);
+      doc.setDrawColor(217, 119, 6);
+      doc.setLineWidth(0.5);
+      doc.line(15, 28, 195, 28);
+      return 34;
+    }
+
+    // Top Dark Slate Accent Banner
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(10, 10, 190, 26, 'F');
+
+    // Logo on Left
+    let logoDrawn = false;
+    if (logoDataUrl) {
+      try {
+        doc.addImage(logoDataUrl, 'PNG', 14, 13, 20, 20);
+        logoDrawn = true;
+      } catch (err) {
+        console.error('Failed to draw logo on Proforma PDF:', err);
+      }
+    }
+    if (!logoDrawn) {
+      doc.setFillColor(217, 119, 6); // amber-600
+      doc.roundedRect(14, 13, 20, 20, 1.5, 1.5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(255, 255, 255);
+      doc.text("SW", 24, 25.5, { align: 'center' });
+    }
+
+    // Company Information
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text("SWEDS WOOD ENTERPRISE", 38, 19);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(203, 213, 225); // slate-300
+    doc.text("Architectural Joinery, Hardwood Furniture, Fitted Kitchens & Interior Timber Solutions", 38, 24);
+    doc.text("2 Sweds free Avenue, Sussex Freetown, Sierra Leone • Tel: +232 76 000000 • Email: info@swedswood.com", 38, 29);
+
+    // Document Title Banner on Right
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13.5);
+    doc.setTextColor(253, 224, 71); // amber-300
+    doc.text("PROFORMA INVOICE", 195, 20, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(255, 255, 255);
+    doc.text("COMMERCIAL QUOTATION", 195, 26, { align: 'right' });
+
+    // Official preliminary notice banner
+    doc.setFillColor(254, 243, 199); // amber-100
+    doc.setDrawColor(245, 158, 11); // amber-500
+    doc.setLineWidth(0.2);
+    doc.rect(10, 36, 190, 7.5, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(146, 64, 14); // amber-800
+    doc.text(
+      "PRELIMINARY ESTIMATE & FORMAL PROFORMA: Issued for client budget approval, deposit settlement, and production scheduling.",
+      105,
+      41,
+      { align: 'center' }
+    );
+
+    // Meta Block Grid (Client Dossier on Left, Quotation Terms on Right)
+    // Left Box: Client Information
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, 47, 88, 38, 1, 1, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(15, 23, 42);
+    doc.text("PROSPECTIVE CLIENT / PROFORMA RECIPIENT:", 18, 52.5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text(customerName || 'Valued Client', 18, 59);
+
+    if (customerCompany) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(180, 83, 9);
+      doc.text(customerCompany, 18, 64);
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+    const phoneY = customerCompany ? 69 : 65;
+    doc.text(`Phone: ${customerPhone || 'N/A'} • Email: ${customerEmail || 'N/A'}`, 18, phoneY);
+    const addrLines = doc.splitTextToSize(`Delivery / Site: ${customerAddress || 'Freetown Workshop Handover'}`, 80);
+    doc.text(addrLines, 18, phoneY + 5);
+
+    // Right Box: Proforma Quotation Terms
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(106, 47, 89, 38, 1, 1, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(15, 23, 42);
+    doc.text("COMMERCIAL QUOTATION DETAILS:", 110, 52.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+
+    doc.text("Proforma Ref No:", 110, 59);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(proformaNo || 'PRO-042', 150, 59);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text("Date of Issuance:", 110, 65);
+    doc.text(date, 150, 65);
+
+    doc.text("Quotation Validity:", 110, 71);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(180, 83, 9);
+    doc.text(validUntil || '30 Days from date', 150, 71);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text("Estimated Lead Time:", 110, 77);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(leadTime || '2 - 3 Weeks from deposit', 150, 77);
+
+    // Project Scope Header Bar
+    doc.setFillColor(241, 245, 249); // slate-100
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(14, 88, 181, 12, 1, 1, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text("PROJECT / COMMISSION FOCUS:", 18, 93);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(51, 65, 85);
+    const scopeSummary = projectTitle ? `${projectTitle}${projectDescription ? ` — ${projectDescription}` : ''}` : 'Custom Architectural Woodworking & Fine Carpentry';
+    doc.text(doc.splitTextToSize(scopeSummary, 172)[0] || '', 18, 97.5);
+
+    return 105;
+  };
+
+  let curY = drawHeader(false);
+
+  // Table Column Geometry
+  const colX_No = 14;
+  const colW_No = 10;
+  const colX_Desc = 24;
+  const colW_Desc = 82;
+  const colX_Wood = 106;
+  const colW_Wood = 32;
+  const colX_Qty = 138;
+  const colW_Qty = 16;
+  const colX_Rate = 154;
+  const colW_Rate = 22;
+  const colX_Total = 176;
+  const colW_Total = 19;
+
+  const drawTableHeader = (y: number) => {
+    doc.setFillColor(30, 41, 59); // slate-800
+    doc.rect(14, y, 181, 7.5, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.8);
+    doc.setTextColor(255, 255, 255);
+
+    doc.text("#", colX_No + 3, y + 5);
+    doc.text("ITEM & CRAFTSMANSHIP SPECIFICATIONS", colX_Desc + 2, y + 5);
+    doc.text("WOOD / FINISH", colX_Wood + 2, y + 5);
+    doc.text("QTY", colX_Qty + 8, y + 5, { align: 'center' });
+    doc.text("UNIT RATE", colX_Rate + colW_Rate - 2, y + 5, { align: 'right' });
+    doc.text("TOTAL (SLL)", colX_Total + colW_Total - 2, y + 5, { align: 'right' });
+
+    return y + 7.5;
+  };
+
+  curY = drawTableHeader(curY);
+
+  // Render Table Rows
+  items.forEach((item, index) => {
+    const itemDesc = item.desc || item.description || 'Custom Carpentry Item';
+    const itemQty = item.qty !== undefined ? item.qty : (item.quantity !== undefined ? item.quantity : 1);
+    const descLines = doc.splitTextToSize(itemDesc, colW_Desc - 4);
+    const woodLines = doc.splitTextToSize(item.woodSpecies || 'Kiln-Dried Hardwood', colW_Wood - 4);
+    const maxLines = Math.max(descLines.length, woodLines.length, 1);
+    const rowH = Math.max(7.5, maxLines * 4 + 3.5);
+
+    if (curY + rowH > 215) {
+      doc.addPage();
+      curY = drawHeader(true);
+      curY = drawTableHeader(curY);
+    }
+
+    // Row alternating background
+    if (index % 2 === 0) {
+      doc.setFillColor(255, 255, 255);
+    } else {
+      doc.setFillColor(248, 250, 252);
+    }
+    doc.rect(14, curY, 181, rowH, 'F');
+
+    // Horizontal bottom border
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
+    doc.line(14, curY + rowH, 195, curY + rowH);
+
+    // Cell Texts
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+    doc.text(String(index + 1).padStart(2, '0'), colX_No + 3, curY + 5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(descLines, colX_Desc + 2, curY + 4.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text(woodLines, colX_Wood + 2, curY + 4.5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(itemQty), colX_Qty + 8, curY + 5, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(Number(item.price).toLocaleString(undefined, { minimumFractionDigits: 2 }), colX_Rate + colW_Rate - 2, curY + 5, { align: 'right' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(Number(item.total).toLocaleString(undefined, { minimumFractionDigits: 2 }), colX_Total + colW_Total - 2, curY + 5, { align: 'right' });
+
+    curY += rowH;
+  });
+
+  // Table bottom border
+  doc.setDrawColor(30, 41, 59);
+  doc.setLineWidth(0.4);
+  doc.line(14, curY, 195, curY);
+
+  // Footer Section Check
+  if (curY > 215) {
+    doc.addPage();
+    curY = drawHeader(true);
+  }
+
+  const footY = Math.max(curY + 4, 190);
+
+  // Left Box: Commercial Terms, Deposit Terms, and Bank Clearance
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(14, footY, 105, 52, 1, 1, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(15, 23, 42);
+  doc.text("COMMERCIAL TERMS & ADVANCE DEPOSIT:", 18, footY + 5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(71, 85, 105);
+  const termsP1 = paymentTerms || "50% Advance Deposit upon formal proforma approval to reserve seasoned timber and initiate bench fabrication. 50% Balance due on delivery and site inspection.";
+  doc.text(doc.splitTextToSize(termsP1, 98), 18, footY + 9.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(15, 23, 42);
+  doc.text("BANK WIRE & MOBILE CLEARANCE:", 18, footY + 24);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text("Bank: Sierra Leone Commercial Bank (SLCB) • Freetown", 18, footY + 28.5);
+  doc.text(`Account Name: Sweds Wood Enterprise • Account: 003-09415-2831`, 18, footY + 32.5);
+  doc.text(`Orange Money Merchant / Africell: 076-000-000 • Ref: ${proformaNo}`, 18, footY + 36.5);
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(6);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Quality Guarantee: Precision joinery, kiln-dried timber & structural moisture guarantee.", 18, footY + 42);
+  doc.text(notes ? `Note: ${notes}` : "Dimensions subject to on-site architectural verification before final sizing.", 18, footY + 46.5);
+
+  // Right Box: Financial Calculation Summary
+  const sumX = 124;
+  const sumW = 71;
+  let sumY = footY;
+
+  // Subtotal
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text("ESTIMATED SUBTOTAL:", sumX, sumY + 5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(`SLL ${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, sumX + sumW, sumY + 5, { align: 'right' });
+  sumY += 7;
+
+  // Optional Discount
+  if (discountPercent > 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(22, 101, 52); // green-800
+    doc.text(`Trade Discount (${discountPercent}%):`, sumX, sumY + 5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`- SLL ${discountVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, sumX + sumW, sumY + 5, { align: 'right' });
+    sumY += 7;
+  }
+
+  // Optional GST
+  if (taxPercent > 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`GST / Sales Tax (${taxPercent}%):`, sumX, sumY + 5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`+ SLL ${taxVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, sumX + sumW, sumY + 5, { align: 'right' });
+    sumY += 7;
+  }
+
+  // GRAND TOTAL HIGHLIGHT ROW
+  doc.setFillColor(15, 23, 42); // slate-900
+  doc.setDrawColor(217, 119, 6); // amber-600
+  doc.rect(sumX - 2, sumY + 2, sumW + 4, 10, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(253, 224, 71); // amber-300
+  doc.text("TOTAL ESTIMATE:", sumX + 2, sumY + 8);
+  doc.setFontSize(9);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`SLL ${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, sumX + sumW - 2, sumY + 8, { align: 'right' });
+  sumY += 14;
+
+  // REQUIRED ADVANCE DEPOSIT BANNER
+  doc.setFillColor(254, 243, 199); // amber-100
+  doc.setDrawColor(245, 158, 11); // amber-500
+  doc.setLineWidth(0.3);
+  doc.roundedRect(sumX - 2, sumY, sumW + 4, 9, 1, 1, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(146, 64, 14); // amber-800
+  doc.text(`ADVANCE DEPOSIT (${depositPercent}%):`, sumX + 2, sumY + 5.5);
+  doc.setFontSize(8);
+  doc.text(`SLL ${depositVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, sumX + sumW - 2, sumY + 5.5, { align: 'right' });
+
+  // Signature Block at Bottom
+  const sigY = 247;
+
+  // Sweds Wood Authorized Signature
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(15, 23, 42);
+  doc.text("For: Sweds Wood Enterprise", 18, sigY);
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.3);
+  doc.line(18, sigY + 12, 85, sigY + 12);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Authorized Signatory / ${preparedBy || 'Workshop Director'}`, 18, sigY + 16);
+
+  // Circular Proforma Seal
+  drawCircularProformaSeal(95, sigY + 8);
+
+  // Client Acceptance Signature
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(15, 23, 42);
+  doc.text("Client Acceptance & Order Approval:", 120, sigY);
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.3);
+  doc.line(120, sigY + 12, 190, sigY + 12);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Signature / Corporate Stamp & Date", 120, sigY + 16);
+
+  // Page Numbers
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(
+      `Page ${p} of ${totalPages} — Sweds Wood Enterprise Official Commercial Proforma Invoice — 2 Sweds free Avenue, Sussex Freetown`,
+      105,
+      283,
+      { align: 'center' }
+    );
+  }
+}

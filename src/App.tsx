@@ -103,12 +103,33 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [quickActionTrigger, setQuickActionTrigger] = useState<string | null>(null);
   const [invoiceJobId, setInvoiceJobId] = useState<string | null>(null);
-  const [invoiceInitialSubTab, setInvoiceInitialSubTab] = useState<'INVOICE' | 'SAVED_INVOICES' | 'RECEIPT'>('INVOICE');
+  const [invoiceInitialSubTab, setInvoiceInitialSubTab] = useState<'INVOICE' | 'PROFORMA' | 'SAVED_INVOICES' | 'RECEIPT'>('INVOICE');
+  const [proformaCustomerId, setProformaCustomerId] = useState<string | null>(null);
+  const [proformaJobId, setProformaJobId] = useState<string | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
 
   const handleTriggerInvoice = (jobId: string) => {
     setInvoiceJobId(jobId);
     setInvoiceInitialSubTab('INVOICE');
+    setActiveTab('invoices');
+  };
+
+  const handleTriggerProforma = (customerId?: string, jobId?: string) => {
+    let targetCustomerId = customerId;
+    if (jobId) {
+      setInvoiceJobId(jobId);
+      setProformaJobId(jobId);
+      if (!targetCustomerId) {
+        const foundJob = jobs.find(j => j.id === jobId);
+        if (foundJob) {
+          targetCustomerId = foundJob.customerId;
+        }
+      }
+    } else {
+      setProformaJobId(null);
+    }
+    setProformaCustomerId(targetCustomerId || null);
+    setInvoiceInitialSubTab('PROFORMA');
     setActiveTab('invoices');
   };
 
@@ -1587,6 +1608,7 @@ export default function App() {
                 registrationRequests={registrationRequests}
                 onApproveRequest={handleApproveRequest}
                 onRejectRequest={handleRejectRequest}
+                onTriggerProforma={handleTriggerProforma}
               />
             )}
 
@@ -1618,6 +1640,7 @@ export default function App() {
                 showRegisterModalOnLoad={quickActionTrigger === 'register-customer'}
                 onCloseRegisterModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
+                onTriggerProforma={handleTriggerProforma}
               />
             )}
 
@@ -1661,6 +1684,7 @@ export default function App() {
                 onCloseCreateModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
                 onTriggerInvoice={handleTriggerInvoice}
+                onTriggerProforma={(jobId) => handleTriggerProforma(undefined, jobId)}
                 onTriggerReceipt={handleTriggerReceipt}
               />
             )}
@@ -1672,8 +1696,18 @@ export default function App() {
                 currentUser={currentUser}
                 invoiceJobId={invoiceJobId}
                 initialSubTab={invoiceInitialSubTab}
-                onClearInvoiceJobId={() => setInvoiceJobId(null)}
+                proformaCustomerId={proformaCustomerId}
+                proformaJobId={proformaJobId}
+                onClearInvoiceJobId={() => {
+                  setInvoiceJobId(null);
+                  setProformaJobId(null);
+                }}
+                onClearProformaParams={() => {
+                  setProformaCustomerId(null);
+                  setProformaJobId(null);
+                }}
                 onUpdateJob={handleUpdateJob}
+                onCreateJob={handleCreateJob}
                 onUpdateJobPayment={handleUpdateJobPayment}
                 onDeleteJobPayment={handleDeleteJobPayment}
                 paymentAuditLogs={paymentAuditLogs}
