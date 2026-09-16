@@ -241,58 +241,129 @@ export default function ProformaInvoiceDesk({
     }
   ]);
 
+  // Helper: Automatically prepare Proforma Invoice using Customer Details & History
+  const autoPrepareForCustomer = (cust: Customer, specificJobId?: string | null) => {
+    setClientType('EXISTING');
+    setSelectedCustomerId(cust.id);
+
+    // Look up any existing jobs or commissions for this client
+    const clientJobs = jobs.filter(j => j.customerId === cust.id);
+    const targetJob = specificJobId 
+      ? jobs.find(j => j.id === specificJobId) 
+      : (clientJobs.length > 0 ? clientJobs[clientJobs.length - 1] : null);
+
+    if (targetJob) {
+      setLinkedJobId(targetJob.id);
+      setProjectTitle(targetJob.title);
+      setProjectDescription(
+        targetJob.description || 
+        `Custom joinery commission for ${cust.name} per architectural specifications at ${cust.address || 'Freetown, Sierra Leone'}.`
+      );
+
+      if (targetJob.items && targetJob.items.length > 0) {
+        setItems(
+          targetJob.items.map((it, idx) => ({
+            id: `job-item-${Date.now()}-${idx}`,
+            description: it.description || targetJob.title,
+            unitRate: String(it.quantity || 1),
+            amount: it.totalCost || (it.quantity * it.unitCost),
+            woodSpecies: 'Kiln-Dried Sierra Leone Hardwood (<12% Moisture)',
+            dimensions: 'Architectural joinery specifications',
+            quantity: it.quantity || 1,
+            unitPrice: it.unitCost || (it.totalCost / (it.quantity || 1)),
+            total: it.totalCost || (it.quantity * it.unitCost)
+          }))
+        );
+      } else {
+        setItems([
+          {
+            id: `job-item-main-${Date.now()}`,
+            description: targetJob.title,
+            unitRate: '1',
+            amount: targetJob.quoteAmount,
+            woodSpecies: 'Kiln-Dried Hardwood • Hand-Rubbed Protective Finish',
+            dimensions: 'Site measured specifications per inspection',
+            quantity: 1,
+            unitPrice: targetJob.quoteAmount,
+            total: targetJob.quoteAmount
+          }
+        ]);
+      }
+
+      setNotes(
+        `1. Moisture Content Guarantee: All timber is kiln-dried to <12% moisture content to prevent warping.\n2. Structural Guarantee: 5-year warranty on all structural timber joinery.\n3. Site Delivery & Inspection: Final delivery directly to ${cust.address || 'client premise'}.\n4. Client Contact on Site: ${cust.name} (${cust.phone}).`
+      );
+
+      setSaveToast(`⚡ Proforma prepared for ${cust.name} using commission "${targetJob.title}"!`);
+      setTimeout(() => setSaveToast(null), 3500);
+    } else {
+      // Customer has no jobs yet: auto-prepare custom proforma tailored to their profile & site address
+      setLinkedJobId(null);
+      const title = cust.company 
+        ? `${cust.company} — Architectural Joinery & Fit-Out` 
+        : `Bespoke Solid Hardwood Joinery Suite for ${cust.name}`;
+      setProjectTitle(title);
+      setProjectDescription(
+        cust.notes 
+          ? `Client Requirements: ${cust.notes}\nSite Delivery & Installation: ${cust.address || 'Freetown, Sierra Leone'}`
+          : `Kiln-dried hardwood joinery, structural mortise-and-tenon construction, site delivery to ${cust.address || 'Freetown, Sierra Leone'}, and architectural fitting.`
+      );
+
+      setItems([
+        {
+          id: `p-item-auto-${Date.now()}-1`,
+          description: cust.company 
+            ? `Commercial Joinery & Executive Fit-Out Suite (${cust.company})`
+            : `Handcrafted Architectural Hardwood Suite for ${cust.name}`,
+          woodSpecies: 'Kiln-Dried African Mahogany & Burma Teak (<12% Moisture)',
+          dimensions: 'Site-verified measurements per preliminary inspection',
+          quantity: 1,
+          unitPrice: 15500000,
+          total: 15500000
+        },
+        {
+          id: `p-item-auto-${Date.now()}-2`,
+          description: `Site Delivery, Fitting & Protective Marine Polyurethane Finish`,
+          woodSpecies: 'Weather-Resistant Protective Treatment & Anti-Fungal Seal',
+          dimensions: `Direct delivery and installation at ${cust.address || 'Client Site'}`,
+          quantity: 1,
+          unitPrice: 2800000,
+          total: 2800000
+        }
+      ]);
+
+      setNotes(
+        `1. Moisture Content Guarantee: All timber is kiln-dried to <12% moisture content to prevent warping.\n2. Structural Guarantee: 5-year warranty on all structural timber joinery.\n3. Site Delivery & Inspection: Direct delivery to ${cust.address || 'Freetown, Sierra Leone'}.\n4. Authorized Client Contact: ${cust.name} (${cust.phone}).`
+      );
+
+      setSaveToast(`⚡ Proforma prepared using ${cust.name}'s profile & site details!`);
+      setTimeout(() => setSaveToast(null), 3500);
+    }
+  };
+
   // Sync if initialCustomerId or initialJobId provided
   useEffect(() => {
     if (initialCustomerId) {
-      setClientType('EXISTING');
-      setSelectedCustomerId(initialCustomerId);
-    }
-  }, [initialCustomerId]);
-
-  useEffect(() => {
-    if (initialJobId) {
-      setLinkedJobId(initialJobId);
+      const cust = customers.find(c => c.id === initialCustomerId);
+      if (cust) {
+        autoPrepareForCustomer(cust, initialJobId);
+      }
+      if (onClearInitialParams) {
+        onClearInitialParams();
+      }
+    } else if (initialJobId) {
       const foundJob = jobs.find(j => j.id === initialJobId);
-      if (foundJob) {
-        setProjectTitle(foundJob.title);
-        setProjectDescription(foundJob.description || 'Bespoke woodwork commission.');
-        if (foundJob.customerId) {
-          setClientType('EXISTING');
-          setSelectedCustomerId(foundJob.customerId);
-        }
-        // Build items from job items or single quote
-        if (foundJob.items && foundJob.items.length > 0) {
-          setItems(
-            foundJob.items.map((it, idx) => ({
-              id: `job-item-${idx}`,
-              description: it.description || foundJob.title,
-              unitRate: String(it.quantity || 1),
-              amount: it.totalCost || (it.quantity * it.unitCost),
-              woodSpecies: 'Kiln-Dried Hardwood',
-              dimensions: 'Bespoke workshop specs',
-              quantity: it.quantity || 1,
-              unitPrice: it.unitCost || (it.totalCost / (it.quantity || 1)),
-              total: it.totalCost || (it.quantity * it.unitCost)
-            }))
-          );
-        } else {
-          setItems([
-            {
-              id: 'job-item-main',
-              description: foundJob.title,
-              unitRate: '1',
-              amount: foundJob.quoteAmount,
-              woodSpecies: 'Kiln-Dried Hardwood & Custom Finish',
-              dimensions: 'Site measured specifications',
-              quantity: 1,
-              unitPrice: foundJob.quoteAmount,
-              total: foundJob.quoteAmount
-            }
-          ]);
+      if (foundJob && foundJob.customerId) {
+        const cust = customers.find(c => c.id === foundJob.customerId);
+        if (cust) {
+          autoPrepareForCustomer(cust, initialJobId);
         }
       }
+      if (onClearInitialParams) {
+        onClearInitialParams();
+      }
     }
-  }, [initialJobId, jobs]);
+  }, [initialCustomerId, initialJobId, customers, jobs]);
 
   // Real-time Firestore synchronization for all saved invoices
   useEffect(() => {
@@ -1108,10 +1179,22 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
 
               {clientType === 'EXISTING' ? (
                 <div className="space-y-3">
-                  <label className="text-xs font-bold text-gray-700 block">Select Registered Client</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-700 block">Select Registered Client</label>
+                    <span className="text-[10px] font-bold text-amber-900 bg-amber-200/70 border border-amber-300 px-2 py-0.5 rounded-full">
+                      Auto-prepares Proforma
+                    </span>
+                  </div>
                   <select
                     value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setSelectedCustomerId(newId);
+                      const found = customers.find(c => c.id === newId);
+                      if (found) {
+                        autoPrepareForCustomer(found);
+                      }
+                    }}
                     className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-wood-600 font-medium text-gray-800 outline-none"
                   >
                     {customers.map(c => (
@@ -1122,26 +1205,88 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                   </select>
 
                   {/* Client card summary */}
-                  <div className="p-3 bg-wood-50/50 rounded-xl border border-wood-200 text-xs space-y-1">
-                    <p className="font-bold text-wood-950">{activeCustomer.name}</p>
-                    {activeCustomer.company && (
-                      <p className="text-gray-600 flex items-center gap-1.5">
-                        <Building2 className="w-3 h-3 text-gray-400" />
-                        <span>{activeCustomer.company}</span>
-                      </p>
-                    )}
+                  <div className="p-3 bg-wood-50/50 rounded-xl border border-wood-200 text-xs space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-wood-950 text-sm">{activeCustomer.name}</p>
+                        {activeCustomer.company && (
+                          <p className="text-gray-600 flex items-center gap-1.5 text-[11px] font-semibold">
+                            <Building2 className="w-3 h-3 text-gray-400 shrink-0" />
+                            <span>{activeCustomer.company}</span>
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md border border-emerald-300 shrink-0">
+                        Client Active
+                      </span>
+                    </div>
+
                     {activeCustomer.phone && (
-                      <p className="text-gray-600 flex items-center gap-1.5">
-                        <Phone className="w-3 h-3 text-gray-400" />
+                      <p className="text-gray-600 flex items-center gap-1.5 font-mono text-[11px]">
+                        <Phone className="w-3 h-3 text-gray-400 shrink-0" />
                         <span>{activeCustomer.phone}</span>
                       </p>
                     )}
-                    {activeCustomer.address && (
-                      <p className="text-gray-600 flex items-center gap-1.5">
-                        <MapPin className="w-3 h-3 text-gray-400" />
-                        <span>{activeCustomer.address}</span>
+                    {activeCustomer.email && (
+                      <p className="text-gray-600 flex items-center gap-1.5 text-[11px]">
+                        <Mail className="w-3 h-3 text-gray-400 shrink-0" />
+                        <span>{activeCustomer.email}</span>
                       </p>
                     )}
+                    {activeCustomer.address && (
+                      <p className="text-gray-600 flex items-center gap-1.5 text-[11px]">
+                        <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
+                        <span>Delivery / Site: {activeCustomer.address}</span>
+                      </p>
+                    )}
+
+                    {/* Linked Commissions Pill Selector */}
+                    {(() => {
+                      const custJobs = jobs.filter(j => j.customerId === selectedCustomerId);
+                      if (custJobs.length > 0) {
+                        return (
+                          <div className="mt-2 pt-2 border-t border-wood-200">
+                            <p className="text-[10px] font-bold text-wood-800 uppercase tracking-wider mb-1">
+                              Client Commissions ({custJobs.length}):
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {custJobs.map(cj => (
+                                <button
+                                  key={cj.id}
+                                  type="button"
+                                  onClick={() => {
+                                    const cust = customers.find(c => c.id === selectedCustomerId);
+                                    if (cust) autoPrepareForCustomer(cust, cj.id);
+                                  }}
+                                  className={`px-2 py-1 text-[10px] font-semibold rounded-lg border transition text-left cursor-pointer ${
+                                    linkedJobId === cj.id 
+                                      ? 'bg-amber-500 text-slate-950 font-bold border-amber-600 shadow-xs' 
+                                      : 'bg-white text-gray-700 hover:bg-wood-100 border-gray-200'
+                                  }`}
+                                  title="Click to auto-prepare proforma from this commission"
+                                >
+                                  {cj.title}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Auto Prepare Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const found = customers.find(c => c.id === selectedCustomerId);
+                        if (found) autoPrepareForCustomer(found);
+                      }}
+                      className="w-full mt-2.5 px-3 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 border border-amber-500 shadow-xs cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                      <span>⚡ Auto-Prepare Proforma For This Client</span>
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -1664,9 +1809,8 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                 </div>
 
                 <div className="text-[11px] text-gray-600 leading-relaxed font-medium">
-                  <p>Workshop: 42 Timber Yard Industrial Layout, Off Bai Bureh Road</p>
-                  <p>Freetown, Sierra Leone • Tel: +232 76 442590 / +232 88 654 321</p>
-                  <p>Web: www.swedswood.com • Email: workshop@swedswood.com</p>
+                  <p className="font-semibold text-slate-800">2 Sweds free Avenue, Sussex Freetown, Sierra Leone</p>
+                  <p>Tel: +232 76 442590 • Email: info@swedswood.com</p>
                 </div>
               </div>
 
@@ -1886,7 +2030,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
 
             {/* Bottom Footer Note */}
             <div className="mt-12 text-center text-[9px] text-gray-400 font-mono tracking-wider uppercase border-t border-gray-100 pt-3">
-              Sweds Wood Ltd • Premium Sierra Leonean Architectural Joinery • Proforma Ref: {proformaNo}
+              Sweds Wood Ltd • 2 Sweds free Avenue, Sussex Freetown, Sierra Leone • Tel: +232 76 442590 • Proforma Ref: {proformaNo}
             </div>
           </div>
         </div>
