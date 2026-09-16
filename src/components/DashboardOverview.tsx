@@ -549,6 +549,22 @@ export default function DashboardOverview({
           <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
             <h3 className="font-display font-bold text-gray-900">Quick Workshop Actions</h3>
             <div className="grid grid-cols-1 gap-2">
+              <button 
+                onClick={() => {
+                  if (onTriggerProforma) {
+                    onTriggerProforma();
+                  } else {
+                    setActiveTab('proforma');
+                  }
+                }}
+                className="flex items-center justify-between p-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 transition text-sm font-bold text-amber-950 shadow-xs cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-amber-900" />
+                  <span>Draft Proforma Invoice</span>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-amber-700" />
+              </button>
               {isManager ? (
                 <>
                   <button 

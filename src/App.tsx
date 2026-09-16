@@ -21,7 +21,8 @@ import {
   Upload,
   HardDrive,
   Settings,
-  BookOpen
+  BookOpen,
+  FileSpreadsheet
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -36,6 +37,7 @@ import FinancialLedger from './components/FinancialLedger';
 import ReportGenerator from './components/ReportGenerator';
 import DailyWorkManager from './components/DailyWorkManager';
 import InvoiceReceiptManager from './components/InvoiceReceiptManager';
+import ProformaInvoiceDesk from './components/ProformaInvoiceDesk';
 import SettingsManager from './components/SettingsManager';
 import UserManualModal from './components/UserManualModal';
 import LoginScreen from './components/LoginScreen';
@@ -130,7 +132,7 @@ export default function App() {
     }
     setProformaCustomerId(targetCustomerId || null);
     setInvoiceInitialSubTab('PROFORMA');
-    setActiveTab('invoices');
+    setActiveTab('proforma');
   };
 
   const handleTriggerReceipt = (jobId?: string) => {
@@ -1315,6 +1317,7 @@ export default function App() {
       { id: 'employees', label: 'Employees', icon: Users },
       { id: 'invoices', label: 'Invoices & Receipts', icon: Receipt },
     ] : []),
+    { id: 'proforma', label: 'PROFORMA INVOICE', icon: FileSpreadsheet, badge: 'Quote' },
     { id: 'jobs', label: 'Job lists', icon: Wrench },
     { id: 'daily-work', label: 'Daily Logs', icon: Camera },
     ...(showManagementTabs ? [
@@ -1392,6 +1395,7 @@ export default function App() {
             {navTabs.map(tab => {
               const TabIcon = tab.icon;
               const isActive = activeTab === tab.id;
+              const isProforma = tab.id === 'proforma';
               return (
                 <button
                   key={tab.id}
@@ -1401,20 +1405,44 @@ export default function App() {
                       setMobileMenuOpen(false);
                       return;
                     }
+                    if (tab.id === 'proforma') {
+                      setInvoiceInitialSubTab('PROFORMA');
+                    }
                     setActiveTab(tab.id);
                     setMobileMenuOpen(false);
                     setQuickActionTrigger(null);
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     tab.id === 'manual'
                       ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-500/30'
-                      : isActive 
-                        ? 'bg-amber-500/10 border border-amber-500/30 text-amber-700 shadow-xs' 
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      : isProforma
+                        ? isActive
+                          ? 'bg-amber-300 text-amber-950 border border-amber-500 shadow-xs font-black'
+                          : 'bg-amber-50 hover:bg-amber-100/90 text-amber-950 border border-amber-300/90'
+                        : isActive 
+                          ? 'bg-amber-500/10 border border-amber-500/30 text-amber-700 shadow-xs' 
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  <TabIcon className={`w-4 h-4 ${tab.id === 'manual' ? 'text-amber-600' : isActive ? 'text-amber-600' : 'text-slate-500'}`} />
-                  <span>{tab.label}</span>
+                  <div className="flex items-center gap-3">
+                    <TabIcon className={`w-4 h-4 shrink-0 ${
+                      tab.id === 'manual' 
+                        ? 'text-amber-600' 
+                        : isProforma
+                          ? 'text-amber-900'
+                          : isActive ? 'text-amber-600' : 'text-slate-500'
+                    }`} />
+                    <span className="truncate">{tab.label}</span>
+                  </div>
+                  {tab.badge && (
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md tracking-wider shrink-0 ${
+                      isProforma && isActive
+                        ? 'bg-amber-950 text-amber-200'
+                        : 'bg-amber-200 text-amber-950 border border-amber-400'
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1555,6 +1583,14 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleTriggerProforma()}
+              className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-amber-500/50"
+              title="Open PROFORMA INVOICE desk & quotation generator"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-950" />
+              <span>PROFORMA INVOICE</span>
+            </button>
             <button
               onClick={() => setIsManualModalOpen(true)}
               className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs"
@@ -1712,6 +1748,41 @@ export default function App() {
                 onDeleteJobPayment={handleDeleteJobPayment}
                 paymentAuditLogs={paymentAuditLogs}
               />
+            )}
+
+            {activeTab === 'proforma' && (
+              <div className="space-y-6">
+                <ProformaInvoiceDesk
+                  customers={customers}
+                  jobs={jobs}
+                  currentUser={currentUser}
+                  initialCustomerId={proformaCustomerId}
+                  initialJobId={proformaJobId || invoiceJobId}
+                  onClearInitialParams={() => {
+                    setProformaCustomerId(null);
+                    setProformaJobId(null);
+                  }}
+                  onSaveInvoiceRecord={(savedRecord) => {
+                    try {
+                      const rawInvs = localStorage.getItem('swedswood_saved_invoices');
+                      const currentInvs = rawInvs ? JSON.parse(rawInvs) : [];
+                      const updated = [savedRecord, ...currentInvs.filter((inv: any) => inv.id !== savedRecord.id)];
+                      localStorage.setItem('swedswood_saved_invoices', JSON.stringify(updated));
+                      saveDocument('savedInvoices', savedRecord).catch(() => {});
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                  onCreateJob={(newJobData) => {
+                    handleCreateJob(newJobData);
+                    setActiveTab('jobs');
+                  }}
+                  onSwitchToSavedInvoices={() => {
+                    setInvoiceInitialSubTab('SAVED_INVOICES');
+                    setActiveTab('invoices');
+                  }}
+                />
+              </div>
             )}
 
             {activeTab === 'daily-work' && (
