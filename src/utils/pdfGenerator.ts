@@ -235,7 +235,7 @@ export function buildInvoicePdfContent(
 
       const metaData = [
         { label: "Invoice No.", val: invNoStr },
-        { label: "Address", val: "2 Sweds free Avenue, Sussex Freetown" },
+        { label: "Address", val: "2 Sweds Free Avenue, Sussex" },
         { label: "Date", val: invDateStr },
         { label: "Terms (days)", val: "COD / Direct Wire Clearance" }
       ];
@@ -587,7 +587,7 @@ export function buildInvoicePdfContent(
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
       doc.setTextColor(80, 80, 80);
-      doc.text("2 Sweds free Avenue, Sussex Freetown, Sierra Leone", 120, 43);
+      doc.text("2 Sweds Free Avenue, Sussex", 120, 43);
       doc.text("Payment Terms: Standard Clearance (COD / Bank Wire)", 120, 48);
 
       return 64;
@@ -794,7 +794,7 @@ export function buildReceiptPdfContent(
   doc.setFontSize(7.5);
   doc.setTextColor(80, 80, 80);
   doc.text(companySub, 36, 25);
-  doc.text("2 Sweds free Avenue, Sussex Freetown, Sierra Leone", 36, 29);
+  doc.text("2 Sweds Free Avenue, Sussex", 36, 29);
 
   // Receipt Badge Box
   doc.setFillColor(240, 253, 244);
@@ -1057,7 +1057,7 @@ export function buildReceiptPdfContent(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(140, 140, 140);
-  doc.text("Sweds Wood Enterprise — Official Carpentry & Woodwork Clearance Receipt — 2 Sweds free Avenue, Sussex Freetown", 105, 283, { align: 'center' });
+  doc.text("Sweds Wood Enterprise — Official Carpentry & Woodwork Clearance Receipt — 2 Sweds Free Avenue, Sussex", 105, 283, { align: 'center' });
 }
 
 // ==========================================
@@ -1205,7 +1205,7 @@ export function buildProformaInvoicePdfContent(
     doc.setFontSize(6.8);
     doc.setTextColor(203, 213, 225); // slate-300
     doc.text("Architectural Joinery, Hardwood Furniture, Fitted Kitchens & Interior Timber Solutions", 38, 24);
-    doc.text("2 Sweds free Avenue, Sussex Freetown, Sierra Leone • Tel: +232 76 442590 • Email: info@swedswood.com", 38, 29);
+    doc.text("2 Sweds Free Avenue, Sussex • Tel: +232 76 442590 • Email: info@swedswood.com", 38, 29);
 
     // Document Title Banner on Right
     doc.setFont('helvetica', 'bold');
@@ -1563,7 +1563,7 @@ export function buildProformaInvoicePdfContent(
     doc.setFontSize(6.5);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `Page ${p} of ${totalPages} — Sweds Wood Enterprise Official Commercial Proforma Invoice — 2 Sweds free Avenue, Sussex Freetown`,
+      `Page ${p} of ${totalPages} — Sweds Wood Enterprise Official Commercial Proforma Invoice — 2 Sweds Free Avenue, Sussex`,
       105,
       283,
       { align: 'center' }

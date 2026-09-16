@@ -845,13 +845,13 @@ export default function InvoiceReceiptManager({
     if (activeInvoice && !editingSavedInvoiceId) {
       if (invoiceTemplate === 'SWEDS_WOOD') {
         setInvoiceCompany("Sweds Wood Enterprise");
-        setInvoiceCompanyContact("2 Sweds free Avenue");
+        setInvoiceCompanyContact("2 Sweds Free Avenue, Sussex");
         setInvoiceTerms("");
         setInvoiceBankInstructions("");
         setInvoiceCustomerMessage("Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!");
       } else {
         setInvoiceCompany("SWEDS WOOD ENTERPRISE");
-        setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 442590");
+        setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds Free Avenue, Sussex.\nContact: info@swedswood.com | +232 76 442590");
         setInvoiceTerms("Payment Clear / Standard Log");
         setInvoiceBankInstructions(`Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${activeInvoice.id.slice(4).toUpperCase()}`);
         setInvoiceCustomerMessage("");
@@ -900,7 +900,7 @@ export default function InvoiceReceiptManager({
   useEffect(() => {
     if (activeReceipt) {
       setReceiptCompany("SWEDS WOOD ENTERPRISE");
-      setReceiptCompanySub("2 Sweds free Avenue, Sussex Freetown Sierra Leone • Official Commission Receipt");
+      setReceiptCompanySub("2 Sweds Free Avenue, Sussex • Official Commission Receipt");
       setReceiptNo(`REC-${activeReceipt.payment.id.toUpperCase()}`);
       setReceiptDate(activeReceipt.payment.date);
       setReceiptCustomer(activeReceipt.job.customerName);

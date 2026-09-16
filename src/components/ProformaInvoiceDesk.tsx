@@ -1809,7 +1809,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                 </div>
 
                 <div className="text-[11px] text-gray-600 leading-relaxed font-medium">
-                  <p className="font-semibold text-slate-800">2 Sweds free Avenue, Sussex Freetown, Sierra Leone</p>
+                  <p className="font-semibold text-slate-800">2 Sweds Free Avenue, Sussex</p>
                   <p>Tel: +232 76 442590 • Email: info@swedswood.com</p>
                 </div>
               </div>
@@ -2030,7 +2030,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
 
             {/* Bottom Footer Note */}
             <div className="mt-12 text-center text-[9px] text-gray-400 font-mono tracking-wider uppercase border-t border-gray-100 pt-3">
-              Sweds Wood Ltd • 2 Sweds free Avenue, Sussex Freetown, Sierra Leone • Tel: +232 76 442590 • Proforma Ref: {proformaNo}
+              Sweds Wood Ltd • 2 Sweds Free Avenue, Sussex • Tel: +232 76 442590 • Proforma Ref: {proformaNo}
             </div>
           </div>
         </div>
