@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import MonthlyTrendsSection from './MonthlyTrendsSection';
+import FiscalIncomeExpenditureSection from './FiscalIncomeExpenditureSection';
 
 interface ReportGeneratorProps {
   employees: Employee[];
@@ -54,12 +55,11 @@ export default function ReportGenerator({
 }: ReportGeneratorProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('Monthly');
-  const [activeSubReport, setActiveSubReport] = useState<'TRENDS' | 'EMPLOYEES' | 'CUSTOMERS' | 'REVENUE' | 'INVENTORY'>('TRENDS');
+  const [activeSubReport, setActiveSubReport] = useState<'FISCAL_BAR_CHART' | 'TRENDS' | 'EMPLOYEES' | 'CUSTOMERS' | 'REVENUE' | 'INVENTORY'>('FISCAL_BAR_CHART');
 
   // Generate Date Boundaries based on selectedPeriod (Daily, Weekly, Monthly, Yearly)
-  // Let's assume current date is July 20, 2026.
-  const currentDateStr = '2026-07-20';
-  const currentDate = new Date(currentDateStr);
+  const currentDate = new Date();
+  const currentDateStr = currentDate.toISOString().split('T')[0];
 
   const getPeriodFilter = (dateStr: string): boolean => {
     const itemDate = new Date(dateStr);
@@ -120,7 +120,7 @@ export default function ReportGenerator({
   };
 
   const handleExportCSV = () => {
-    alert("Drafting Excel CSV Summary for SWED WOOD WORK. Export compiled successfully!");
+    alert("Drafting Excel CSV Summary for SWEDS WOOD ENTERPRISE. Export compiled successfully!");
   };
 
   const handleDownloadPDFReport = () => {
@@ -134,7 +134,7 @@ export default function ReportGenerator({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(15);
     doc.setTextColor(255, 255, 255);
-    doc.text('SWED WOOD WORK - MONTHLY SUMMARY REPORT', 14, 15);
+    doc.text('SWEDS WOOD ENTERPRISE - MONTHLY SUMMARY REPORT', 14, 15);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
@@ -284,9 +284,9 @@ export default function ReportGenerator({
     // Footer
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
-    doc.text('SWED WOOD WORK MANAGEMENT SYSTEM — OFFICIAL AUDIT SUMMARY REPORT', pageWidth / 2, 288, { align: 'center' });
+    doc.text('SWEDS WOOD ENTERPRISE MANAGEMENT SYSTEM — OFFICIAL AUDIT SUMMARY REPORT', pageWidth / 2, 288, { align: 'center' });
 
-    doc.save(`SWED_Monthly_Report_${selectedPeriod}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`SWEDS_Monthly_Report_${selectedPeriod}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   return (
@@ -296,7 +296,7 @@ export default function ReportGenerator({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs print:hidden">
         <div>
           <h1 className="text-2xl font-display font-bold text-wood-900 tracking-tight">
-            SWED WOOD WORK Reports Ledger
+            SWEDS WOOD ENTERPRISE Reports Ledger
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Generate and audit Daily, Weekly, Monthly, and Yearly operational dossiers.
@@ -357,7 +357,7 @@ export default function ReportGenerator({
 
       {/* Printable Report Header */}
       <div className="hidden print:block text-center border-b pb-6 space-y-1">
-        <h1 className="text-2xl font-serif font-bold text-gray-900 uppercase">SWED WOOD WORK</h1>
+        <h1 className="text-2xl font-serif font-bold text-gray-900 uppercase">SWEDS WOOD ENTERPRISE</h1>
         <p className="text-sm text-gray-500">Professional Woodwork & Bespoke Furniture Workshop</p>
         <p className="text-xs font-mono font-bold text-gray-700">{selectedPeriod.toUpperCase()} GENERAL AUDIT REPORT &mdash; PIVOT DATE: {currentDateStr}</p>
       </div>
@@ -392,49 +392,68 @@ export default function ReportGenerator({
       </div>
 
       {/* Sub-Reports Tabs selection */}
-      <div className="flex border-b border-gray-100 print:hidden overflow-x-auto">
+      <div className="flex border-b border-gray-100 print:hidden overflow-x-auto gap-1">
+        <button
+          onClick={() => setActiveSubReport('FISCAL_BAR_CHART')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubReport === 'FISCAL_BAR_CHART' ? 'border-emerald-600 text-wood-950 font-bold' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+        >
+          <BarChart3 className="w-4 h-4 text-emerald-600" />
+          <span>Monthly Income vs Expenditure</span>
+          <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-md ml-1">
+            Recharts Bar Chart
+          </span>
+        </button>
         <button
           onClick={() => setActiveSubReport('TRENDS')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'TRENDS' ? 'border-amber-600 text-wood-900 font-bold' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubReport === 'TRENDS' ? 'border-amber-600 text-wood-900 font-bold' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
         >
-          <BarChart3 className="w-4 h-4 text-amber-600" />
-          <span>Completion & Cost Trends</span>
+          <TrendingUp className="w-4 h-4 text-amber-600" />
+          <span>Completions & Material Costs</span>
           <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[10px] font-black rounded-md ml-1">
             Recharts
           </span>
         </button>
         <button
           onClick={() => setActiveSubReport('EMPLOYEES')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'EMPLOYEES' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubReport === 'EMPLOYEES' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
         >
           <Users className="w-4 h-4" />
           Employee Audit
         </button>
         <button
           onClick={() => setActiveSubReport('CUSTOMERS')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'CUSTOMERS' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubReport === 'CUSTOMERS' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
         >
           <UserCheck className="w-4 h-4" />
           Customer Audit
         </button>
         <button
           onClick={() => setActiveSubReport('REVENUE')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'REVENUE' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubReport === 'REVENUE' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
         >
           <TrendingUp className="w-4 h-4" />
           Revenue Ledger
         </button>
         <button
           onClick={() => setActiveSubReport('INVENTORY')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${activeSubReport === 'INVENTORY' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${activeSubReport === 'INVENTORY' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
         >
           <Package className="w-4 h-4" />
           Inventory Balance
         </button>
       </div>
 
+      {/* NEW SECTION: Monthly Financial Income and Expenditure Trends (Recharts) */}
+      {(activeSubReport === 'FISCAL_BAR_CHART' || window.matchMedia('print').matches) && (
+        <FiscalIncomeExpenditureSection
+          financialTransactions={financialTransactions}
+          jobs={jobs}
+          fiscalYear={2026}
+        />
+      )}
+
       {/* SUB-REPORT 0: Monthly Job Completion & Material Cost Trends (Recharts) */}
-      {(activeSubReport === 'TRENDS' || window.matchMedia('print').matches) && (
+      {activeSubReport === 'TRENDS' && (
         <MonthlyTrendsSection 
           jobs={jobs}
           inventory={inventory}

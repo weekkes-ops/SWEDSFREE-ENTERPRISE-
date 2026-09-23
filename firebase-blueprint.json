@@ -148,6 +148,38 @@
         "status": { "type": "string" }
       },
       "required": ["id", "invoiceNo", "customerName"]
+    },
+    "paymentAuditLogs": {
+      "title": "Payment Audit Log",
+      "description": "Auditable log entries for all payment creation, modification, and deletion events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jobId": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "customerName": { "type": "string" },
+        "paymentId": { "type": "string" },
+        "action": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "date": { "type": "string" },
+        "modifiedBy": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "jobId", "action", "amount", "timestamp"]
     }
+  },
+  "firestore": {
+    "/inventory/{id}": { "schema": "inventory", "description": "Lumber, hardware and raw materials" },
+    "/customers/{id}": { "schema": "customers", "description": "Workshop client records" },
+    "/employees/{id}": { "schema": "employees", "description": "Craftsmen and staff directory" },
+    "/jobs/{id}": { "schema": "jobs", "description": "Commissions and woodwork projects" },
+    "/inventoryTransactions/{id}": { "schema": "inventoryTransactions", "description": "Material movement logs" },
+    "/financialTransactions/{id}": { "schema": "financialTransactions", "description": "Income and expense transactions" },
+    "/dailyWorkLogs/{id}": { "schema": "dailyWorkLogs", "description": "Artisan daily production reports" },
+    "/registrationRequests/{id}": { "schema": "registrationRequests", "description": "Staff account requests" },
+    "/warningLetters/{id}": { "schema": "warningLetters", "description": "HR discipline records" },
+    "/savedInvoices/{id}": { "schema": "savedInvoices", "description": "Official invoices and receipts" },
+    "/paymentAuditLogs/{id}": { "schema": "paymentAuditLogs", "description": "Payment modification audit trails" }
   }
 }

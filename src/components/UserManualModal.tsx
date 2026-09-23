@@ -356,7 +356,17 @@ export default function UserManualModal({ isOpen, onClose }: UserManualModalProp
   };
 
   const handleOpenInNewTab = () => {
-    window.open('/Swedswood_Woodwork_System_User_Manual.pdf', '_blank');
+    try {
+      const a = document.createElement('a');
+      a.href = '/Swedswood_Woodwork_System_User_Manual.pdf';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      window.open('/Swedswood_Woodwork_System_User_Manual.pdf', '_blank');
+    }
   };
 
   return (
