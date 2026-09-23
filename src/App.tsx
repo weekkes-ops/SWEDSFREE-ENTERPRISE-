@@ -22,7 +22,8 @@ import {
   HardDrive,
   Settings,
   BookOpen,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Clock
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -378,6 +379,12 @@ export default function App() {
   const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters', []));
   const [paymentAuditLogs, setPaymentAuditLogs] = useState<PaymentAuditLogEntry[]>(() => getStoredData('swedsfree_payment_audit_logs', INITIAL_PAYMENT_AUDIT_LOGS));
 
+  // 1-minute inactivity timeout configuration (60,000ms = 1 minute)
+  const [inactivityNotice, setInactivityNotice] = useState<string | null>(null);
+  const [showInactivityWarning, setShowInactivityWarning] = useState<boolean>(false);
+  const [inactivityRemainingSeconds, setInactivityRemainingSeconds] = useState<number>(15);
+  const lastActivityRef = useRef<number>(Date.now());
+
   // Clear all data function for live production
   const handleClearAllSystemDataForGoLive = async (silent: boolean = false) => {
     if (!silent && !window.confirm('CRITICAL GO-LIVE ACTION: Are you sure you want to clear ALL system data (inventory, customers, jobs, financial ledger, transactions, invoices, and daily logs) to start completely fresh for live production? This action cannot be undone.')) {
@@ -582,6 +589,66 @@ export default function App() {
     } else {
       localStorage.removeItem('swedsfree_current_user');
     }
+  }, [currentUser]);
+
+  // 1-minute Inactivity Auto-Lock & Logout (60s inactivity threshold)
+  useEffect(() => {
+    if (!currentUser) {
+      setShowInactivityWarning(false);
+      return;
+    }
+
+    // Reset activity timestamp upon login or user state update
+    lastActivityRef.current = Date.now();
+
+    const recordActivity = () => {
+      lastActivityRef.current = Date.now();
+      setShowInactivityWarning(prev => (prev ? false : prev));
+    };
+
+    // User interaction events: mouse, keys, touch, scroll, clicks
+    const activityEvents: (keyof WindowEventMap)[] = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
+
+    let lastThrottledTime = 0;
+    const throttledHandler = () => {
+      const now = Date.now();
+      if (now - lastThrottledTime > 500) {
+        lastThrottledTime = now;
+        recordActivity();
+      }
+    };
+
+    activityEvents.forEach(evt => {
+      window.addEventListener(evt, throttledHandler, { passive: true });
+    });
+
+    const checkInterval = setInterval(() => {
+      const elapsed = Date.now() - lastActivityRef.current;
+      const TIMEOUT_MS = 60000; // 60 seconds = 1 minute
+      const WARNING_MS = 45000; // 45 seconds (15-second grace countdown)
+
+      if (elapsed >= TIMEOUT_MS) {
+        // Automatically logout due to inactivity
+        setShowInactivityWarning(false);
+        setCurrentUser(null);
+        localStorage.removeItem('swedsfree_current_user');
+        setInactivityNotice('You were automatically signed out after 1 minute of inactivity.');
+        setActiveTab('dashboard');
+      } else if (elapsed >= WARNING_MS) {
+        setShowInactivityWarning(true);
+        const rem = Math.max(1, Math.ceil((TIMEOUT_MS - elapsed) / 1000));
+        setInactivityRemainingSeconds(rem);
+      } else {
+        setShowInactivityWarning(false);
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(checkInterval);
+      activityEvents.forEach(evt => {
+        window.removeEventListener(evt, throttledHandler);
+      });
+    };
   }, [currentUser]);
 
   // 2. Sync to localStorage
@@ -1341,15 +1408,65 @@ export default function App() {
         employees={employees} 
         onLogin={(user) => {
           setCurrentUser(user);
+          setInactivityNotice(null);
           setActiveTab('dashboard');
         }} 
         onRegisterRequest={handleRegisterRequest}
+        inactivityNotice={inactivityNotice}
+        onClearInactivityNotice={() => setInactivityNotice(null)}
       />
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col md:flex-row antialiased font-sans relative overflow-x-hidden print:bg-white print:text-black">
+      
+      {/* 1-Minute Inactivity Security Warning Dialog */}
+      {showInactivityWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full border-2 border-amber-500 shadow-2xl space-y-4 text-center">
+            <div className="w-14 h-14 bg-amber-100 border border-amber-300 rounded-2xl flex items-center justify-center mx-auto text-amber-600 animate-pulse">
+              <Clock className="w-8 h-8" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Inactivity Warning</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                You have been inactive. For workshop data safety and audit log protection, your session will automatically log out in:
+              </p>
+              <div className="text-3xl font-black text-amber-600 font-mono py-1">
+                {inactivityRemainingSeconds}s
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Click "Keep Working" or interact with the screen to stay logged in.
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  lastActivityRef.current = Date.now();
+                  setShowInactivityWarning(false);
+                }}
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-md transition cursor-pointer"
+              >
+                Keep Working
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInactivityWarning(false);
+                  setCurrentUser(null);
+                  localStorage.removeItem('swedsfree_current_user');
+                  setActiveTab('dashboard');
+                }}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Mesh Gradient Background */}
       <div className="absolute inset-0 z-0 opacity-20 pointer-events-none print:hidden">
@@ -1470,6 +1587,15 @@ export default function App() {
                   <p className="text-xs font-black text-slate-900 truncate leading-tight">{currentUser.name}</p>
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-0.5">{currentUser.role}</p>
                 </div>
+              </div>
+              <div className="flex items-center justify-between text-[10px] bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
+                <span className="flex items-center gap-1 font-semibold text-slate-600">
+                  <Clock className="w-3 h-3 text-amber-600" />
+                  Auto-Lock:
+                </span>
+                <span className="font-bold text-amber-700 font-mono text-[9px] bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                  1 min inactive
+                </span>
               </div>
               <button 
                 onClick={() => {
@@ -1776,6 +1902,19 @@ export default function App() {
                       const updated = [savedRecord, ...currentInvs.filter((inv: any) => inv.id !== savedRecord.id)];
                       localStorage.setItem('swedswood_saved_invoices', JSON.stringify(updated));
                       saveDocument('savedInvoices', savedRecord).catch(() => {});
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                  onDeleteInvoiceRecord={(deletedId) => {
+                    try {
+                      const rawInvs = localStorage.getItem('swedswood_saved_invoices');
+                      if (rawInvs) {
+                        const currentInvs = JSON.parse(rawInvs);
+                        const updated = currentInvs.filter((inv: any) => inv.id !== deletedId);
+                        localStorage.setItem('swedswood_saved_invoices', JSON.stringify(updated));
+                      }
+                      deleteDocument('savedInvoices', deletedId).catch(() => {});
                     } catch (e) {
                       console.error(e);
                     }

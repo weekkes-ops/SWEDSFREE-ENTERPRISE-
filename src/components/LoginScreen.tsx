@@ -12,7 +12,9 @@ import {
   CheckCircle, 
   Phone, 
   Mail, 
-  Briefcase 
+  Briefcase,
+  Clock,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -20,9 +22,17 @@ interface LoginScreenProps {
   employees: Employee[];
   onLogin: (user: Employee) => void;
   onRegisterRequest: (request: { name: string; email: string; phone: string; role: EmployeeRole; password?: string }) => void;
+  inactivityNotice?: string | null;
+  onClearInactivityNotice?: () => void;
 }
 
-export default function LoginScreen({ employees, onLogin, onRegisterRequest }: LoginScreenProps) {
+export default function LoginScreen({ 
+  employees, 
+  onLogin, 
+  onRegisterRequest,
+  inactivityNotice,
+  onClearInactivityNotice 
+}: LoginScreenProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -330,6 +340,28 @@ export default function LoginScreen({ employees, onLogin, onRegisterRequest }: L
                   <LogIn className="w-5 h-5 text-amber-600" />
                   <h2 className="text-lg font-bold text-slate-900">Workshop Portal Sign In</h2>
                 </div>
+
+                {inactivityNotice && (
+                  <div className="mb-5 p-3.5 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3 text-xs text-amber-900 shadow-xs animate-in fade-in duration-200">
+                    <div className="p-1.5 bg-amber-200/70 rounded-xl text-amber-800 shrink-0 mt-0.5">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-amber-950 text-xs">Security Notice: 1-Minute Inactivity Auto-Lock</p>
+                      <p className="text-amber-800 text-[11px] leading-relaxed mt-0.5">{inactivityNotice}</p>
+                    </div>
+                    {onClearInactivityNotice && (
+                      <button 
+                        type="button" 
+                        onClick={onClearInactivityNotice} 
+                        className="text-amber-600 hover:text-amber-950 p-1 hover:bg-amber-100/60 rounded-lg transition"
+                        title="Dismiss notice"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <form onSubmit={handleLoginSubmit} className="space-y-5">
                   {/* User Selection */}

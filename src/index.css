@@ -427,7 +427,7 @@ button.bg-wood-700:hover {
   .bg-gray-100,
   .bg-slate-100,
   .bg-wood-100,
-  .bg-[#e0f2fe],
+  .bg-\[\#e0f2fe\],
   tr.bg-gray-50 {
     background-color: #f8fafc !important;
     background: #f8fafc !important;
@@ -476,8 +476,8 @@ button.bg-wood-700:hover {
   .text-wood-900,
   .text-wood-800,
   .text-wood-600,
-  .text-[#0f52ba],
-  .text-[#1e3a8a] {
+  .text-\[\#0f52ba\],
+  .text-\[\#1e3a8a\] {
     color: #000000 !important;
   }
 
