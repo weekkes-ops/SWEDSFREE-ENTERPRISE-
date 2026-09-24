@@ -671,7 +671,18 @@ export default function CustomerManager({
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
                       <Mail className="w-3 h-3 text-wood-600" /> Email address
                     </span>
-                    <p className="text-gray-700 font-medium truncate">{selectedCustomer.email}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-gray-700 font-medium truncate">{selectedCustomer.email}</p>
+                      {selectedCustomer.email && (
+                        <a
+                          href={`mailto:${selectedCustomer.email}?cc=swedswoodinfo@gmail.com&subject=Swedswood%20Enterprise%20Notice`}
+                          className="text-blue-600 hover:text-blue-800 p-0.5"
+                          title="Compose email with CC to swedswoodinfo@gmail.com"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1 md:col-span-1">
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">

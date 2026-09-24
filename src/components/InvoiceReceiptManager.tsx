@@ -40,7 +40,9 @@ import {
   Lock,
   PlusCircle,
   ArrowRight,
-  FileSpreadsheet
+  ArrowLeft,
+  FileSpreadsheet,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -48,6 +50,7 @@ import JSZip from 'jszip';
 import { buildInvoicePdfContent, buildReceiptPdfContent, buildProformaInvoicePdfContent, getLogoDataUrl } from '../utils/pdfGenerator';
 export { getLogoDataUrl };
 import ProformaInvoiceDesk from './ProformaInvoiceDesk';
+import EmailDispatchModal, { SYSTEM_EMAIL } from './EmailDispatchModal';
 
 export interface CustomInvoiceItem {
   id: string;
@@ -108,6 +111,7 @@ interface InvoiceReceiptManagerProps {
   onDeleteJobPayment?: (jobId: string, paymentId: string) => void;
   onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   paymentAuditLogs?: PaymentAuditLogEntry[];
+  onGoBack?: () => void;
 }
 
 export default function InvoiceReceiptManager({
@@ -124,7 +128,8 @@ export default function InvoiceReceiptManager({
   onUpdateJobPayment,
   onDeleteJobPayment,
   onCreateJob,
-  paymentAuditLogs = []
+  paymentAuditLogs = [],
+  onGoBack
 }: InvoiceReceiptManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [searchTerm, setSearchTerm] = useState('');
@@ -414,13 +419,42 @@ export default function InvoiceReceiptManager({
   const [invoicePdfMode, setInvoicePdfMode] = useState<'VIEW' | 'EDIT'>('VIEW');
   const [receiptPdfMode, setReceiptPdfMode] = useState<'VIEW' | 'EDIT'>('VIEW');
 
+  // Email Dispatch Modal state
+  const [emailModalData, setEmailModalData] = useState<{
+    isOpen: boolean;
+    docType: 'PROFORMA' | 'INVOICE' | 'RECEIPT';
+    docNumber: string;
+    docDate: string;
+    customerName: string;
+    customerCompany?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    projectTitle: string;
+    totalAmount: number;
+    amountPaid?: number;
+    balanceDue?: number;
+    items?: Array<{ description: string; quantity?: number; amount: number }>;
+    paymentMethod?: string;
+    onDownloadPdf?: () => void;
+  }>({
+    isOpen: false,
+    docType: 'INVOICE',
+    docNumber: '',
+    docDate: '',
+    customerName: '',
+    projectTitle: '',
+    totalAmount: 0
+  });
+
+  const [isEmailHistoryOpen, setIsEmailHistoryOpen] = useState(false);
+
   // ==========================================
   // INLINE EDITABLE STATES - INVOICE PDF
   // ==========================================
   const [invoiceLogoUrl, setInvoiceLogoUrl] = useState<string>('/logo.svg');
   const [invoiceLogoSize, setInvoiceLogoSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [invoiceCompany, setInvoiceCompany] = useState("SWEDS WOOD ENTERPRISE");
-  const [invoiceCompanyContact, setInvoiceCompanyContact] = useState("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: info@swedwoodwork.com | +232 76 442590");
+  const [invoiceCompanyContact, setInvoiceCompanyContact] = useState("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds free Avenue, Sussex Freetown Sierra Leone.\nContact: swedswoodinfo@gmail.com | +232 76 442590");
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [invoiceTerms, setInvoiceTerms] = useState("Payment Clear / Standard Log");
@@ -848,7 +882,7 @@ export default function InvoiceReceiptManager({
         setInvoiceCustomerMessage("Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!");
       } else {
         setInvoiceCompany("SWEDS WOOD ENTERPRISE");
-        setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds Free Avenue, Sussex.\nContact: info@swedswood.com | +232 76 442590");
+        setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Sweds Free Avenue, Sussex.\nContact: swedswoodinfo@gmail.com | +232 76 442590");
         setInvoiceTerms("Payment Clear / Standard Log");
         setInvoiceBankInstructions(`Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${activeInvoice.id.slice(4).toUpperCase()}`);
         setInvoiceCustomerMessage("");
@@ -1531,6 +1565,129 @@ export default function InvoiceReceiptManager({
     doc.save(`Receipt_${receiptNo || activeReceipt.payment.id}_${cleanCust}.pdf`);
   };
 
+  // ==========================================
+  // EMAIL DISPATCH MODAL HANDLERS
+  // ==========================================
+  const handleOpenActiveInvoiceEmailModal = () => {
+    if (!activeInvoice) return;
+    const totals = getCalculatedTotals();
+    const cust = customers.find(c => c.id === activeInvoice.customerId);
+    const invoiceNumber = invoiceNo || `INV-${activeInvoice.id.slice(4).toUpperCase()}`;
+
+    setEmailModalData({
+      isOpen: true,
+      docType: 'INVOICE',
+      docNumber: invoiceNumber,
+      docDate: invoiceDate || new Date().toISOString().split('T')[0],
+      customerName: invoiceCustomerName || activeInvoice.customerName,
+      customerCompany: invoiceCustomerCompany || cust?.company,
+      customerEmail: invoiceCustomerEmail || cust?.email,
+      customerPhone: invoiceCustomerPhone || cust?.phone,
+      projectTitle: invoiceProjectTitle || activeInvoice.title,
+      totalAmount: totals.finalTotal,
+      amountPaid: totals.totalPaid,
+      balanceDue: totals.outstanding,
+      items: customInvoiceItems.length > 0 
+        ? customInvoiceItems.map(it => ({
+            description: it.description,
+            quantity: typeof it.quantity === 'number' ? it.quantity : 1,
+            amount: it.amount
+          }))
+        : [{
+            description: invoiceProjectTitle || activeInvoice.title,
+            quantity: typeof invoiceProjectQty === 'number' ? invoiceProjectQty : 1,
+            amount: totals.subtotal
+          }],
+      onDownloadPdf: handleDownloadSinglePdf
+    });
+  };
+
+  const handleOpenActiveReceiptEmailModal = () => {
+    if (!activeReceipt) return;
+    const cust = customers.find(c => c.id === activeReceipt.job.customerId);
+    const totalPaidSoFar = activeReceipt.job.payments.reduce((s, p) => s + p.amount, 0);
+    const balRemaining = Math.max(0, activeReceipt.job.quoteAmount - totalPaidSoFar);
+    const recNumber = receiptNo || `REC-${activeReceipt.payment.id.toUpperCase()}`;
+
+    setEmailModalData({
+      isOpen: true,
+      docType: 'RECEIPT',
+      docNumber: recNumber,
+      docDate: receiptDate || activeReceipt.payment.date,
+      customerName: receiptCustomer || activeReceipt.job.customerName,
+      customerCompany: cust?.company,
+      customerEmail: cust?.email,
+      customerPhone: cust?.phone,
+      projectTitle: receiptProject || activeReceipt.job.title,
+      totalAmount: activeReceipt.job.quoteAmount,
+      amountPaid: receiptAmount || activeReceipt.payment.amount,
+      balanceDue: balRemaining,
+      paymentMethod: receiptMethod || activeReceipt.payment.method,
+      items: [{
+        description: `Woodwork clearance payment towards ${receiptProject || activeReceipt.job.title}`,
+        quantity: 1,
+        amount: receiptAmount || activeReceipt.payment.amount
+      }],
+      onDownloadPdf: handleDownloadSingleReceiptPdf
+    });
+  };
+
+  const handleOpenSavedInvoiceEmailModal = (inv: SavedInvoice) => {
+    const cust = customers.find(c => c.id === inv.customerId);
+    const isProforma = inv.template === 'PROFORMA' || inv.docType === 'PROFORMA';
+    setEmailModalData({
+      isOpen: true,
+      docType: isProforma ? 'PROFORMA' : 'INVOICE',
+      docNumber: inv.invoiceNo,
+      docDate: inv.date,
+      customerName: inv.customerName,
+      customerCompany: inv.customerCompany || cust?.company,
+      customerEmail: inv.customerEmail || cust?.email,
+      customerPhone: inv.customerPhone || cust?.phone,
+      projectTitle: inv.projectTitle || (inv.items && inv.items[0]?.description) || 'Carpentry Project',
+      totalAmount: inv.subtotal,
+      amountPaid: 0,
+      balanceDue: inv.subtotal,
+      items: (inv.items || []).map(it => ({
+        description: it.description,
+        quantity: it.quantity,
+        amount: it.amount || it.total || 0
+      })),
+      onDownloadPdf: () => handleDownloadSavedInvoicePdf(inv)
+    });
+  };
+
+  const handleDirectEmailReceipt = (job: Job, p: JobPayment) => {
+    const cust = customers.find(c => c.id === job.customerId);
+    const totalPaidSoFar = job.payments.reduce((s, pay) => s + pay.amount, 0);
+    const balRemaining = Math.max(0, job.quoteAmount - totalPaidSoFar);
+
+    setEmailModalData({
+      isOpen: true,
+      docType: 'RECEIPT',
+      docNumber: `REC-${p.id.toUpperCase()}`,
+      docDate: p.date,
+      customerName: job.customerName,
+      customerCompany: cust?.company,
+      customerEmail: cust?.email,
+      customerPhone: cust?.phone,
+      projectTitle: job.title,
+      totalAmount: job.quoteAmount,
+      amountPaid: p.amount,
+      balanceDue: balRemaining,
+      paymentMethod: p.method,
+      items: [{
+        description: `Installment payment for ${job.title}`,
+        quantity: 1,
+        amount: p.amount
+      }],
+      onDownloadPdf: () => {
+        setActiveReceipt({ job, payment: p });
+        setTimeout(() => handleDownloadSingleReceiptPdf(), 150);
+      }
+    });
+  };
+
   const handleBulkPdfExport = async () => {
     if (selectedBulkJobIds.length === 0) return;
     setIsExporting(true);
@@ -1786,6 +1943,16 @@ export default function InvoiceReceiptManager({
       {/* Top Section Header with SubTab buttons */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-5 rounded-2xl border border-wood-100 shadow-xs no-print">
         <div className="flex items-center gap-3">
+          {onGoBack && (
+            <button
+              onClick={onGoBack}
+              className="p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-500/30 transition flex items-center gap-1.5 text-xs font-black shadow-2xs cursor-pointer active:scale-95"
+              title="Go back to previous page"
+            >
+              <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+              <span className="hidden sm:inline">Go Back</span>
+            </button>
+          )}
           <img src={invoiceLogoUrl || '/logo.svg'} alt="Swedswood Enterprise Logo" className="w-12 h-12 object-contain" />
           <div>
             <h1 className="text-xl font-display font-black text-wood-900 tracking-tight flex items-center gap-2">
@@ -1899,6 +2066,16 @@ export default function InvoiceReceiptManager({
           >
             <FolderArchive className="w-4 h-4 text-amber-500" />
             <span>Bulk PDF Export</span>
+          </button>
+
+          <button
+            onClick={() => setIsEmailHistoryOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-900/60 hover:bg-blue-900 text-blue-200 border border-blue-500/40 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            title="View system email dispatch history & configure swedswoodinfo@gmail.com"
+          >
+            <Mail className="w-4 h-4 text-blue-400" />
+            <span className="hidden sm:inline">System Email:</span>
+            <span className="font-mono text-[11px] text-blue-200 font-semibold">{SYSTEM_EMAIL}</span>
           </button>
         </div>
       </div>
@@ -2293,6 +2470,13 @@ export default function InvoiceReceiptManager({
                                 title="Download PDF"
                               >
                                 <Download className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleOpenSavedInvoiceEmailModal(inv)}
+                                className="p-1.5 bg-gray-100 hover:bg-blue-600 hover:text-white text-gray-700 rounded-lg transition cursor-pointer"
+                                title="Send Invoice to Client via Email (swedswoodinfo@gmail.com)"
+                              >
+                                <Mail className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => setDeleteConfirmInvoiceId(inv.id)}
@@ -3265,6 +3449,13 @@ export default function InvoiceReceiptManager({
                               >
                                 Open PDF Receipt
                               </button>
+                              <button
+                                onClick={() => handleDirectEmailReceipt(selectedJob, p)}
+                                className="p-1.5 text-blue-700 bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 rounded-lg transition shadow-2xs cursor-pointer"
+                                title="Send Receipt to client via Email (swedswoodinfo@gmail.com)"
+                              >
+                                <Mail className="w-3.5 h-3.5" />
+                              </button>
                               {!isAuditor && (
                                 <button
                                   type="button"
@@ -3472,6 +3663,15 @@ export default function InvoiceReceiptManager({
                   >
                     <Download className="w-4 h-4" />
                     <span>Download PDF File</span>
+                  </button>
+
+                  <button
+                    onClick={handleOpenActiveInvoiceEmailModal}
+                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+                    title="Send Invoice to client via Email (swedswoodinfo@gmail.com)"
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span>Email Invoice</span>
                   </button>
 
                   <button
@@ -4614,6 +4814,15 @@ export default function InvoiceReceiptManager({
                   </button>
 
                   <button
+                    onClick={handleOpenActiveReceiptEmailModal}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                    title="Send Receipt to client via Email (swedswoodinfo@gmail.com)"
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span>Email Receipt</span>
+                  </button>
+
+                  <button
                     onClick={handlePrint}
                     className="px-4 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
                   >
@@ -5407,6 +5616,171 @@ export default function InvoiceReceiptManager({
         )}
       </AnimatePresence>
 
+      {/* Email Dispatch Modal */}
+      <EmailDispatchModal
+        isOpen={emailModalData.isOpen}
+        onClose={() => setEmailModalData(prev => ({ ...prev, isOpen: false }))}
+        docType={emailModalData.docType}
+        docNumber={emailModalData.docNumber}
+        docDate={emailModalData.docDate}
+        customerName={emailModalData.customerName}
+        customerCompany={emailModalData.customerCompany}
+        customerEmail={emailModalData.customerEmail}
+        customerPhone={emailModalData.customerPhone}
+        projectTitle={emailModalData.projectTitle}
+        totalAmount={emailModalData.totalAmount}
+        amountPaid={emailModalData.amountPaid}
+        balanceDue={emailModalData.balanceDue}
+        items={emailModalData.items}
+        paymentMethod={emailModalData.paymentMethod}
+        onDownloadPdf={emailModalData.onDownloadPdf}
+      />
+
+      {/* System Email Dispatch Audit Log & Status Modal */}
+      <AnimatePresence>
+        {isEmailHistoryOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs no-print">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-wood-950 text-white p-5 flex items-center justify-between border-b border-blue-900">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-300">
+                    <Mail className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-black text-sm uppercase tracking-wider text-white flex items-center gap-2">
+                      System Email Dispatch Center
+                    </h3>
+                    <p className="text-xs text-blue-200/80 font-mono">
+                      System Sender: <strong className="text-blue-300">{SYSTEM_EMAIL}</strong>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsEmailHistoryOpen(false)}
+                  className="p-1.5 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 overflow-y-auto space-y-4">
+                <div className="bg-blue-50/80 border border-blue-200/70 p-4 rounded-xl text-xs space-y-2 text-slate-800">
+                  <div className="flex items-center gap-2 font-bold text-blue-950">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>Official Sweds Wood Dispatch Address</span>
+                  </div>
+                  <p className="text-slate-600 leading-relaxed text-[11px]">
+                    All Proforma Invoices, Invoices, and Official Receipts dispatched via the system automatically default to sender / CC address <code className="bg-blue-100 text-blue-900 px-1 py-0.5 rounded font-mono font-bold">{SYSTEM_EMAIL}</code>.
+                  </p>
+                  <div className="pt-2 flex flex-wrap gap-2">
+                    <a
+                      href={`https://mail.google.com/mail/?view=cm&fs=1&from=${encodeURIComponent(SYSTEM_EMAIL)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-xs"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>Open Gmail for {SYSTEM_EMAIL}</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Email Transmissions Log */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">
+                      Recent Dispatched Documents
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-bold">
+                      Saved locally in audit storage
+                    </span>
+                  </div>
+
+                  {(() => {
+                    let logs: any[] = [];
+                    try {
+                      const raw = localStorage.getItem('swedsfree_email_logs');
+                      if (raw) logs = JSON.parse(raw);
+                    } catch (e) {}
+
+                    if (!Array.isArray(logs) || logs.length === 0) {
+                      return (
+                        <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                          <Mail className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          No client emails dispatched yet from this workstation.<br />
+                          Click "Email Invoice", "Email Receipt", or "Email Client" on any document to compose.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                        {logs.map((log: any) => (
+                          <div key={log.id} className="p-3 hover:bg-slate-50 transition text-xs flex items-center justify-between gap-3">
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded font-black text-[9px] uppercase ${
+                                  log.docType === 'RECEIPT' ? 'bg-emerald-100 text-emerald-800' :
+                                  log.docType === 'PROFORMA' ? 'bg-amber-100 text-amber-800' :
+                                  'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {log.docType}
+                                </span>
+                                <span className="font-mono font-bold text-slate-900">{log.docNumber}</span>
+                                <span className="text-slate-400">&bull;</span>
+                                <span className="font-medium text-slate-700 truncate">{log.customerName}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 truncate">
+                                To: <strong className="text-slate-700">{log.recipientEmail}</strong> &bull; Subject: {log.subject}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-mono font-bold text-slate-800 text-xs">
+                                {formatCurrency(log.totalAmount || 0, 0)}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                {log.formattedDate || new Date(log.timestamp).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('swedsfree_email_logs');
+                    setIsEmailHistoryOpen(false);
+                  }}
+                  className="text-xs text-red-600 hover:text-red-700 font-bold cursor-pointer"
+                >
+                  Clear Email Logs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEmailHistoryOpen(false)}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

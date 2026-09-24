@@ -264,7 +264,7 @@ export function generateUserManualPDFDoc(): jsPDF {
   doc.setFontSize(8.5);
   doc.setTextColor(...slate700);
   doc.text('Workshop Address: 2 Sweds free Avenue, Sussex, Freetown, Sierra Leone', margin + 8, y + 17);
-  doc.text('Official Contact: info@swedwoodwork.com | Tel: +232 76 442590', margin + 8, y + 23);
+  doc.text('Official Contact: swedswoodinfo@gmail.com | Tel: +232 76 442590', margin + 8, y + 23);
   doc.text('Operating Currency Standard: Sierra Leone Leone (Le / SLL)', margin + 8, y + 29);
   doc.text('Application Release: Version 2.5 Production Build (2026 Edition)', margin + 8, y + 35);
   doc.text('Audience: System Administrators, Workshop Managers, Auditors & Artisans', margin + 8, y + 41);
@@ -801,9 +801,9 @@ export function generateUserManualPDFDoc(): jsPDF {
     'For technical assistance, system customization, or training workshops:\n' +
     '• Swedswood Enterprise IT Support Desk\n' +
     '• 2 Sweds free Avenue, Sussex, Freetown, Sierra Leone\n' +
-    '• Email: support@swedwoodwork.com | info@swedwoodwork.com\n' +
+    '• Email: swedswoodinfo@gmail.com\n' +
     '• Direct Helpline: +232 76 442590\n' +
-    '• Website: www.swedwoodwork.com'
+    '• Website: www.swedswood.com'
   );
 
   // ==========================================

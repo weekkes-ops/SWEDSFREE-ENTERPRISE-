@@ -1205,7 +1205,7 @@ export function buildProformaInvoicePdfContent(
     doc.setFontSize(6.8);
     doc.setTextColor(203, 213, 225); // slate-300
     doc.text("Architectural Joinery, Hardwood Furniture, Fitted Kitchens & Interior Timber Solutions", 38, 24);
-    doc.text("2 Sweds Free Avenue, Sussex • Tel: +232 76 442590 • Email: info@swedswood.com", 38, 29);
+    doc.text("2 Sweds Free Avenue, Sussex • Tel: +232 76 442590 • Email: swedswoodinfo@gmail.com", 38, 29);
 
     // Document Title Banner on Right
     doc.setFont('helvetica', 'bold');

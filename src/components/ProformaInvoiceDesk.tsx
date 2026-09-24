@@ -24,6 +24,7 @@ import {
   Percent, 
   DollarSign, 
   ArrowRight, 
+  ArrowLeft,
   ShieldCheck, 
   Copy, 
   Check, 
@@ -46,6 +47,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import EmailDispatchModal from './EmailDispatchModal';
 
 interface ProformaInvoiceDeskProps {
   customers: Customer[];
@@ -59,6 +61,7 @@ interface ProformaInvoiceDeskProps {
   onDeleteInvoiceRecord?: (id: string) => void;
   onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   onSwitchToSavedInvoices?: () => void;
+  onGoBack?: () => void;
 }
 
 interface WoodworkPreset {
@@ -125,7 +128,8 @@ export default function ProformaInvoiceDesk({
   onSaveInvoiceRecord,
   onDeleteInvoiceRecord,
   onCreateJob,
-  onSwitchToSavedInvoices
+  onSwitchToSavedInvoices,
+  onGoBack
 }: ProformaInvoiceDeskProps) {
   // Mode: Editor vs Preview vs Manage & Archive
   const [viewMode, setViewMode] = useState<'EDIT' | 'PREVIEW' | 'MANAGE'>('PREVIEW');
@@ -889,6 +893,68 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
     }
   };
 
+  // Email Dispatch Modal state
+  const [emailModalData, setEmailModalData] = useState<{
+    isOpen: boolean;
+    docNumber: string;
+    docDate: string;
+    customerName: string;
+    customerCompany?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    projectTitle: string;
+    totalAmount: number;
+    items?: Array<{ description: string; quantity?: number; amount: number }>;
+    downloadPdfFn?: () => void;
+  }>({
+    isOpen: false,
+    docNumber: '',
+    docDate: '',
+    customerName: '',
+    projectTitle: '',
+    totalAmount: 0
+  });
+
+  const handleOpenActiveEmailModal = () => {
+    setEmailModalData({
+      isOpen: true,
+      docNumber: proformaNo,
+      docDate: issueDate,
+      customerName: activeCustomer.name,
+      customerCompany: activeCustomer.company,
+      customerEmail: activeCustomer.email,
+      customerPhone: activeCustomer.phone,
+      projectTitle,
+      totalAmount,
+      items: items.map(i => ({
+        description: i.description,
+        quantity: i.quantity,
+        amount: i.total || (i.quantity || 1) * (i.unitPrice || 0)
+      })),
+      downloadPdfFn: handleDownloadPdf
+    });
+  };
+
+  const handleOpenSavedEmailModal = (inv: SavedInvoice) => {
+    setEmailModalData({
+      isOpen: true,
+      docNumber: inv.invoiceNo,
+      docDate: inv.date,
+      customerName: inv.customerName,
+      customerCompany: inv.customerCompany,
+      customerEmail: inv.customerEmail,
+      customerPhone: inv.customerPhone,
+      projectTitle: inv.projectTitle || inv.items[0]?.description || 'Custom Bespoke Woodwork',
+      totalAmount: inv.subtotal,
+      items: (inv.items || []).map(i => ({
+        description: i.description,
+        quantity: i.quantity,
+        amount: i.amount || i.total || 0
+      })),
+      downloadPdfFn: () => handleDownloadSingleProformaPdf(inv)
+    });
+  };
+
   // 1-Click Convert to Live Job
   const handleConvertToLiveJob = () => {
     if (!onCreateJob) {
@@ -970,15 +1036,27 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                 </span>
               )}
             </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-              <FileSpreadsheet className="w-7 h-7 text-amber-400" />
-              <span>Proforma Invoice Desk</span>
-              {editingProformaId && (
-                <span className="text-xs font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-lg">
-                  Editing {proformaNo}
-                </span>
+            <div className="flex items-center gap-3">
+              {onGoBack && (
+                <button
+                  onClick={onGoBack}
+                  className="p-2 sm:px-3 sm:py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 transition flex items-center gap-1.5 text-xs font-black shadow-xs cursor-pointer active:scale-95 shrink-0"
+                  title="Go back to previous page"
+                >
+                  <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+                  <span className="hidden sm:inline">Go Back</span>
+                </button>
               )}
-            </h2>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+                <FileSpreadsheet className="w-7 h-7 text-amber-400" />
+                <span>Proforma Invoice Desk</span>
+                {editingProformaId && (
+                  <span className="text-xs font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-lg">
+                    Editing {proformaNo}
+                  </span>
+                )}
+              </h2>
+            </div>
             <p className="text-xs text-amber-200/80 max-w-2xl leading-relaxed">
               Generate exquisite, itemized woodworking proforma invoices for prospective and registered clients. Complete with timber species specifications, 50% advance deposit terms, 5-year joinery warranty, and formal master craftsman clearance seals.
             </p>
@@ -1092,6 +1170,15 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
             >
               <Share2 className="w-4 h-4 text-emerald-400" />
               <span>WhatsApp</span>
+            </button>
+
+            <button
+              onClick={handleOpenActiveEmailModal}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition cursor-pointer"
+              title="Send Proforma to client via Email (swedswoodinfo@gmail.com)"
+            >
+              <Mail className="w-4 h-4" />
+              <span>Email Client</span>
             </button>
 
             {onCreateJob && (
@@ -1810,7 +1897,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
 
                 <div className="text-[11px] text-gray-600 leading-relaxed font-medium">
                   <p className="font-semibold text-slate-800">2 Sweds Free Avenue, Sussex</p>
-                  <p>Tel: +232 76 442590 • Email: info@swedswood.com</p>
+                  <p>Tel: +232 76 442590 • Email: swedswoodinfo@gmail.com</p>
                 </div>
               </div>
 
@@ -2325,6 +2412,15 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                         <Share2 className="w-4 h-4" />
                       </button>
 
+                      {/* Email Proforma to Client */}
+                      <button
+                        onClick={() => handleOpenSavedEmailModal(inv)}
+                        className="p-2 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 rounded-xl transition cursor-pointer"
+                        title="Send Proforma to client via Email (swedswoodinfo@gmail.com)"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </button>
+
                       {/* Delete Button (Admin / Manager) */}
                       {canManage && (
                         <button
@@ -2439,6 +2535,23 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
           </div>
         )}
       </AnimatePresence>
+
+      {/* Email Dispatch Modal for Proforma Invoice */}
+      <EmailDispatchModal
+        isOpen={emailModalData.isOpen}
+        onClose={() => setEmailModalData(prev => ({ ...prev, isOpen: false }))}
+        docType="PROFORMA"
+        docNumber={emailModalData.docNumber}
+        docDate={emailModalData.docDate}
+        customerName={emailModalData.customerName}
+        customerCompany={emailModalData.customerCompany}
+        customerEmail={emailModalData.customerEmail}
+        customerPhone={emailModalData.customerPhone}
+        projectTitle={emailModalData.projectTitle}
+        totalAmount={emailModalData.totalAmount}
+        items={emailModalData.items}
+        onDownloadPdf={emailModalData.downloadPdfFn}
+      />
     </div>
   );
 }
