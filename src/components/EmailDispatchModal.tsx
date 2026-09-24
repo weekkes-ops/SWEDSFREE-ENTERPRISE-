@@ -24,7 +24,7 @@ import { formatCurrency } from '../types';
 export const SYSTEM_EMAIL = 'swedswoodinfo@gmail.com';
 export const WORKSHOP_NAME = 'Swedswood Enterprise';
 export const WORKSHOP_PHONE = '+232 76 442590';
-export const WORKSHOP_ADDRESS = '12 Bai Bureh Road, Freetown, Sierra Leone';
+export const WORKSHOP_ADDRESS = '2 Swed Free Avenue, Sussex';
 
 export interface EmailDispatchModalProps {
   isOpen: boolean;
@@ -164,7 +164,7 @@ export default function EmailDispatchModal({
     body += `Workshop Address: ${WORKSHOP_ADDRESS}\n\n`;
     body += `Warm regards,\n`;
     body += `Swedswood Enterprise Management\n`;
-    body += `Freetown, Sierra Leone`;
+    body += `2 Swed Free Avenue, Sussex`;
 
     return body;
   };

@@ -1223,7 +1223,7 @@ export default function CustomerManager({
                   <img src="/logo.svg" alt="Company Logo" className="w-12 h-12 object-contain mx-auto mb-2" />
                   <h2 className="font-display font-black text-xl text-wood-950 uppercase tracking-tight">Swedswood Enterprise</h2>
                   <p className="text-[11px] text-gray-500 font-semibold">Custom Hardwood Carpentry & Bespoke Furniture</p>
-                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">2 Sweds free Avenue, Sussex Freetown Sierra Leone</p>
+                  <p className="text-[10px] text-gray-400 font-mono mt-0.5">2 Swed Free Avenue, Sussex</p>
                   <div className="mt-3 inline-block px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-black uppercase tracking-wider">
                     Official Payment Installment Receipt
                   </div>

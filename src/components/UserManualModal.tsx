@@ -316,7 +316,7 @@ const CHAPTERS: ManualChapter[] = [
     content: [
       {
         heading: 'Workshop Support & Enquiries',
-        text: 'Swedswood Enterprise IT Support Desk\n2 Sweds free Avenue, Sussex, Freetown, Sierra Leone\nEmail: swedswoodinfo@gmail.com\nTel: +232 76 442590'
+        text: 'Swedswood Enterprise IT Support Desk\n2 Swed Free Avenue, Sussex\nEmail: swedswoodinfo@gmail.com\nTel: +232 76 442590'
       }
     ]
   }
@@ -393,7 +393,7 @@ export default function UserManualModal({ isOpen, onClose }: UserManualModalProp
                 </span>
               </div>
               <p className="text-[11px] text-slate-300">
-                Woodwork & Timber Logistics Management System • 2 Sweds free Ave, Freetown, Sierra Leone
+                Woodwork & Timber Logistics Management System • 2 Swed Free Avenue, Sussex
               </p>
             </div>
           </div>

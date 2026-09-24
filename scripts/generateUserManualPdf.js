@@ -52,7 +52,7 @@ export function buildUserManualDoc() {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(...slate500);
-    doc.text('Confidential & Proprietary • 2 Sweds free Ave, Sussex, Freetown, Sierra Leone • www.swedwoodwork.com', margin, pageHeight - 7);
+    doc.text('Confidential & Proprietary • 2 Swed Free Avenue, Sussex • www.swedwoodwork.com', margin, pageHeight - 7);
 
     doc.setFont('helvetica', 'bold');
     doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
@@ -271,8 +271,8 @@ export function buildUserManualDoc() {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(...slate700);
-  doc.text('Workshop Address: 2 Sweds free Avenue, Sussex, Freetown, Sierra Leone', margin + 8, y + 17);
-  doc.text('Official Contact: info@swedwoodwork.com | Tel: +232 76 112 3344 / +232 88 554 9900', margin + 8, y + 23);
+  doc.text('Workshop Address: 2 Swed Free Avenue, Sussex', margin + 8, y + 17);
+  doc.text('Official Contact: swedswoodinfo@gmail.com | Tel: +232 76 442590', margin + 8, y + 23);
   doc.text('Operating Currency Standard: Sierra Leone Leone (Le / SLL)', margin + 8, y + 29);
   doc.text('Application Release: Version 2.5 Production Build (2026 Edition)', margin + 8, y + 35);
   doc.text('Audience: System Administrators, Workshop Managers, Auditors & Artisans', margin + 8, y + 41);
@@ -808,10 +808,10 @@ export function buildUserManualDoc() {
   addParagraph(
     'For technical assistance, system customization, or training workshops:\n' +
     '• Swedswood Enterprise IT Support Desk\n' +
-    '• 2 Sweds free Avenue, Sussex, Freetown, Sierra Leone\n' +
-    '• Email: support@swedwoodwork.com | info@swedwoodwork.com\n' +
-    '• Direct Helpline: +232 76 112 3344 / +232 88 554 9900\n' +
-    '• Website: www.swedwoodwork.com'
+    '• 2 Swed Free Avenue, Sussex\n' +
+    '• Email: swedswoodinfo@gmail.com\n' +
+    '• Direct Helpline: +232 76 442590\n' +
+    '• Website: www.swedswood.com'
   );
 
   // ==========================================
