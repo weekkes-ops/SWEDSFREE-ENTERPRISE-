@@ -14,7 +14,9 @@ import {
   Mail, 
   Briefcase,
   Clock,
-  X
+  X,
+  RotateCcw,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,6 +26,7 @@ interface LoginScreenProps {
   onRegisterRequest: (request: { name: string; email: string; phone: string; role: EmployeeRole; password?: string }) => void;
   inactivityNotice?: string | null;
   onClearInactivityNotice?: () => void;
+  onStartNewSession?: () => void;
 }
 
 export default function LoginScreen({ 
@@ -31,13 +34,15 @@ export default function LoginScreen({
   onLogin, 
   onRegisterRequest,
   inactivityNotice,
-  onClearInactivityNotice 
+  onClearInactivityNotice,
+  onStartNewSession 
 }: LoginScreenProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState(false);
+  const [freshSessionBadge, setFreshSessionBadge] = useState(false);
 
   // Registration Form States
   const [regName, setRegName] = useState('');
@@ -349,6 +354,24 @@ export default function LoginScreen({
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-amber-950 text-xs">Security Notice: 1-Minute Inactivity Auto-Lock</p>
                       <p className="text-amber-800 text-[11px] leading-relaxed mt-0.5">{inactivityNotice}</p>
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUsername('');
+                            setPassword('');
+                            setError('');
+                            setFreshSessionBadge(true);
+                            if (onStartNewSession) onStartNewSession();
+                            if (onClearInactivityNotice) onClearInactivityNotice();
+                            setTimeout(() => setFreshSessionBadge(false), 4000);
+                          }}
+                          className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-bold inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Start Clean Session</span>
+                        </button>
+                      </div>
                     </div>
                     {onClearInactivityNotice && (
                       <button 
@@ -360,6 +383,13 @@ export default function LoginScreen({
                         <X className="w-3.5 h-3.5" />
                       </button>
                     )}
+                  </div>
+                )}
+
+                {freshSessionBadge && (
+                  <div className="mb-4 p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center gap-2 text-xs font-bold text-emerald-800 animate-in fade-in">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>✓ Brand new session initialized. Please sign in with your credentials.</span>
                   </div>
                 )}
 
@@ -434,6 +464,23 @@ export default function LoginScreen({
                     >
                       <UserPlus className="w-4 h-4 text-amber-600" />
                       <span>Request New Access Registration</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUsername('');
+                        setPassword('');
+                        setError('');
+                        setFreshSessionBadge(true);
+                        if (onStartNewSession) onStartNewSession();
+                        if (onClearInactivityNotice) onClearInactivityNotice();
+                        setTimeout(() => setFreshSessionBadge(false), 4000);
+                      }}
+                      className="w-full py-2 bg-transparent hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded-xl font-bold flex items-center justify-center gap-1.5 transition duration-150 text-[11px] cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3 text-slate-400" />
+                      <span>Start Clean Session</span>
                     </button>
                   </div>
                 </form>
