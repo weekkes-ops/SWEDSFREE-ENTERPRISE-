@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { jsPDF } from 'jspdf';
 import { 
   Employee, 
@@ -28,7 +28,12 @@ import {
   ShieldCheck,
   Building2,
   Wrench,
-  BarChart3
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  CheckCircle2,
+  Filter
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import MonthlyTrendsSection from './MonthlyTrendsSection';
@@ -54,64 +59,188 @@ export default function ReportGenerator({
   currentUser
 }: ReportGeneratorProps) {
   const isAuditor = currentUser?.role === 'Auditor';
-  const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('Monthly');
+  const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('All Time');
   const [activeSubReport, setActiveSubReport] = useState<'FISCAL_BAR_CHART' | 'TRENDS' | 'EMPLOYEES' | 'CUSTOMERS' | 'REVENUE' | 'INVENTORY'>('FISCAL_BAR_CHART');
 
-  // Generate Date Boundaries based on selectedPeriod (Daily, Weekly, Monthly, Yearly)
-  const currentDate = new Date();
-  const currentDateStr = currentDate.toISOString().split('T')[0];
+  // Compute available months dynamically from transactions and job commission dates
+  const availableMonths = useMemo(() => {
+    const monthSet = new Set<string>();
+    financialTransactions.forEach(t => {
+      if (t.date && t.date.length >= 7) monthSet.add(t.date.slice(0, 7));
+    });
+    inventoryTransactions.forEach(t => {
+      if (t.date && t.date.length >= 7) monthSet.add(t.date.slice(0, 7));
+    });
+    jobs.forEach(j => {
+      if (j.startDate && j.startDate.length >= 7) monthSet.add(j.startDate.slice(0, 7));
+      (j.payments || []).forEach(p => {
+        if (p.date && p.date.length >= 7) monthSet.add(p.date.slice(0, 7));
+      });
+    });
 
-  const getPeriodFilter = (dateStr: string): boolean => {
+    // Ensure standard 2026 months and current calendar month are available
+    const curMonthKey = new Date().toISOString().slice(0, 7);
+    monthSet.add(curMonthKey);
+    ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'].forEach(m => monthSet.add(m));
+
+    return Array.from(monthSet).sort().reverse();
+  }, [financialTransactions, inventoryTransactions, jobs]);
+
+  // Identify latest month containing active financial records or default to 2026-07 (primary workshop activity)
+  const defaultMonth = useMemo(() => {
+    const activeWithFin = availableMonths.find(m =>
+      financialTransactions.some(t => t.date && t.date.startsWith(m)) ||
+      inventoryTransactions.some(t => t.date && t.date.startsWith(m))
+    );
+    return activeWithFin || '2026-07';
+  }, [availableMonths, financialTransactions, inventoryTransactions]);
+
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => defaultMonth);
+  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [selectedDate, setSelectedDate] = useState<string>(() => '2026-07-20');
+
+  // Human-readable pivot label
+  const getPivotDateLabel = () => {
+    if (selectedPeriod === 'All Time') {
+      return 'All Time (Full Ledger History)';
+    }
+    if (selectedPeriod === 'Monthly') {
+      const [y, m] = selectedMonth.split('-');
+      const d = new Date(parseInt(y), parseInt(m) - 1, 1);
+      return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+    if (selectedPeriod === 'Yearly') {
+      return `Fiscal Year ${selectedYear}`;
+    }
+    if (selectedPeriod === 'Daily') {
+      return `Day: ${selectedDate}`;
+    }
+    if (selectedPeriod === 'Weekly') {
+      return `7-Day Range around ${selectedDate}`;
+    }
+    return selectedPeriod;
+  };
+
+  // Date filter predicate
+  const getPeriodFilter = (dateStr?: string): boolean => {
+    if (!dateStr) return false;
+    if (selectedPeriod === 'All Time') {
+      return true;
+    }
+    if (selectedPeriod === 'Monthly') {
+      return dateStr.startsWith(selectedMonth);
+    }
+    if (selectedPeriod === 'Yearly') {
+      return dateStr.startsWith(String(selectedYear));
+    }
+
     const itemDate = new Date(dateStr);
-    const diffTime = Math.abs(currentDate.getTime() - itemDate.getTime());
+    const pivotDateObj = new Date(selectedDate);
+    const diffTime = Math.abs(pivotDateObj.getTime() - itemDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (selectedPeriod === 'Daily') {
-      // Is same day (let's allow last 24h/same day or match July 20, 2026 exactly)
-      return itemDate.toDateString() === currentDate.toDateString();
+      return dateStr === selectedDate || itemDate.toDateString() === pivotDateObj.toDateString();
     } else if (selectedPeriod === 'Weekly') {
-      // Within last 7 days
-      return diffDays <= 7 && itemDate <= currentDate;
-    } else if (selectedPeriod === 'Monthly') {
-      // Is same month and year (July 2026)
-      return itemDate.getMonth() === currentDate.getMonth() && itemDate.getFullYear() === currentDate.getFullYear();
-    } else if (selectedPeriod === 'Yearly') {
-      // Is same year (2026)
-      return itemDate.getFullYear() === currentDate.getFullYear();
+      return diffDays <= 7;
     }
     return true;
   };
 
-  // 1. Filtered Datasets
-  const periodFinTx = financialTransactions.filter(t => getPeriodFilter(t.date));
-  const periodInvTx = inventoryTransactions.filter(t => getPeriodFilter(t.date));
-  const periodJobs = jobs.filter(j => getPeriodFilter(j.startDate) || j.payments.some(p => getPeriodFilter(p.date)));
-  const periodCustomers = customers.filter(c => getPeriodFilter(c.registrationDate));
+  // 1. Filtered Datasets for selected period
+  const periodFinTx = useMemo(() => 
+    financialTransactions.filter(t => getPeriodFilter(t.date)),
+    [financialTransactions, selectedPeriod, selectedMonth, selectedYear, selectedDate]
+  );
+  
+  const periodInvTx = useMemo(() => 
+    inventoryTransactions.filter(t => getPeriodFilter(t.date)),
+    [inventoryTransactions, selectedPeriod, selectedMonth, selectedYear, selectedDate]
+  );
+  
+  const periodJobs = useMemo(() => 
+    jobs.filter(j => 
+      (j.startDate && getPeriodFilter(j.startDate)) || 
+      (j.dueDate && getPeriodFilter(j.dueDate)) ||
+      (j.payments && j.payments.some(p => p.date && getPeriodFilter(p.date)))
+    ),
+    [jobs, selectedPeriod, selectedMonth, selectedYear, selectedDate]
+  );
+  
+  const periodCustomers = useMemo(() => 
+    customers.filter(c => getPeriodFilter(c.registrationDate)),
+    [customers, selectedPeriod, selectedMonth, selectedYear, selectedDate]
+  );
 
-  // 2. Employees Period Metrics
+  // 2. Employees & Artisan Wages Paid Metric
   const activeStaff = employees.filter(e => e.status === 'Active');
-  const PeriodWagesCost = periodFinTx
-    .filter(t => t.category === 'Employee Wages')
+  
+  // Wages from Financial Ledger (Employee Wages category or description mentioning wages/payroll/artisan)
+  const ledgerWages = periodFinTx
+    .filter(t => t.category === 'Employee Wages' || (t.type === 'EXPENDITURE' && /wage|salary|payroll|artisan|craftsman|labor/i.test(t.description || '')))
     .reduce((sum, t) => sum + t.amount, 0);
 
-  // 3. Customers Period Metrics
-  const periodRevenue = periodFinTx
+  // Direct Job Labor Cost allocated to artisans for commissions active in this period
+  const jobLaborCost = periodJobs.reduce((sum, j) => sum + (j.laborCost || 0), 0);
+
+  // Tally artisan wages: prioritize verified ledger payroll payouts, with fallback to direct commissioned job labor costs
+  const PeriodWagesCost = ledgerWages > 0 ? ledgerWages : jobLaborCost;
+
+  // 3. Customer Revenue Metric
+  // Inflow from financial ledger
+  const finIncome = periodFinTx
     .filter(t => t.type === 'INCOME')
     .reduce((sum, t) => sum + t.amount, 0);
 
+  // Job payment receipts logged for this period
+  const jobPaymentsCleared = jobs.flatMap(j => (j.payments || []).filter(p => p.date && getPeriodFilter(p.date)))
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  // Non-job revenue (e.g. scrap wood sales, ad-hoc workshop receipts)
+  const nonJobIncome = periodFinTx
+    .filter(t => t.type === 'INCOME' && t.category !== 'Job Payment')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Verified Customer Revenue (cleared client funds)
+  const periodRevenue = Math.max(finIncome, jobPaymentsCleared + nonJobIncome);
   const newCustomersCount = periodCustomers.length;
 
-  // 4. Revenue Period Metrics
-  const totalIncome = periodFinTx.filter(t => t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
-  const totalExpense = periodFinTx.filter(t => t.type === 'EXPENDITURE').reduce((sum, t) => sum + t.amount, 0);
+  // 4. Period Net Earnings Metric
+  const totalIncome = periodRevenue;
+  
+  // Expenditures from financial ledger
+  const ledgerExpense = periodFinTx
+    .filter(t => t.type === 'EXPENDITURE')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Operational expenditures from job material allocations and artisan wages if ledger is unpopulated for this period
+  const jobOperationalExpense = periodJobs.reduce((sum, j) => {
+    const matCost = (j.materialsUsed || []).reduce((mSum, m) => mSum + (m.totalCost || 0), 0);
+    return sum + matCost + (j.laborCost || 0) + (j.otherCosts || 0);
+  }, 0);
+
+  const totalExpense = ledgerExpense > 0 ? ledgerExpense : jobOperationalExpense;
   const netEarnings = totalIncome - totalExpense;
 
-  // 5. Inventory Period Metrics
-  const inwardsQty = periodInvTx.filter(t => t.type === 'INWARDS').reduce((sum, t) => sum + t.quantity, 0);
-  const inwardsVal = periodInvTx.filter(t => t.type === 'INWARDS').reduce((sum, t) => sum + t.totalValue, 0);
-  
-  const outwardsQty = periodInvTx.filter(t => t.type === 'OUTWARDS').reduce((sum, t) => sum + t.quantity, 0);
-  const outwardsVal = periodInvTx.filter(t => t.type === 'OUTWARDS').reduce((sum, t) => sum + t.totalValue, 0);
+  // 5. Lumber Consumed Metric
+  // Inventory outwards transactions (timber/materials dispatched from stock)
+  const invOutwards = periodInvTx.filter(t => t.type === 'OUTWARDS');
+  const invOutwardsQty = invOutwards.reduce((sum, t) => sum + t.quantity, 0);
+  const invOutwardsVal = invOutwards.reduce((sum, t) => sum + t.totalValue, 0);
+
+  // Materials consumed directly on jobs in this period
+  const jobMaterialsInPeriod = periodJobs.flatMap(j => j.materialsUsed || []);
+  const jobMatQty = jobMaterialsInPeriod.reduce((sum, m) => sum + m.quantity, 0);
+  const jobMatVal = jobMaterialsInPeriod.reduce((sum, m) => sum + m.totalCost, 0);
+
+  // Prioritize inventory ledger dispatches, with fallback to job materials consumed
+  const outwardsQty = invOutwardsQty > 0 ? invOutwardsQty : jobMatQty;
+  const outwardsVal = invOutwardsVal > 0 ? invOutwardsVal : jobMatVal;
+
+  // Inventory inwards transactions (materials received into workshop stock)
+  const invInwards = periodInvTx.filter(t => t.type === 'INWARDS');
+  const inwardsQty = invInwards.reduce((sum, t) => sum + t.quantity, 0);
+  const inwardsVal = invInwards.reduce((sum, t) => sum + t.totalValue, 0);
 
   const lowStockCount = inventory.filter(i => i.currentStock <= i.minStockThreshold).length;
 
@@ -120,12 +249,52 @@ export default function ReportGenerator({
   };
 
   const handleExportCSV = () => {
-    alert("Drafting Excel CSV Summary for SWEDS WOOD ENTERPRISE. Export compiled successfully!");
+    const pivotLabel = getPivotDateLabel();
+    const rows: (string | number)[][] = [
+      ['SWEDS WOOD ENTERPRISE - AUDIT DOSSIER REPORT'],
+      [`Report Period: ${selectedPeriod}`, `Pivot: ${pivotLabel}`, `Exported Date: ${new Date().toLocaleDateString('en-US')}`],
+      [''],
+      ['FINANCIAL TRANSACTIONS LEDGER (PERIOD)'],
+      ['Date', 'Type', 'Category', 'Description', 'Amount (SLE)'],
+      ...periodFinTx.map(t => [
+        t.date || '-',
+        t.type,
+        t.category || '-',
+        (t.description || '').replace(/"/g, '""'),
+        `${t.type === 'INCOME' ? '+' : '-'}${t.amount}`
+      ]),
+      [''],
+      ['JOB COMMISSIONS IN PERIOD'],
+      ['Job ID', 'Title', 'Customer', 'Status', 'Quote (SLE)', 'Paid (SLE)', 'Labor Cost (SLE)'],
+      ...periodJobs.map(j => {
+        const paid = (j.payments || []).reduce((sum, p) => sum + p.amount, 0);
+        return [
+          j.id,
+          (j.title || '').replace(/"/g, '""'),
+          (j.customerName || '').replace(/"/g, '""'),
+          j.status,
+          j.quoteAmount,
+          paid,
+          j.laborCost || 0
+        ];
+      })
+    ];
+
+    const csvContent = '\uFEFF' + rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `SWEDS_WOOD_AUDIT_${selectedPeriod.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleDownloadPDFReport = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pivotLabel = getPivotDateLabel();
 
     // Header Title
     doc.setFillColor(30, 27, 22);
@@ -134,12 +303,12 @@ export default function ReportGenerator({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(15);
     doc.setTextColor(255, 255, 255);
-    doc.text('SWEDS WOOD ENTERPRISE - MONTHLY SUMMARY REPORT', 14, 15);
+    doc.text('SWEDS WOOD ENTERPRISE - EXECUTIVE AUDIT REPORT', 14, 15);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(200, 200, 200);
-    doc.text(`Report Period: ${selectedPeriod} | Pivot Date: 2026-07-20 | Downloaded: ${new Date().toLocaleDateString('en-US')}`, 14, 22);
+    doc.text(`Period: ${selectedPeriod} | Pivot: ${pivotLabel} | Generated: ${new Date().toLocaleDateString('en-US')}`, 14, 22);
 
     let startY = 36;
 
@@ -286,7 +455,18 @@ export default function ReportGenerator({
     doc.setTextColor(120, 120, 120);
     doc.text('SWEDS WOOD ENTERPRISE MANAGEMENT SYSTEM — OFFICIAL AUDIT SUMMARY REPORT', pageWidth / 2, 288, { align: 'center' });
 
-    doc.save(`SWEDS_Monthly_Report_${selectedPeriod}_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`SWEDS_Monthly_Report_${selectedPeriod.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  // Helper to step backward/forward in months
+  const handleStepMonth = (direction: 'prev' | 'next') => {
+    const currentIndex = availableMonths.indexOf(selectedMonth);
+    if (currentIndex === -1) return;
+    if (direction === 'prev' && currentIndex < availableMonths.length - 1) {
+      setSelectedMonth(availableMonths[currentIndex + 1]);
+    } else if (direction === 'next' && currentIndex > 0) {
+      setSelectedMonth(availableMonths[currentIndex - 1]);
+    }
   };
 
   return (
@@ -299,7 +479,7 @@ export default function ReportGenerator({
             SWEDS WOOD ENTERPRISE Reports Ledger
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Generate and audit Daily, Weekly, Monthly, and Yearly operational dossiers.
+            Generate and audit Daily, Weekly, Monthly, Yearly, and All-Time operational dossiers.
           </p>
         </div>
         
@@ -327,7 +507,7 @@ export default function ReportGenerator({
           </button>
           <button 
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs"
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Export CSV Sheet</span>
@@ -337,21 +517,98 @@ export default function ReportGenerator({
 
       {/* Report Period Filter Bar */}
       <div className="bg-white p-4 rounded-xl border border-wood-100 shadow-xs flex flex-wrap items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
-          {(['Daily', 'Weekly', 'Monthly', 'Yearly'] as ReportPeriod[]).map(per => (
-            <button
-              key={per}
-              onClick={() => setSelectedPeriod(per)}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${selectedPeriod === per ? 'bg-wood-900 text-white shadow-xs' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              {per} Report
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Main Period Mode Buttons */}
+          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
+            {(['All Time', 'Monthly', 'Yearly', 'Weekly', 'Daily'] as ReportPeriod[]).map(per => (
+              <button
+                key={per}
+                onClick={() => setSelectedPeriod(per)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  selectedPeriod === per 
+                    ? 'bg-wood-900 text-white shadow-xs' 
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                {per === 'All Time' ? 'All Time (Full Ledger)' : `${per} Report`}
+              </button>
+            ))}
+          </div>
+
+          {/* Contextual Sub-Selector for Monthly */}
+          {selectedPeriod === 'Monthly' && (
+            <div className="flex items-center gap-1.5 bg-amber-50/70 border border-amber-200/80 px-2.5 py-1 rounded-xl">
+              <span className="text-[11px] font-bold text-amber-900">Select Month:</span>
+              <button
+                onClick={() => handleStepMonth('prev')}
+                className="p-1 text-amber-800 hover:bg-amber-100 rounded cursor-pointer transition"
+                title="Older Month"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-white text-xs font-bold text-amber-950 border border-amber-300 rounded px-2 py-1 outline-none cursor-pointer"
+              >
+                {availableMonths.map(m => {
+                  const [y, mon] = m.split('-');
+                  const d = new Date(parseInt(y), parseInt(mon) - 1, 1);
+                  const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                  const hasData = financialTransactions.some(t => t.date && t.date.startsWith(m)) ||
+                                  inventoryTransactions.some(t => t.date && t.date.startsWith(m));
+                  return (
+                    <option key={m} value={m}>
+                      {label} {hasData ? '• Active Data' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+              <button
+                onClick={() => handleStepMonth('next')}
+                className="p-1 text-amber-800 hover:bg-amber-100 rounded cursor-pointer transition"
+                title="Newer Month"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Contextual Sub-Selector for Yearly */}
+          {selectedPeriod === 'Yearly' && (
+            <div className="flex items-center gap-1.5 bg-amber-50/70 border border-amber-200/80 px-2.5 py-1 rounded-xl">
+              <span className="text-[11px] font-bold text-amber-900">Fiscal Year:</span>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="bg-white text-xs font-bold text-amber-950 border border-amber-300 rounded px-2 py-1 outline-none cursor-pointer"
+              >
+                <option value={2026}>2026 Fiscal Year</option>
+                <option value={2025}>2025 Fiscal Year</option>
+              </select>
+            </div>
+          )}
+
+          {/* Contextual Sub-Selector for Daily / Weekly */}
+          {(selectedPeriod === 'Daily' || selectedPeriod === 'Weekly') && (
+            <div className="flex items-center gap-1.5 bg-amber-50/70 border border-amber-200/80 px-2.5 py-1 rounded-xl">
+              <span className="text-[11px] font-bold text-amber-900">
+                {selectedPeriod === 'Daily' ? 'Select Date:' : 'Pivot Week Center:'}
+              </span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-white text-xs font-bold text-amber-950 border border-amber-300 rounded px-2 py-1 outline-none cursor-pointer"
+              />
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold bg-wood-50/50 px-3 py-1.5 rounded-lg border border-wood-100">
-          <Calendar className="w-4 h-4 text-wood-600" />
-          <span>Report Pivot Date: <strong>July 20, 2026</strong></span>
+        {/* Dynamic Pivot Indicator */}
+        <div className="flex items-center gap-2 text-xs text-gray-700 font-semibold bg-wood-50/80 px-3.5 py-2 rounded-xl border border-wood-100">
+          <Calendar className="w-4 h-4 text-wood-700" />
+          <span>Audit Pivot Scope: <strong className="text-wood-950">{getPivotDateLabel()}</strong></span>
         </div>
       </div>
 
@@ -359,36 +616,9 @@ export default function ReportGenerator({
       <div className="hidden print:block text-center border-b pb-6 space-y-1">
         <h1 className="text-2xl font-serif font-bold text-gray-900 uppercase">SWEDS WOOD ENTERPRISE</h1>
         <p className="text-sm text-gray-500">Professional Woodwork & Bespoke Furniture Workshop</p>
-        <p className="text-xs font-mono font-bold text-gray-700">{selectedPeriod.toUpperCase()} GENERAL AUDIT REPORT &mdash; PIVOT DATE: {currentDateStr}</p>
-      </div>
-
-      {/* 4 Core Pivot Stat Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs">
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Artisan Wages Paid</span>
-          <p className="text-xl font-bold font-mono text-gray-800 mt-1">{formatCurrency(PeriodWagesCost, 0)}</p>
-          <p className="text-[9px] text-gray-400 font-semibold uppercase mt-0.5">{activeStaff.length} craftsmen active</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs">
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Customer Revenue</span>
-          <p className="text-xl font-bold font-mono text-emerald-700 mt-1">+{formatCurrency(periodRevenue, 0)}</p>
-          <p className="text-[9px] text-emerald-600 font-semibold uppercase mt-0.5">{newCustomersCount} new client signups</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs">
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Period Net Earnings</span>
-          <p className={`text-xl font-bold font-mono mt-1 ${netEarnings >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-            {netEarnings >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netEarnings), 0)}
-          </p>
-          <p className="text-[9px] text-gray-400 font-semibold uppercase mt-0.5">Retained earnings</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs">
-          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Lumber Consumed</span>
-          <p className="text-xl font-bold font-mono text-wood-900 mt-1">{outwardsQty} <span className="text-xs text-gray-500 font-normal">Units</span></p>
-          <p className="text-[9px] text-wood-700 font-semibold uppercase mt-0.5">Asset value: {formatCurrency(outwardsVal, 0)}</p>
-        </div>
+        <p className="text-xs font-mono font-bold text-gray-700">
+          {selectedPeriod.toUpperCase()} AUDIT DOSSIER &mdash; SCOPE: {getPivotDateLabel().toUpperCase()}
+        </p>
       </div>
 
       {/* Sub-Reports Tabs selection */}

@@ -138,7 +138,7 @@ export interface FinancialTransaction {
   referenceId?: string; // JobId, EmployeeId, or InventoryTransactionId
 }
 
-export type ReportPeriod = 'Daily' | 'Weekly' | 'Monthly' | 'Yearly';
+export type ReportPeriod = 'All Time' | 'Daily' | 'Weekly' | 'Monthly' | 'Yearly';
 
 export interface DailyWorkLog {
   id: string;
