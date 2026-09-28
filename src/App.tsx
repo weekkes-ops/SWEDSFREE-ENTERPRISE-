@@ -57,19 +57,6 @@ import {
   clearEntireCollection,
   fetchCollectionFromFirestore 
 } from './lib/firestoreService';
-import { 
-  INITIAL_INVENTORY, 
-  INITIAL_CUSTOMERS, 
-  INITIAL_EMPLOYEES, 
-  INITIAL_JOBS, 
-  INITIAL_INVENTORY_TRANSACTIONS, 
-  INITIAL_FINANCIALS,
-  INITIAL_DAILY_WORK_LOGS,
-  INITIAL_REGISTRATION_REQUESTS,
-  INITIAL_WARNING_LETTERS,
-  INITIAL_SAVED_INVOICES,
-  INITIAL_PAYMENT_AUDIT_LOGS
-} from './data';
 
 const LIVE_ADMIN_EMPLOYEE: Employee = {
   id: 'emp-01',
@@ -394,19 +381,14 @@ export default function App() {
   // Helper to load stored data from local cache with fallback
   const getStoredData = <T,>(key: string, fallback: T[] = []): T[] => {
     try {
-      const seedDisabled = localStorage.getItem('swedsfree_seed_disabled') === 'true';
       const raw = localStorage.getItem(key);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          if (seedDisabled) return parsed;
-          if (parsed.length > 0) return parsed;
+          return parsed;
         }
       }
-      if (seedDisabled) {
-        if (key === 'swedsfree_employees') return [LIVE_ADMIN_EMPLOYEE] as unknown as T[];
-        return [];
-      }
+      if (key === 'swedsfree_employees') return [LIVE_ADMIN_EMPLOYEE] as unknown as T[];
     } catch (e) {
       console.error(`Error loading stored data for ${key}:`, e);
     }
@@ -440,7 +422,7 @@ export default function App() {
   const [dailyWorkLogs, setDailyWorkLogs] = useState<DailyWorkLog[]>(() => getStoredData('swedsfree_daily_work_logs', []));
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>(() => getStoredData('swedsfree_registration_requests', []));
   const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters', []));
-  const [paymentAuditLogs, setPaymentAuditLogs] = useState<PaymentAuditLogEntry[]>(() => getStoredData('swedsfree_payment_audit_logs', INITIAL_PAYMENT_AUDIT_LOGS));
+  const [paymentAuditLogs, setPaymentAuditLogs] = useState<PaymentAuditLogEntry[]>(() => getStoredData('swedsfree_payment_audit_logs', []));
 
   // 1-minute inactivity timeout configuration (60,000ms = 1 minute)
   const [inactivityNotice, setInactivityNotice] = useState<string | null>(null);
@@ -529,23 +511,10 @@ export default function App() {
     }
   };
 
-  // Restore all records dated up to today (August 5, 2026) from Firestore
+  // Restore all records from Firestore into local state
   const handleRestoreAllDataTillToday = async () => {
     try {
       setSyncStatus('syncing');
-      localStorage.removeItem('swedsfree_seed_disabled');
-
-      // Save complete initial records dated up to today to Firestore
-      await saveBatchDocuments('inventory', INITIAL_INVENTORY);
-      await saveBatchDocuments('customers', INITIAL_CUSTOMERS);
-      await saveBatchDocuments('employees', INITIAL_EMPLOYEES);
-      await saveBatchDocuments('jobs', INITIAL_JOBS);
-      await saveBatchDocuments('inventoryTransactions', INITIAL_INVENTORY_TRANSACTIONS);
-      await saveBatchDocuments('financialTransactions', INITIAL_FINANCIALS);
-      await saveBatchDocuments('dailyWorkLogs', INITIAL_DAILY_WORK_LOGS);
-      await saveBatchDocuments('registrationRequests', INITIAL_REGISTRATION_REQUESTS);
-      await saveBatchDocuments('warningLetters', INITIAL_WARNING_LETTERS);
-      await saveBatchDocuments('savedInvoices', INITIAL_SAVED_INVOICES);
 
       // Query Firestore directly for server documents
       const inv = await fetchCollectionFromFirestore<InventoryItem>('inventory');
@@ -559,16 +528,16 @@ export default function App() {
       const warns = await fetchCollectionFromFirestore<WarningLetter>('warningLetters');
       const invs = await fetchCollectionFromFirestore<SavedInvoice>('savedInvoices');
 
-      const finalInv = inv.length > 0 ? inv : INITIAL_INVENTORY;
-      const finalCust = cust.length > 0 ? cust : INITIAL_CUSTOMERS;
-      const finalEmp = emp.length > 0 ? emp : INITIAL_EMPLOYEES;
-      const finalJobs = jbs.length > 0 ? jbs : INITIAL_JOBS;
-      const finalInvTx = invTx.length > 0 ? invTx : INITIAL_INVENTORY_TRANSACTIONS;
-      const finalFinTx = finTx.length > 0 ? finTx : INITIAL_FINANCIALS;
-      const finalWLogs = wLogs.length > 0 ? wLogs : INITIAL_DAILY_WORK_LOGS;
-      const finalReqs = reqs.length > 0 ? reqs : INITIAL_REGISTRATION_REQUESTS;
-      const finalWarns = warns.length > 0 ? warns : INITIAL_WARNING_LETTERS;
-      const finalInvs = invs.length > 0 ? invs : INITIAL_SAVED_INVOICES;
+      const finalInv = inv;
+      const finalCust = cust;
+      const finalEmp = emp.length > 0 ? emp : [LIVE_ADMIN_EMPLOYEE];
+      const finalJobs = jbs;
+      const finalInvTx = invTx;
+      const finalFinTx = finTx;
+      const finalWLogs = wLogs;
+      const finalReqs = reqs;
+      const finalWarns = warns;
+      const finalInvs = invs;
 
       setInventory(finalInv);
       setCustomers(finalCust);
@@ -610,38 +579,9 @@ export default function App() {
     const syncCollection = <T extends { id: string }>(
       collectionName: string,
       setter: React.Dispatch<React.SetStateAction<T[]>>,
-      localKey: string,
-      initialFallback: T[] = []
+      localKey: string
     ) => {
       const unsub = subscribeToCollection<T>(collectionName, (items) => {
-        const seedDisabled = localStorage.getItem('swedsfree_seed_disabled') === 'true';
-
-        if (!seedDisabled) {
-          if (!items || items.length === 0) {
-            if (initialFallback && initialFallback.length > 0) {
-              saveBatchDocuments(collectionName, initialFallback);
-              setter(initialFallback);
-              localStorage.setItem(localKey, JSON.stringify(initialFallback));
-              localStorage.setItem('swedsfree_seed_disabled', 'true');
-              return;
-            }
-          }
-
-          if (initialFallback && initialFallback.length > 0) {
-            const existingIds = new Set((items || []).map(i => i.id));
-            const missingItems = initialFallback.filter(fb => !existingIds.has(fb.id));
-            if (missingItems.length > 0) {
-              saveBatchDocuments(collectionName, missingItems);
-              const combined = [...(items || []), ...missingItems];
-              setter(combined);
-              localStorage.setItem(localKey, JSON.stringify(combined));
-              localStorage.setItem('swedsfree_seed_disabled', 'true');
-              return;
-            }
-          }
-          localStorage.setItem('swedsfree_seed_disabled', 'true');
-        }
-
         let finalItems = items || [];
         if (collectionName === 'employees' && finalItems.length === 0) {
           finalItems = [LIVE_ADMIN_EMPLOYEE] as unknown as T[];
@@ -653,16 +593,16 @@ export default function App() {
       unsubs.push(unsub);
     };
 
-    syncCollection('inventory', setInventory, 'swedsfree_inventory', INITIAL_INVENTORY);
-    syncCollection('customers', setCustomers, 'swedsfree_customers', INITIAL_CUSTOMERS);
-    syncCollection('employees', setEmployees, 'swedsfree_employees', INITIAL_EMPLOYEES);
-    syncCollection('jobs', setJobs, 'swedsfree_jobs', INITIAL_JOBS);
-    syncCollection('inventoryTransactions', setInventoryTransactions, 'swedsfree_inv_transactions', INITIAL_INVENTORY_TRANSACTIONS);
-    syncCollection('financialTransactions', setFinancialTransactions, 'swedsfree_fin_transactions', INITIAL_FINANCIALS);
-    syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs', INITIAL_DAILY_WORK_LOGS);
-    syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests', INITIAL_REGISTRATION_REQUESTS);
-    syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters', INITIAL_WARNING_LETTERS);
-    syncCollection('paymentAuditLogs', setPaymentAuditLogs, 'swedsfree_payment_audit_logs', INITIAL_PAYMENT_AUDIT_LOGS);
+    syncCollection('inventory', setInventory, 'swedsfree_inventory');
+    syncCollection('customers', setCustomers, 'swedsfree_customers');
+    syncCollection('employees', setEmployees, 'swedsfree_employees');
+    syncCollection('jobs', setJobs, 'swedsfree_jobs');
+    syncCollection('inventoryTransactions', setInventoryTransactions, 'swedsfree_inv_transactions');
+    syncCollection('financialTransactions', setFinancialTransactions, 'swedsfree_fin_transactions');
+    syncCollection('dailyWorkLogs', setDailyWorkLogs, 'swedsfree_daily_work_logs');
+    syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests');
+    syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters');
+    syncCollection('paymentAuditLogs', setPaymentAuditLogs, 'swedsfree_payment_audit_logs');
 
     // Mark initialization complete without clearing data automatically
     if (localStorage.getItem('swedsfree_initial_purge_done') !== 'true') {

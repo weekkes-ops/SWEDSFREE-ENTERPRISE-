@@ -587,8 +587,9 @@ export function buildInvoicePdfContent(
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
       doc.setTextColor(80, 80, 80);
-      doc.text("2 Swed Free Avenue, Sussex", 120, 43);
-      doc.text("Payment Terms: Standard Clearance (COD / Bank Wire)", 120, 48);
+      doc.text("2 Swed Free Avenue, Sussex", 120, 42.5);
+      doc.text("Email: swedswoodinfo@gmail.com • +232 76 442590", 120, 46.5);
+      doc.text("Payment Terms: Standard Clearance (COD / Bank Wire)", 120, 50.5);
 
       return 64;
     };
@@ -794,7 +795,7 @@ export function buildReceiptPdfContent(
   doc.setFontSize(7.5);
   doc.setTextColor(80, 80, 80);
   doc.text(companySub, 36, 25);
-  doc.text("2 Swed Free Avenue, Sussex", 36, 29);
+  doc.text("2 Swed Free Avenue, Sussex • Email: swedswoodinfo@gmail.com", 36, 29);
 
   // Receipt Badge Box
   doc.setFillColor(240, 253, 244);

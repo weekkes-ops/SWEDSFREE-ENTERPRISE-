@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Customer, Job, Employee, SavedInvoice, SavedInvoiceItem, formatCurrency } from '../types';
 import { saveDocument, deleteDocument, subscribeToCollection } from '../lib/firestoreService';
-import { INITIAL_SAVED_INVOICES } from '../data';
 import { buildProformaInvoicePdfContent, ProformaPdfItem, getLogoDataUrl } from '../utils/pdfGenerator';
 import { jsPDF } from 'jspdf';
 import { 
@@ -147,7 +146,7 @@ export default function ProformaInvoiceDesk({
       const raw = localStorage.getItem('swedswood_saved_invoices');
       if (raw) return JSON.parse(raw);
     } catch (e) {}
-    return INITIAL_SAVED_INVOICES;
+    return [];
   });
 
   // Client Selection State
@@ -902,6 +901,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
     customerCompany?: string;
     customerEmail?: string;
     customerPhone?: string;
+    customerAddress?: string;
     projectTitle: string;
     totalAmount: number;
     items?: Array<{ description: string; quantity?: number; amount: number }>;
@@ -924,6 +924,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
       customerCompany: activeCustomer.company,
       customerEmail: activeCustomer.email,
       customerPhone: activeCustomer.phone,
+      customerAddress: activeCustomer.address,
       projectTitle,
       totalAmount,
       items: items.map(i => ({
@@ -944,6 +945,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
       customerCompany: inv.customerCompany,
       customerEmail: inv.customerEmail,
       customerPhone: inv.customerPhone,
+      customerAddress: inv.customerAddress,
       projectTitle: inv.projectTitle || inv.items[0]?.description || 'Custom Bespoke Woodwork',
       totalAmount: inv.subtotal,
       items: (inv.items || []).map(i => ({
@@ -2547,6 +2549,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
         customerCompany={emailModalData.customerCompany}
         customerEmail={emailModalData.customerEmail}
         customerPhone={emailModalData.customerPhone}
+        customerAddress={emailModalData.customerAddress}
         projectTitle={emailModalData.projectTitle}
         totalAmount={emailModalData.totalAmount}
         items={emailModalData.items}

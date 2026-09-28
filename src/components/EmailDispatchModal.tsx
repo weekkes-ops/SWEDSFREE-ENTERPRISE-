@@ -16,7 +16,8 @@ import {
   User, 
   DollarSign,
   ShieldCheck,
-  Paperclip
+  Paperclip,
+  MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency } from '../types';
@@ -25,6 +26,7 @@ export const SYSTEM_EMAIL = 'swedswoodinfo@gmail.com';
 export const WORKSHOP_NAME = 'Swedswood Enterprise';
 export const WORKSHOP_PHONE = '+232 76 442590';
 export const WORKSHOP_ADDRESS = '2 Swed Free Avenue, Sussex';
+export const SYSTEM_ADDRESS = '2 Swed Free Avenue, Sussex';
 
 export interface EmailDispatchModalProps {
   isOpen: boolean;
@@ -36,6 +38,7 @@ export interface EmailDispatchModalProps {
   customerCompany?: string;
   customerEmail?: string;
   customerPhone?: string;
+  customerAddress?: string;
   projectTitle: string;
   totalAmount: number;
   amountPaid?: number;
@@ -62,6 +65,7 @@ export default function EmailDispatchModal({
   customerCompany,
   customerEmail = '',
   customerPhone = '',
+  customerAddress = '',
   projectTitle,
   totalAmount,
   amountPaid = 0,
@@ -119,10 +123,13 @@ export default function EmailDispatchModal({
     body += `Type: ${docTitle}\n`;
     body += `Reference Number: ${docNumber}\n`;
     body += `Date: ${docDate}\n`;
+    body += `System Address (Workshop): ${WORKSHOP_ADDRESS}\n`;
+    body += `Official System Email: ${SYSTEM_EMAIL}\n`;
     body += `Project / Commission: ${projectTitle}\n`;
     body += `Customer: ${customerName}\n`;
     if (customerCompany) body += `Company: ${customerCompany}\n`;
     if (customerPhone) body += `Phone: ${customerPhone}\n`;
+    if (customerAddress) body += `Site / Delivery Address: ${customerAddress}\n`;
     body += `--------------------------------------------------\n\n`;
 
     if (items && items.length > 0) {
@@ -160,11 +167,11 @@ export default function EmailDispatchModal({
 
     body += `If you have any questions or require modifications, please contact our workshop team:\n`;
     body += `Official System Email: ${SYSTEM_EMAIL}\n`;
-    body += `Workshop Contact: ${WORKSHOP_PHONE}\n`;
-    body += `Workshop Address: ${WORKSHOP_ADDRESS}\n\n`;
+    body += `System Address: ${WORKSHOP_ADDRESS}\n`;
+    body += `Workshop Contact: ${WORKSHOP_PHONE}\n\n`;
     body += `Warm regards,\n`;
     body += `Swedswood Enterprise Management\n`;
-    body += `2 Swed Free Avenue, Sussex`;
+    body += `${WORKSHOP_ADDRESS}`;
 
     return body;
   };
@@ -273,10 +280,19 @@ export default function EmailDispatchModal({
                   {docNumber}
                 </span>
               </div>
-              <p className="text-xs text-slate-300 flex items-center gap-1.5 mt-0.5">
-                <span>System Sender:</span>
-                <span className="font-bold text-amber-400 font-mono">{SYSTEM_EMAIL}</span>
-              </p>
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-300 mt-0.5">
+                <span className="flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Sender:</span>
+                  <strong className="text-amber-400 font-mono">{SYSTEM_EMAIL}</strong>
+                </span>
+                <span className="text-slate-500">•</span>
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                  <span>System Address:</span>
+                  <strong className="text-slate-100">{WORKSHOP_ADDRESS}</strong>
+                </span>
+              </div>
             </div>
           </div>
           <button
@@ -318,41 +334,62 @@ export default function EmailDispatchModal({
 
           {/* Sender & Recipient Information Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            {/* Sender (System Email) */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-                Sender Email (System Address)
+            {/* Sender (Official System Credentials & Address) */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 block flex items-center justify-between">
+                <span>Official System Identity & Address</span>
+                <span className="text-emerald-700 font-bold normal-case text-[10px] flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                  Verified
+                </span>
               </label>
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800 bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="truncate font-mono text-amber-900">{SYSTEM_EMAIL}</span>
+              <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                  <Mail className="w-4 h-4 text-blue-600 shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block leading-tight">System Email Address</span>
+                    <span className="font-mono text-amber-950 font-bold text-xs truncate block">{SYSTEM_EMAIL}</span>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 text-xs text-slate-700 pt-1.5 border-t border-slate-100">
+                  <MapPin className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block leading-tight">System Workshop Address</span>
+                    <span className="font-bold text-slate-900 leading-tight text-xs block">{WORKSHOP_ADDRESS}</span>
+                  </div>
+                </div>
               </div>
-              <p className="text-[10px] text-slate-500">Official Swedswood Enterprise mail server identity</p>
             </div>
 
             {/* Recipient Client Email */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-wider text-slate-700 block">
                 Client / Recipient Email *
               </label>
-              <input
-                type="email"
-                required
-                placeholder="e.g. client@company.com"
-                value={recipientEmail}
-                onChange={(e) => {
-                  setRecipientEmail(e.target.value);
-                  setEmailClientError('');
-                }}
-                className={`w-full p-2.5 bg-white border rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
-                  !recipientEmail ? 'border-amber-400 bg-amber-50/30' : 'border-slate-300'
-                }`}
-              />
-              {!recipientEmail && (
-                <p className="text-[10px] font-bold text-amber-600">
-                  ⚠️ No email on record. Enter the customer's email address above.
-                </p>
-              )}
+              <div className="space-y-1.5">
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. client@company.com"
+                  value={recipientEmail}
+                  onChange={(e) => {
+                    setRecipientEmail(e.target.value);
+                    setEmailClientError('');
+                  }}
+                  className={`w-full p-2.5 bg-white border rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                    !recipientEmail ? 'border-amber-400 bg-amber-50/30' : 'border-slate-300'
+                  }`}
+                />
+                {!recipientEmail ? (
+                  <p className="text-[10px] font-bold text-amber-600">
+                    ⚠️ No email on record. Enter the customer's email address above.
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-slate-500">
+                    {customerAddress ? `Delivery Address: ${customerAddress}` : 'Dispatch document will be transmitted to this email address.'}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

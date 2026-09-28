@@ -9,6 +9,14 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 
+export function isFirestoreAvailable(): boolean {
+  try {
+    return Boolean(db && typeof (db as any).app === 'object');
+  } catch {
+    return false;
+  }
+}
+
 // Helper to remove undefined fields which Firestore rejects
 export function sanitizeForFirestore<T>(data: T): T {
   if (data === null || data === undefined) return data;
@@ -32,22 +40,33 @@ export function subscribeToCollection<T extends { id: string }>(
   collectionName: string,
   onData: (items: T[]) => void,
   onError?: (err: Error) => void
-) {
-  const colRef = collection(db, collectionName);
-  return onSnapshot(
-    colRef,
-    (snapshot) => {
-      const items: T[] = [];
-      snapshot.forEach((docSnap) => {
-        items.push({ id: docSnap.id, ...docSnap.data() } as T);
-      });
-      onData(items);
-    },
-    (err) => {
-      console.error(`Firestore subscription error on ${collectionName}:`, err);
-      if (onError) onError(err);
-    }
-  );
+): () => void {
+  if (!isFirestoreAvailable()) {
+    console.warn(`Firestore service not available for collection: ${collectionName}. Running in local storage mode.`);
+    return () => {};
+  }
+
+  try {
+    const colRef = collection(db, collectionName);
+    return onSnapshot(
+      colRef,
+      (snapshot) => {
+        const items: T[] = [];
+        snapshot.forEach((docSnap) => {
+          items.push({ id: docSnap.id, ...docSnap.data() } as T);
+        });
+        onData(items);
+      },
+      (err) => {
+        console.error(`Firestore subscription error on ${collectionName}:`, err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    console.error(`Failed to subscribe to ${collectionName}:`, err);
+    if (onError) onError(err);
+    return () => {};
+  }
 }
 
 // Save or update a single document permanently
@@ -55,6 +74,7 @@ export async function saveDocument<T extends { id: string }>(
   collectionName: string,
   item: T
 ): Promise<void> {
+  if (!isFirestoreAvailable()) return;
   try {
     const docId = String(item.id);
     const docRef = doc(db, collectionName, docId);
@@ -62,7 +82,6 @@ export async function saveDocument<T extends { id: string }>(
     await setDoc(docRef, cleanData, { merge: true });
   } catch (err) {
     console.error(`Error saving document ${item.id} to ${collectionName}:`, err);
-    throw err;
   }
 }
 
@@ -71,12 +90,12 @@ export async function deleteDocument(
   collectionName: string,
   id: string
 ): Promise<void> {
+  if (!isFirestoreAvailable()) return;
   try {
     const docRef = doc(db, collectionName, String(id));
     await deleteDoc(docRef);
   } catch (err) {
     console.error(`Error deleting document ${id} from ${collectionName}:`, err);
-    throw err;
   }
 }
 
@@ -85,7 +104,7 @@ export async function saveBatchDocuments<T extends { id: string }>(
   collectionName: string,
   items: T[]
 ): Promise<void> {
-  if (!items || items.length === 0) return;
+  if (!items || items.length === 0 || !isFirestoreAvailable()) return;
   try {
     const batch = writeBatch(db);
     items.forEach((item) => {
@@ -108,7 +127,7 @@ export async function deleteBatchDocuments(
   collectionName: string,
   ids: string[]
 ): Promise<void> {
-  if (!ids || ids.length === 0) return;
+  if (!ids || ids.length === 0 || !isFirestoreAvailable()) return;
   try {
     const batch = writeBatch(db);
     ids.forEach((id) => {
@@ -126,6 +145,7 @@ export async function deleteBatchDocuments(
 
 // Clear all documents from a collection directly in Firestore
 export async function clearEntireCollection(collectionName: string): Promise<void> {
+  if (!isFirestoreAvailable()) return;
   try {
     const colRef = collection(db, collectionName);
     const snapshot = await getDocs(colRef);
@@ -144,6 +164,7 @@ export async function clearEntireCollection(collectionName: string): Promise<voi
 export async function fetchCollectionFromFirestore<T extends { id: string }>(
   collectionName: string
 ): Promise<T[]> {
+  if (!isFirestoreAvailable()) return [];
   try {
     const colRef = collection(db, collectionName);
     const snapshot = await getDocs(colRef);
@@ -157,4 +178,3 @@ export async function fetchCollectionFromFirestore<T extends { id: string }>(
     return [];
   }
 }
-

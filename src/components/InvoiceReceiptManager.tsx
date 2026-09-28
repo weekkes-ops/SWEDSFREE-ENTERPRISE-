@@ -157,23 +157,9 @@ export default function InvoiceReceiptManager({
   });
 
   useEffect(() => {
-    let seeded = false;
     const unsub = subscribeToCollection<SavedInvoice>('savedInvoices', (items) => {
-      if (items.length > 0) {
-        setSavedInvoices(items);
-        localStorage.setItem('swedswood_saved_invoices', JSON.stringify(items));
-      } else if (!seeded) {
-        seeded = true;
-        let localItems: SavedInvoice[] = [];
-        try {
-          const raw = localStorage.getItem('swedswood_saved_invoices');
-          if (raw) localItems = JSON.parse(raw);
-        } catch (e) {}
-        if (localItems && localItems.length > 0) {
-          setSavedInvoices(localItems);
-          saveBatchDocuments('savedInvoices', localItems);
-        }
-      }
+      setSavedInvoices(items);
+      localStorage.setItem('swedswood_saved_invoices', JSON.stringify(items));
     });
     return () => unsub();
   }, []);
@@ -429,6 +415,7 @@ export default function InvoiceReceiptManager({
     customerCompany?: string;
     customerEmail?: string;
     customerPhone?: string;
+    customerAddress?: string;
     projectTitle: string;
     totalAmount: number;
     amountPaid?: number;
@@ -1583,6 +1570,7 @@ export default function InvoiceReceiptManager({
       customerCompany: invoiceCustomerCompany || cust?.company,
       customerEmail: invoiceCustomerEmail || cust?.email,
       customerPhone: invoiceCustomerPhone || cust?.phone,
+      customerAddress: invoiceCustomerAddress || cust?.address,
       projectTitle: invoiceProjectTitle || activeInvoice.title,
       totalAmount: totals.finalTotal,
       amountPaid: totals.totalPaid,
@@ -1618,6 +1606,7 @@ export default function InvoiceReceiptManager({
       customerCompany: cust?.company,
       customerEmail: cust?.email,
       customerPhone: cust?.phone,
+      customerAddress: cust?.address,
       projectTitle: receiptProject || activeReceipt.job.title,
       totalAmount: activeReceipt.job.quoteAmount,
       amountPaid: receiptAmount || activeReceipt.payment.amount,
@@ -1644,6 +1633,7 @@ export default function InvoiceReceiptManager({
       customerCompany: inv.customerCompany || cust?.company,
       customerEmail: inv.customerEmail || cust?.email,
       customerPhone: inv.customerPhone || cust?.phone,
+      customerAddress: inv.customerAddress || cust?.address,
       projectTitle: inv.projectTitle || (inv.items && inv.items[0]?.description) || 'Carpentry Project',
       totalAmount: inv.subtotal,
       amountPaid: 0,
@@ -1671,6 +1661,7 @@ export default function InvoiceReceiptManager({
       customerCompany: cust?.company,
       customerEmail: cust?.email,
       customerPhone: cust?.phone,
+      customerAddress: cust?.address,
       projectTitle: job.title,
       totalAmount: job.quoteAmount,
       amountPaid: p.amount,
@@ -2071,10 +2062,10 @@ export default function InvoiceReceiptManager({
           <button
             onClick={() => setIsEmailHistoryOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-blue-900/60 hover:bg-blue-900 text-blue-200 border border-blue-500/40 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-            title="View system email dispatch history & configure swedswoodinfo@gmail.com"
+            title="View system email dispatch history & configure swedswoodinfo@gmail.com • 2 Swed Free Avenue, Sussex"
           >
             <Mail className="w-4 h-4 text-blue-400" />
-            <span className="hidden sm:inline">System Email:</span>
+            <span className="hidden sm:inline">System Email & Dispatch:</span>
             <span className="font-mono text-[11px] text-blue-200 font-semibold">{SYSTEM_EMAIL}</span>
           </button>
         </div>
@@ -5627,6 +5618,7 @@ export default function InvoiceReceiptManager({
         customerCompany={emailModalData.customerCompany}
         customerEmail={emailModalData.customerEmail}
         customerPhone={emailModalData.customerPhone}
+        customerAddress={emailModalData.customerAddress}
         projectTitle={emailModalData.projectTitle}
         totalAmount={emailModalData.totalAmount}
         amountPaid={emailModalData.amountPaid}
@@ -5656,8 +5648,10 @@ export default function InvoiceReceiptManager({
                     <h3 className="font-display font-black text-sm uppercase tracking-wider text-white flex items-center gap-2">
                       System Email Dispatch Center
                     </h3>
-                    <p className="text-xs text-blue-200/80 font-mono">
-                      System Sender: <strong className="text-blue-300">{SYSTEM_EMAIL}</strong>
+                    <p className="text-xs text-blue-200/80 font-mono flex flex-wrap items-center gap-2">
+                      <span>Sender: <strong className="text-blue-300">{SYSTEM_EMAIL}</strong></span>
+                      <span>•</span>
+                      <span>Address: <strong className="text-amber-300">2 Swed Free Avenue, Sussex</strong></span>
                     </p>
                   </div>
                 </div>
@@ -5671,15 +5665,27 @@ export default function InvoiceReceiptManager({
 
               {/* Body */}
               <div className="p-5 overflow-y-auto space-y-4">
-                <div className="bg-blue-50/80 border border-blue-200/70 p-4 rounded-xl text-xs space-y-2 text-slate-800">
+                <div className="bg-blue-50/80 border border-blue-200/70 p-4 rounded-xl text-xs space-y-3 text-slate-800">
                   <div className="flex items-center gap-2 font-bold text-blue-950">
                     <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>Official Sweds Wood Dispatch Address</span>
+                    <span>Official Sweds Wood Dispatch Identity & System Address</span>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="bg-white p-2.5 rounded-lg border border-blue-200/60 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block leading-tight">System Email Address</span>
+                      <span className="font-mono font-bold text-blue-900 truncate block mt-0.5">{SYSTEM_EMAIL}</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-lg border border-blue-200/60 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block leading-tight">System Workshop Address</span>
+                      <span className="font-semibold text-slate-900 block mt-0.5">2 Swed Free Avenue, Sussex</span>
+                    </div>
+                  </div>
+
                   <p className="text-slate-600 leading-relaxed text-[11px]">
-                    All Proforma Invoices, Invoices, and Official Receipts dispatched via the system automatically default to sender / CC address <code className="bg-blue-100 text-blue-900 px-1 py-0.5 rounded font-mono font-bold">{SYSTEM_EMAIL}</code>.
+                    All Proforma Invoices, Invoices, and Official Receipts dispatched via the system are issued from <strong>2 Swed Free Avenue, Sussex</strong> and automatically default to sender / CC address <code className="bg-blue-100 text-blue-900 px-1 py-0.5 rounded font-mono font-bold">{SYSTEM_EMAIL}</code>.
                   </p>
-                  <div className="pt-2 flex flex-wrap gap-2">
+                  <div className="pt-1 flex flex-wrap gap-2">
                     <a
                       href={`https://mail.google.com/mail/?view=cm&fs=1&from=${encodeURIComponent(SYSTEM_EMAIL)}`}
                       target="_blank"
