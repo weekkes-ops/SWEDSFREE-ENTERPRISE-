@@ -770,12 +770,18 @@ export default function EmployeeManager({
                           {formatCurrency(
                             selectedReq.role === 'Admin' ? 9500 :
                             selectedReq.role === 'Manager' ? 8000 :
+                            selectedReq.role === 'Supervisor' ? 7500 :
                             selectedReq.role === 'Auditor' ? 6500 :
+                            selectedReq.role === 'Contractor' ? 6000 :
                             selectedReq.role === 'Designer' ? 6000 :
+                            selectedReq.role === 'Welder' ? 5200 :
                             selectedReq.role === 'Carpenter' ? 5200 :
                             selectedReq.role === 'Carver' ? 4800 :
-                            selectedReq.role === 'Sander' ? 3200 :
-                            selectedReq.role === 'Polisher' ? 3800 : 3500,
+                            selectedReq.role === 'Marketer' ? 4800 :
+                            selectedReq.role === 'Driver' ? 3800 :
+                            selectedReq.role === 'Polisher' ? 3800 :
+                            selectedReq.role === 'Security' ? 3200 :
+                            selectedReq.role === 'Sander' ? 3200 : 3500,
                             0
                           )}
                         </p>
@@ -790,12 +796,18 @@ export default function EmployeeManager({
                           {formatCurrency(
                             selectedReq.role === 'Admin' ? 350 :
                             selectedReq.role === 'Manager' ? 280 :
+                            selectedReq.role === 'Supervisor' ? 260 :
                             selectedReq.role === 'Auditor' ? 220 :
+                            selectedReq.role === 'Contractor' ? 210 :
                             selectedReq.role === 'Designer' ? 200 :
+                            selectedReq.role === 'Welder' ? 190 :
                             selectedReq.role === 'Carpenter' ? 190 :
                             selectedReq.role === 'Carver' ? 175 :
-                            selectedReq.role === 'Sander' ? 110 :
-                            selectedReq.role === 'Polisher' ? 130 : 120,
+                            selectedReq.role === 'Marketer' ? 170 :
+                            selectedReq.role === 'Driver' ? 135 :
+                            selectedReq.role === 'Polisher' ? 130 :
+                            selectedReq.role === 'Security' ? 110 :
+                            selectedReq.role === 'Sander' ? 110 : 120,
                             0
                           )}/day
                         </p>
@@ -915,6 +927,12 @@ export default function EmployeeManager({
                       <option value="Designer">Designer (Blueprints & CAD)</option>
                       <option value="Sander">Sander (Sanding & Softness)</option>
                       <option value="Polisher">Polisher (Lacquers & French Polish)</option>
+                      <option value="Supervisor">Supervisor (Workshop & Production)</option>
+                      <option value="Welder">Welder (Metalwork & Framing)</option>
+                      <option value="Driver">Driver (Logistics & Deliveries)</option>
+                      <option value="Security">Security (Facility & Assets)</option>
+                      <option value="Marketer">Marketer (Sales & Marketing)</option>
+                      <option value="Contractor">Contractor (Subcontractor & Specialist)</option>
                       <option value="Manager">Manager (Operations & Estimates)</option>
                       <option value="Apprentice">Apprentice (General Assistant)</option>
                     </select>
@@ -1142,7 +1160,23 @@ export default function EmployeeManager({
                     <label className="text-xs font-bold text-gray-500 uppercase">Specialist Role *</label>
                     <select
                       value={role}
-                      onChange={(e) => setRole(e.target.value as EmployeeRole)}
+                      onChange={(e) => {
+                        const newRole = e.target.value as EmployeeRole;
+                        setRole(newRole);
+                        if (newRole === 'Supervisor') { setBaseSalary(7500); setDailyRate(260); }
+                        else if (newRole === 'Welder') { setBaseSalary(5200); setDailyRate(190); }
+                        else if (newRole === 'Contractor') { setBaseSalary(6000); setDailyRate(210); }
+                        else if (newRole === 'Marketer') { setBaseSalary(4800); setDailyRate(170); }
+                        else if (newRole === 'Driver') { setBaseSalary(3800); setDailyRate(135); }
+                        else if (newRole === 'Security') { setBaseSalary(3200); setDailyRate(110); }
+                        else if (newRole === 'Carpenter') { setBaseSalary(5200); setDailyRate(190); }
+                        else if (newRole === 'Carver') { setBaseSalary(4800); setDailyRate(175); }
+                        else if (newRole === 'Designer') { setBaseSalary(6000); setDailyRate(200); }
+                        else if (newRole === 'Sander') { setBaseSalary(3200); setDailyRate(110); }
+                        else if (newRole === 'Polisher') { setBaseSalary(3800); setDailyRate(130); }
+                        else if (newRole === 'Manager') { setBaseSalary(8000); setDailyRate(280); }
+                        else if (newRole === 'Apprentice') { setBaseSalary(2500); setDailyRate(90); }
+                      }}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 bg-white"
                     >
                       <option value="Carpenter">Carpenter (Joints & Framing)</option>
@@ -1150,6 +1184,12 @@ export default function EmployeeManager({
                       <option value="Designer">Designer (Blueprints & CAD)</option>
                       <option value="Sander">Sander (Sanding & Softness)</option>
                       <option value="Polisher">Polisher (Lacquers & French Polish)</option>
+                      <option value="Supervisor">Supervisor (Workshop & Production)</option>
+                      <option value="Welder">Welder (Metalwork & Framing)</option>
+                      <option value="Driver">Driver (Logistics & Deliveries)</option>
+                      <option value="Security">Security (Facility & Assets)</option>
+                      <option value="Marketer">Marketer (Sales & Marketing)</option>
+                      <option value="Contractor">Contractor (Subcontractor & Specialist)</option>
                       <option value="Manager">Manager (Operations & Estimates)</option>
                       <option value="Apprentice">Apprentice (General Assistant)</option>
                     </select>

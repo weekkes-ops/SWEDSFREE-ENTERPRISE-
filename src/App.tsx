@@ -1402,12 +1402,18 @@ export default function App() {
     let dailyRate = 120;
     if (req.role === 'Admin') { baseSalary = 9500; dailyRate = 350; }
     else if (req.role === 'Manager') { baseSalary = 8000; dailyRate = 280; }
+    else if (req.role === 'Supervisor') { baseSalary = 7500; dailyRate = 260; }
     else if (req.role === 'Auditor') { baseSalary = 6500; dailyRate = 220; }
+    else if (req.role === 'Contractor') { baseSalary = 6000; dailyRate = 210; }
     else if (req.role === 'Designer') { baseSalary = 6000; dailyRate = 200; }
+    else if (req.role === 'Welder') { baseSalary = 5200; dailyRate = 190; }
     else if (req.role === 'Carpenter') { baseSalary = 5200; dailyRate = 190; }
     else if (req.role === 'Carver') { baseSalary = 4800; dailyRate = 175; }
-    else if (req.role === 'Sander') { baseSalary = 3200; dailyRate = 110; }
+    else if (req.role === 'Marketer') { baseSalary = 4800; dailyRate = 170; }
+    else if (req.role === 'Driver') { baseSalary = 3800; dailyRate = 135; }
     else if (req.role === 'Polisher') { baseSalary = 3800; dailyRate = 130; }
+    else if (req.role === 'Security') { baseSalary = 3200; dailyRate = 110; }
+    else if (req.role === 'Sander') { baseSalary = 3200; dailyRate = 110; }
 
     const newEmp: Employee = {
       id: `emp-${Date.now()}`,

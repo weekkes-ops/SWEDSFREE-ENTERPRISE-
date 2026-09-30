@@ -36,7 +36,23 @@ export interface Customer {
   registrationDate: string;
 }
 
-export type EmployeeRole = 'Admin' | 'Manager' | 'Employee' | 'Auditor' | 'Carpenter' | 'Carver' | 'Designer' | 'Sander' | 'Polisher' | 'Apprentice';
+export type EmployeeRole = 
+  | 'Admin' 
+  | 'Manager' 
+  | 'Employee' 
+  | 'Auditor' 
+  | 'Carpenter' 
+  | 'Carver' 
+  | 'Designer' 
+  | 'Sander' 
+  | 'Polisher' 
+  | 'Supervisor'
+  | 'Welder'
+  | 'Driver'
+  | 'Security'
+  | 'Marketer'
+  | 'Contractor'
+  | 'Apprentice';
 export type EmployeeStatus = 'Active' | 'On Leave' | 'Inactive';
 
 export interface Employee {

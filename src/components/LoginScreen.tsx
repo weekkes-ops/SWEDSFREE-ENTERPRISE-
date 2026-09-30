@@ -293,6 +293,12 @@ export default function LoginScreen({
                         <option value="Designer">Designer</option>
                         <option value="Sander">Sander</option>
                         <option value="Polisher">Polisher</option>
+                        <option value="Supervisor">Supervisor</option>
+                        <option value="Welder">Welder</option>
+                        <option value="Driver">Driver</option>
+                        <option value="Security">Security</option>
+                        <option value="Marketer">Marketer</option>
+                        <option value="Contractor">Contractor</option>
                         <option value="Apprentice">Apprentice</option>
                         <option value="Auditor">Auditor (Read-Only)</option>
                         <option value="Manager">Manager</option>
