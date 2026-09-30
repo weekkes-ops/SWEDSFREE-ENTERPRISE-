@@ -167,6 +167,34 @@
         "timestamp": { "type": "string" }
       },
       "required": ["id", "jobId", "action", "amount", "timestamp"]
+    },
+    "officialDocuments": {
+      "title": "Official Document",
+      "description": "Contracts, forestry permits, NRA tax certificates, blueprints, agreements and official compliance records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "referenceNumber": { "type": "string" },
+        "category": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "jobId": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "issuingAuthority": { "type": "string" },
+        "issueDate": { "type": "string" },
+        "expiryDate": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "confidentiality": { "type": "string" },
+        "status": { "type": "string" },
+        "description": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "uploadedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "referenceNumber", "category", "fileUrl", "uploadedBy"]
     }
   },
   "firestore": {
@@ -180,6 +208,7 @@
     "/registrationRequests/{id}": { "schema": "registrationRequests", "description": "Staff account requests" },
     "/warningLetters/{id}": { "schema": "warningLetters", "description": "HR discipline records" },
     "/savedInvoices/{id}": { "schema": "savedInvoices", "description": "Official invoices and receipts" },
-    "/paymentAuditLogs/{id}": { "schema": "paymentAuditLogs", "description": "Payment modification audit trails" }
+    "/paymentAuditLogs/{id}": { "schema": "paymentAuditLogs", "description": "Payment modification audit trails" },
+    "/officialDocuments/{id}": { "schema": "officialDocuments", "description": "Official documents, contracts, permits, tax clearances, and blueprints vault" }
   }
 }

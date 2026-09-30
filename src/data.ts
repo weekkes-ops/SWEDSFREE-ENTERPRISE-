@@ -1,4 +1,4 @@
-import { InventoryItem, InventoryTransaction, Customer, Employee, Job, FinancialTransaction, DailyWorkLog, RegistrationRequest, WarningLetter, SavedInvoice, PaymentAuditLogEntry } from './types';
+import { InventoryItem, InventoryTransaction, Customer, Employee, Job, FinancialTransaction, DailyWorkLog, RegistrationRequest, WarningLetter, SavedInvoice, PaymentAuditLogEntry, OfficialDocument } from './types';
 
 export const INITIAL_INVENTORY: InventoryItem[] = [
   { id: 'inv-101', name: 'Mahogany Timber Planks (2x10x12)', category: 'Lumber', unit: 'Board Feet', currentStock: 450, minStockThreshold: 100, unitCost: 45, lastUpdated: '2026-08-04' },
@@ -311,3 +311,6 @@ export const INITIAL_PAYMENT_AUDIT_LOGS: PaymentAuditLogEntry[] = [
     timestamp: '2026-07-28T16:45:00.000Z'
   }
 ];
+
+export { INITIAL_OFFICIAL_DOCUMENTS } from './initialDocuments';
+

@@ -25,7 +25,9 @@ import {
   FileSpreadsheet,
   Clock,
   RotateCcw,
-  ArrowLeft
+  ArrowLeft,
+  FileCheck,
+  UploadCloud
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -38,6 +40,7 @@ import EmployeeManager from './components/EmployeeManager';
 import JobManager from './components/JobManager';
 import FinancialLedger from './components/FinancialLedger';
 import ReportGenerator from './components/ReportGenerator';
+import OfficialDocumentsManager from './components/OfficialDocumentsManager';
 import DailyWorkManager from './components/DailyWorkManager';
 import InvoiceReceiptManager from './components/InvoiceReceiptManager';
 import ProformaInvoiceDesk from './components/ProformaInvoiceDesk';
@@ -48,6 +51,7 @@ import { LogOut } from 'lucide-react';
 import { downloadUserManualPdf } from './utils/userManualPdf';
 
 // Seed data & types
+import { INITIAL_OFFICIAL_DOCUMENTS } from './initialDocuments';
 import { 
   subscribeToCollection, 
   saveDocument, 
@@ -87,7 +91,8 @@ import {
   EmployeeRole,
   WarningLetter,
   SavedInvoice,
-  PaymentAuditLogEntry
+  PaymentAuditLogEntry,
+  OfficialDocument
 } from './types';
 
 export default function App() {
@@ -150,6 +155,7 @@ export default function App() {
       case 'daily-work': return 'Daily Logs';
       case 'finance': return 'Financial Ledger';
       case 'reports': return 'Audit Reports';
+      case 'documents': return 'Official Documents';
       case 'settings': return 'Settings';
       default: return tabId;
     }
@@ -295,7 +301,8 @@ export default function App() {
       registrationRequests,
       warningLetters,
       savedInvoices,
-      paymentAuditLogs
+      paymentAuditLogs,
+      officialDocuments
     };
     const jsonStr = JSON.stringify(backupData, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -347,6 +354,7 @@ export default function App() {
           { key: 'registrationRequests', localKey: 'swedsfree_registration_requests', data: data.registrationRequests, setter: setRegistrationRequests },
           { key: 'warningLetters', localKey: 'swedsfree_warning_letters', data: data.warningLetters, setter: setWarningLetters },
           { key: 'paymentAuditLogs', localKey: 'swedsfree_payment_audit_logs', data: data.paymentAuditLogs, setter: setPaymentAuditLogs },
+          { key: 'officialDocuments', localKey: 'swedsfree_official_documents', data: data.officialDocuments, setter: setOfficialDocuments },
           { key: 'savedInvoices', localKey: 'swedswood_saved_invoices', data: data.savedInvoices, setter: null },
         ];
 
@@ -423,6 +431,7 @@ export default function App() {
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>(() => getStoredData('swedsfree_registration_requests', []));
   const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters', []));
   const [paymentAuditLogs, setPaymentAuditLogs] = useState<PaymentAuditLogEntry[]>(() => getStoredData('swedsfree_payment_audit_logs', []));
+  const [officialDocuments, setOfficialDocuments] = useState<OfficialDocument[]>(() => getStoredData('swedsfree_official_documents', INITIAL_OFFICIAL_DOCUMENTS));
 
   // 1-minute inactivity timeout configuration (60,000ms = 1 minute)
   const [inactivityNotice, setInactivityNotice] = useState<string | null>(null);
@@ -476,6 +485,7 @@ export default function App() {
       await clearEntireCollection('dailyWorkLogs');
       await clearEntireCollection('registrationRequests');
       await clearEntireCollection('warningLetters');
+      await clearEntireCollection('officialDocuments');
       await clearEntireCollection('employees');
 
       await saveDocument('employees', LIVE_ADMIN_EMPLOYEE);
@@ -492,6 +502,7 @@ export default function App() {
     setDailyWorkLogs([]);
     setRegistrationRequests([]);
     setWarningLetters([]);
+    setOfficialDocuments([]);
 
     localStorage.setItem('swedsfree_inventory', JSON.stringify([]));
     localStorage.setItem('swedsfree_customers', JSON.stringify([]));
@@ -502,6 +513,7 @@ export default function App() {
     localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify([]));
     localStorage.setItem('swedsfree_registration_requests', JSON.stringify([]));
     localStorage.setItem('swedsfree_warning_letters', JSON.stringify([]));
+    localStorage.setItem('swedsfree_official_documents', JSON.stringify([]));
     localStorage.setItem('swedswood_saved_invoices', JSON.stringify([]));
 
     setActiveTab('dashboard');
@@ -527,6 +539,7 @@ export default function App() {
       const reqs = await fetchCollectionFromFirestore<RegistrationRequest>('registrationRequests');
       const warns = await fetchCollectionFromFirestore<WarningLetter>('warningLetters');
       const invs = await fetchCollectionFromFirestore<SavedInvoice>('savedInvoices');
+      const docs = await fetchCollectionFromFirestore<OfficialDocument>('officialDocuments');
 
       const finalInv = inv;
       const finalCust = cust;
@@ -538,6 +551,7 @@ export default function App() {
       const finalReqs = reqs;
       const finalWarns = warns;
       const finalInvs = invs;
+      const finalDocs = docs.length > 0 ? docs : INITIAL_OFFICIAL_DOCUMENTS;
 
       setInventory(finalInv);
       setCustomers(finalCust);
@@ -548,6 +562,7 @@ export default function App() {
       setDailyWorkLogs(finalWLogs);
       setRegistrationRequests(finalReqs);
       setWarningLetters(finalWarns);
+      setOfficialDocuments(finalDocs);
 
       localStorage.setItem('swedsfree_inventory', JSON.stringify(finalInv));
       localStorage.setItem('swedsfree_customers', JSON.stringify(finalCust));
@@ -558,6 +573,7 @@ export default function App() {
       localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify(finalWLogs));
       localStorage.setItem('swedsfree_registration_requests', JSON.stringify(finalReqs));
       localStorage.setItem('swedsfree_warning_letters', JSON.stringify(finalWarns));
+      localStorage.setItem('swedsfree_official_documents', JSON.stringify(finalDocs));
       localStorage.setItem('swedswood_saved_invoices', JSON.stringify(finalInvs));
 
       setLastSyncTime(new Date().toLocaleTimeString());
@@ -603,6 +619,7 @@ export default function App() {
     syncCollection('registrationRequests', setRegistrationRequests, 'swedsfree_registration_requests');
     syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters');
     syncCollection('paymentAuditLogs', setPaymentAuditLogs, 'swedsfree_payment_audit_logs');
+    syncCollection('officialDocuments', setOfficialDocuments, 'swedsfree_official_documents');
 
     // Mark initialization complete without clearing data automatically
     if (localStorage.getItem('swedsfree_initial_purge_done') !== 'true') {
@@ -1090,6 +1107,41 @@ export default function App() {
     saveDocument('warningLetters', newWarning);
   };
 
+  // G. Official documents mutators
+  const handleAddOfficialDocument = (newDocData: Omit<OfficialDocument, 'id'>) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    const newDoc: OfficialDocument = {
+      ...newDocData,
+      id: `doc-${Date.now()}`
+    };
+    setOfficialDocuments(prev => {
+      const updated = [newDoc, ...prev];
+      localStorage.setItem('swedsfree_official_documents', JSON.stringify(updated));
+      return updated;
+    });
+    saveDocument('officialDocuments', newDoc);
+  };
+
+  const handleUpdateOfficialDocument = (updatedDoc: OfficialDocument) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setOfficialDocuments(prev => {
+      const updated = prev.map(d => d.id === updatedDoc.id ? updatedDoc : d);
+      localStorage.setItem('swedsfree_official_documents', JSON.stringify(updated));
+      return updated;
+    });
+    saveDocument('officialDocuments', updatedDoc);
+  };
+
+  const handleDeleteOfficialDocument = (id: string) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setOfficialDocuments(prev => {
+      const updated = prev.filter(d => d.id !== id);
+      localStorage.setItem('swedsfree_official_documents', JSON.stringify(updated));
+      return updated;
+    });
+    deleteDocument('officialDocuments', id);
+  };
+
   // Record Updators
   const handleUpdateInventoryItem = (updatedItem: InventoryItem) => {
     const originalItem = inventory.find(item => item.id === updatedItem.id);
@@ -1413,6 +1465,12 @@ export default function App() {
   // Navigation menu tabs metadata
   const navTabs = [
     { id: 'dashboard', label: 'Workshop Hub', icon: LayoutDashboard },
+    { 
+      id: 'documents', 
+      label: 'Official Documents', 
+      icon: FileCheck, 
+      badge: officialDocuments.length > 0 ? `${officialDocuments.length}` : 'Upload' 
+    },
     ...(showManagementTabs ? [
       { id: 'inventory', label: 'Inventory', icon: Package },
       { id: 'customers', label: 'Clients/Customers', icon: UserCheck },
@@ -1532,8 +1590,8 @@ export default function App() {
       </div>
 
       {/* Desktop Left-Hand Sidebar Panel */}
-      <aside className={`w-64 bg-white text-slate-800 shrink-0 flex flex-col justify-between p-5 border-r border-slate-200 sticky top-0 h-screen z-40 transition-transform shadow-xs ${mobileMenuOpen ? 'translate-x-0 fixed inset-y-0 left-0 w-72' : 'max-md:-translate-x-full max-md:hidden'} print:hidden relative z-10`}>
-        <div className="space-y-6">
+      <aside className={`w-64 bg-white text-slate-800 shrink-0 flex flex-col justify-between p-5 border-r border-slate-200 sticky top-0 h-screen z-40 transition-transform shadow-xs overflow-y-auto ${mobileMenuOpen ? 'translate-x-0 fixed inset-y-0 left-0 w-72' : 'max-md:-translate-x-full max-md:hidden'} print:hidden relative z-10`}>
+        <div className="space-y-5">
           
           {/* Logo / Brand Header */}
           <div className="flex items-center justify-between">
@@ -1553,6 +1611,32 @@ export default function App() {
               className="md:hidden text-slate-500 hover:text-slate-900"
             >
               <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Quick Action Button for Uploading Official Documents (JPEG, PDF, PNG) */}
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-2.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                <FileCheck className="w-3.5 h-3.5 text-amber-700" />
+                <span>Documents &amp; Vault</span>
+              </span>
+              <span className="text-[9px] font-mono font-bold bg-amber-200/80 text-amber-950 px-1.5 py-0.5 rounded">
+                JPEG • PDF • PNG
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setActiveTab('documents');
+                setQuickActionTrigger('upload-doc');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full py-2 px-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+              id="sidebar-upload-official-doc-btn"
+              title="Upload official document scan (JPEG, PDF, PNG)"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>+ Upload Official Doc</span>
             </button>
           </div>
 
@@ -2029,6 +2113,20 @@ export default function App() {
               />
             )}
 
+            {activeTab === 'documents' && (
+              <OfficialDocumentsManager
+                documents={officialDocuments}
+                customers={customers}
+                jobs={jobs}
+                currentUser={currentUser}
+                initialOpenUploadModal={quickActionTrigger === 'upload-doc'}
+                onAddDocument={handleAddOfficialDocument}
+                onUpdateDocument={handleUpdateOfficialDocument}
+                onDeleteDocument={handleDeleteOfficialDocument}
+                onGoBack={handleGoBack}
+              />
+            )}
+
             {activeTab === 'settings' && (
               <SettingsManager
                 currentUser={currentUser}
@@ -2049,6 +2147,7 @@ export default function App() {
                   jobs: jobs.length,
                   financials: financialTransactions.length,
                   dailyLogs: dailyWorkLogs.length,
+                  officialDocuments: officialDocuments.length,
                   savedInvoices: (() => {
                     try {
                       const raw = localStorage.getItem('swedswood_saved_invoices');

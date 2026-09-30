@@ -254,13 +254,6 @@ export default function ReportGenerator({
       ['SWEDS WOOD ENTERPRISE - AUDIT DOSSIER REPORT'],
       [`Report Period: ${selectedPeriod}`, `Pivot: ${pivotLabel}`, `Exported Date: ${new Date().toLocaleDateString('en-US')}`],
       [''],
-      ['EXECUTIVE KPI AUDIT SUMMARY'],
-      ['Metric', 'Value', 'Details'],
-      ['Artisan Wages Paid', `SLE ${PeriodWagesCost.toLocaleString()}`, `${activeStaff.length} active craftsmen in workshop`],
-      ['Customer Revenue', `SLE ${periodRevenue.toLocaleString()}`, `${newCustomersCount} new client accounts registered`],
-      ['Period Net Earnings', `SLE ${netEarnings.toLocaleString()}`, netEarnings >= 0 ? 'Surplus net retained earnings' : 'Operating deficit'],
-      ['Lumber Consumed', `${outwardsQty} Units`, `Total asset cost: SLE ${outwardsVal.toLocaleString()}`],
-      [''],
       ['FINANCIAL TRANSACTIONS LEDGER (PERIOD)'],
       ['Date', 'Type', 'Category', 'Description', 'Amount (SLE)'],
       ...periodFinTx.map(t => [
@@ -318,19 +311,6 @@ export default function ReportGenerator({
     doc.text(`Period: ${selectedPeriod} | Pivot: ${pivotLabel} | Generated: ${new Date().toLocaleDateString('en-US')}`, 14, 22);
 
     let startY = 36;
-
-    // Executive KPI Summary Banner in PDF
-    doc.setFillColor(245, 243, 239);
-    doc.rect(14, startY, pageWidth - 28, 24, 'F');
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 27, 22);
-    doc.text(`Artisan Wages Paid: SLE ${PeriodWagesCost.toLocaleString()}`, 18, startY + 8);
-    doc.text(`Customer Revenue: SLE ${periodRevenue.toLocaleString()}`, 105, startY + 8);
-    doc.text(`Period Net Earnings: SLE ${netEarnings.toLocaleString()}`, 18, startY + 17);
-    doc.text(`Lumber Consumed: ${outwardsQty} Units (SLE ${outwardsVal.toLocaleString()})`, 105, startY + 17);
-
-    startY += 32;
 
     // 1. Executive Financial Summary Section
     doc.setFontSize(12);
@@ -489,8 +469,6 @@ export default function ReportGenerator({
     }
   };
 
-  const isPeriodEmpty = PeriodWagesCost === 0 && periodRevenue === 0 && netEarnings === 0 && outwardsQty === 0;
-
   return (
     <div className="space-y-6 print:space-y-4 print:p-0">
       
@@ -642,85 +620,6 @@ export default function ReportGenerator({
           {selectedPeriod.toUpperCase()} AUDIT DOSSIER &mdash; SCOPE: {getPivotDateLabel().toUpperCase()}
         </p>
       </div>
-
-      {/* 4 Core Pivot Stat Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs hover:border-wood-200 transition">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Artisan Wages Paid</span>
-            <Users className="w-4 h-4 text-wood-500" />
-          </div>
-          <p className="text-xl font-bold font-mono text-gray-900 mt-1">{formatCurrency(PeriodWagesCost, 0)}</p>
-          <p className="text-[9px] text-gray-400 font-semibold uppercase mt-0.5">{activeStaff.length} craftsmen active</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs hover:border-emerald-200 transition">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Customer Revenue</span>
-            <TrendingUp className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="text-xl font-bold font-mono text-emerald-700 mt-1">+{formatCurrency(periodRevenue, 0)}</p>
-          <p className="text-[9px] text-emerald-600 font-semibold uppercase mt-0.5">
-            {newCustomersCount > 0 ? `${newCustomersCount} client signups` : 'Cleared receipts & deposits'}
-          </p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs hover:border-blue-200 transition">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Period Net Earnings</span>
-            <DollarSign className={`w-4 h-4 ${netEarnings >= 0 ? 'text-emerald-600' : 'text-red-500'}`} />
-          </div>
-          <p className={`text-xl font-bold font-mono mt-1 ${netEarnings >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-            {netEarnings >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netEarnings), 0)}
-          </p>
-          <p className="text-[9px] text-gray-400 font-semibold uppercase mt-0.5">
-            {netEarnings >= 0 ? 'Retained net earnings' : 'Operating variance'}
-          </p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs hover:border-amber-200 transition">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Lumber Consumed</span>
-            <Package className="w-4 h-4 text-wood-700" />
-          </div>
-          <p className="text-xl font-bold font-mono text-wood-900 mt-1">
-            {outwardsQty} <span className="text-xs text-gray-500 font-normal">Units</span>
-          </p>
-          <p className="text-[9px] text-wood-700 font-semibold uppercase mt-0.5">Asset value: {formatCurrency(outwardsVal, 0)}</p>
-        </div>
-      </div>
-
-      {/* Helpful Quick-Switch Alert when an empty period is selected */}
-      {isPeriodEmpty && selectedPeriod !== 'All Time' && (
-        <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900">
-          <div className="flex items-start gap-2.5">
-            <Info className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-bold">No recorded transactions found for {getPivotDateLabel()}.</p>
-              <p className="text-amber-800 text-[11px] mt-0.5">
-                Switch to <strong>All Time</strong> to audit cumulative workshop metrics, or jump directly to the active ledger months (July or August 2026).
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setSelectedPeriod('All Time')}
-              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer"
-            >
-              View All Time Records
-            </button>
-            <button
-              onClick={() => {
-                setSelectedPeriod('Monthly');
-                setSelectedMonth('2026-07');
-              }}
-              className="px-3 py-1.5 bg-white border border-amber-300 hover:bg-amber-100/60 text-amber-900 rounded-lg font-bold text-xs cursor-pointer"
-            >
-              Jump to July 2026
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Sub-Reports Tabs selection */}
       <div className="flex border-b border-gray-100 print:hidden overflow-x-auto gap-1">

@@ -245,4 +245,42 @@ export function formatCurrency(amount: number, decimals: number = 2): string {
   return `Le ${amount.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
 }
 
+export type OfficialDocumentCategory = 
+  | 'Contracts & Agreements'
+  | 'Permits & Regulatory'
+  | 'Client Commission Documents'
+  | 'Financial & Tax Documents'
+  | 'Company & Legal Registration'
+  | 'Safety & HR Compliance'
+  | 'Delivery & Logistics Vouchers'
+  | 'Other Official Scans';
+
+export type DocumentConfidentiality = 'Public' | 'Internal / Workshop' | 'Confidential / Management';
+
+export type DocumentStatus = 'Active' | 'Expiring Soon' | 'Expired' | 'Archived';
+
+export interface OfficialDocument {
+  id: string;
+  title: string;
+  referenceNumber: string; // e.g. "SL-FOR-2026-089"
+  category: OfficialDocumentCategory;
+  customerId?: string; // Linked customer, if any
+  customerName?: string;
+  jobId?: string; // Linked commission / job, if any
+  jobTitle?: string;
+  issuingAuthority: string; // e.g. "National Revenue Authority", "Ministry of Forestry", "Freetown Grand Hotel"
+  issueDate: string; // YYYY-MM-DD
+  expiryDate?: string; // YYYY-MM-DD (optional, if time-bound)
+  fileUrl: string; // Base64 data URL or document URL
+  fileName: string;
+  fileType: string; // 'application/pdf' | 'image/png' | 'image/jpeg' | etc.
+  fileSize: string; // formatted size e.g. "1.4 MB"
+  confidentiality: DocumentConfidentiality;
+  status: DocumentStatus;
+  description?: string;
+  uploadedBy: string; // e.g. "Mr Paul Bindi (Admin)"
+  uploadedAt: string; // YYYY-MM-DD or ISO
+  tags: string[];
+}
+
 

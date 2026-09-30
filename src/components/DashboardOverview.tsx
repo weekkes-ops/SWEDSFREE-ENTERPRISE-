@@ -15,7 +15,8 @@ import {
   Check,
   X,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileCheck
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -564,6 +565,17 @@ export default function DashboardOverview({
                   <span>Draft Proforma Invoice</span>
                 </div>
                 <ArrowUpRight className="w-4 h-4 text-amber-700" />
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('documents')}
+                className="flex items-center justify-between p-3 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100 transition text-sm font-bold text-sky-950 shadow-xs cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <FileCheck className="w-4 h-4 text-sky-700" />
+                  <span>Official Documents &amp; Vault</span>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-sky-600" />
               </button>
               {isManager ? (
                 <>

@@ -22,7 +22,8 @@ import {
   DollarSign,
   Users,
   BookOpen,
-  ExternalLink
+  ExternalLink,
+  FileCheck
 } from 'lucide-react';
 import { Employee } from '../types';
 import { downloadUserManualPdf } from '../utils/userManualPdf';
@@ -47,6 +48,7 @@ interface SettingsManagerProps {
     financials: number;
     dailyLogs: number;
     savedInvoices: number;
+    officialDocuments?: number;
   };
 }
 
@@ -453,6 +455,16 @@ export default function SettingsManager({
                   <p className="text-[10px] text-slate-500 font-semibold">Staff Accounts</p>
                 </div>
               </div>
+
+              {typeof recordCounts.officialDocuments === 'number' && (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-2.5">
+                  <FileCheck className="w-4 h-4 text-sky-600 shrink-0" />
+                  <div>
+                    <p className="font-black text-slate-900">{recordCounts.officialDocuments}</p>
+                    <p className="text-[10px] text-slate-500 font-semibold">Official Docs</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
