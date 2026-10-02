@@ -166,8 +166,14 @@ export default function ProformaInvoiceDesk({
   // Proforma Header Metadata
   const [proformaNo, setProformaNo] = useState(() => {
     const year = new Date().getFullYear();
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    return `PRO-${year}-${rand}`;
+    try {
+      const raw = localStorage.getItem('swedswood_saved_invoices');
+      const list = raw ? JSON.parse(raw) : [];
+      const nextSeq = String(list.length + 1).padStart(4, '0');
+      return `PRO-${year}-${nextSeq}`;
+    } catch {
+      return `PRO-${year}-0001`;
+    }
   });
 
   // Official System Logo
@@ -410,8 +416,8 @@ export default function ProformaInvoiceDesk({
   const handleStartNewProforma = () => {
     setEditingProformaId(null);
     const year = new Date().getFullYear();
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    setProformaNo(`PRO-${year}-${rand}`);
+    const nextSeq = String(allSavedInvoices.length + 1).padStart(4, '0');
+    setProformaNo(`PRO-${year}-${nextSeq}`);
     setIssueDate(new Date().toISOString().split('T')[0]);
     setValidityDays(30);
     setLeadTime('2 - 3 Weeks from deposit confirmation');
@@ -687,7 +693,7 @@ export default function ProformaInvoiceDesk({
 
   const handleAddPreset = (preset: WoodworkPreset) => {
     const newItem: SavedInvoiceItem = {
-      id: `preset-${Date.now()}-${Math.random()}`,
+      id: `preset-${Date.now()}-${items.length + 1}`,
       description: preset.title,
       unitRate: String(preset.qty),
       amount: preset.qty * preset.rate,
@@ -725,8 +731,8 @@ export default function ProformaInvoiceDesk({
 
   const handleRegenerateRef = () => {
     const year = new Date().getFullYear();
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    setProformaNo(`PRO-${year}-${rand}`);
+    const nextSeq = String(allSavedInvoices.length + 1).padStart(4, '0');
+    setProformaNo(`PRO-${year}-${nextSeq}`);
   };
 
   // PDF Export

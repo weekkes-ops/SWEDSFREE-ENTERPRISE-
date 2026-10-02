@@ -451,7 +451,7 @@ export function generateUserManualPDFDoc(): jsPDF {
       ['Invoicing & Receipts', 'Full Access', 'Full Access', 'Read-Only', 'No Access'],
       ['Payment Audit Trail', 'Full Access', 'Full Access', 'Audit View', 'No Access'],
       ['Financial Cash Ledger', 'Full Access', 'Full Access', 'Audit View', 'No Access'],
-      ['Employee Roster & Payroll', 'Full Access', 'Full Access', 'Read-Only', 'No Access'],
+      ['Employee Roster & Staff Registry', 'Full Access', 'Full Access', 'Read-Only', 'No Access'],
       ['Audit Reports & Trends', 'Full Access', 'Full Access', 'Full Access', 'No Access'],
       ['Backup & Restore (Settings)', 'Full Access', 'Full Access', 'No Access', 'No Access'],
       ['Database Fresh Start', 'Admin Only', 'No Access', 'No Access', 'No Access']
@@ -709,13 +709,13 @@ export function generateUserManualPDFDoc(): jsPDF {
   );
 
   // ==========================================
-  // CHAPTER 10: HUMAN RESOURCES & PAYROLL
+  // CHAPTER 10: HUMAN RESOURCES & ARTISAN REGISTRY
   // ==========================================
   doc.addPage();
-  drawHeader('Chapter 10: Human Resources & Payroll');
+  drawHeader('Chapter 10: Human Resources & Staff Registry');
   y = 22;
 
-  addChapterHeading('10', 'Human Resources, Attendance & Wage Management');
+  addChapterHeading('10', 'Human Resources & Artisan Staff Registry');
 
   addSectionHeading('10.1 Staff Roster & Artisan Profiles');
   addParagraph(
@@ -723,12 +723,12 @@ export function generateUserManualPDFDoc(): jsPDF {
     'Profiles include contact telephone numbers, emergency contacts, hire dates, and role assignments.'
   );
 
-  addSectionHeading('10.2 Wage Calculations in Sierra Leone Leones (Le)');
+  addSectionHeading('10.2 Role Allocations & Workshop Governance');
   addParagraph(
-    'All wage computations are strictly formatted in Sierra Leone Leones (Le):'
+    'Workforce governance is centered around operational roles and project assignments:'
   );
-  addBullet('Base Compensation', 'Configurable as Daily Rate, Hourly Wage, or Fixed Monthly Salary.');
-  addBullet('Overtime Multipliers', 'Overtime hours logged during night shifts or weekend rush projects are calculated with configurable overtime multipliers.');
+  addBullet('Specialist Roles', 'Support for specialized roles including Carpenter, Carver, Designer, Sander, Polisher, Supervisor, Welder, Driver, Security, Marketer, Contractor, and Apprentice.');
+  addBullet('Commission Assignments', 'Artisans are linked directly to bespoke woodwork jobs for transparent workload distribution.');
   addBullet('Disciplinary & Warning Letters', 'Formal written warnings can be attached to an employee profile to ensure professional standards and punctuality across the workshop.');
 
   // ==========================================

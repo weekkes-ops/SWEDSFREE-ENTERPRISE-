@@ -11,12 +11,12 @@ export const INITIAL_CUSTOMERS: Customer[] = [
 ];
 
 export const INITIAL_EMPLOYEES: Employee[] = [
-  { id: 'emp-01', name: 'Mr Paul Bindi', role: 'Admin', phone: '+232 76 442590', email: 'paul.bindi@swedsfree.com', status: 'Active', baseSalary: 9500, dailyRate: 350, hireDate: '2024-01-10', password: 'admin' },
-  { id: 'emp-02', name: 'David Mansaray', role: 'Manager', phone: '+232 78 222 3333', email: 'david.m@swedsfree.com', status: 'Active', baseSalary: 7500, dailyRate: 280, hireDate: '2024-03-15', password: 'manager' },
-  { id: 'emp-03', name: 'Fatmata Sesay', role: 'Auditor', phone: '+232 30 444 5555', email: 'fatmata.s@swedsfree.com', status: 'Active', baseSalary: 6800, dailyRate: 250, hireDate: '2024-06-01', password: 'auditor' },
-  { id: 'emp-04', name: 'Ibrahim Bangura', role: 'Carpenter', phone: '+232 77 666 7777', email: 'ibrahim.b@swedsfree.com', status: 'Active', baseSalary: 5200, dailyRate: 200, hireDate: '2024-08-20', password: 'emp' },
-  { id: 'emp-05', name: 'Alimamy Kamara', role: 'Carver', phone: '+232 88 888 9999', email: 'alimamy.k@swedsfree.com', status: 'Active', baseSalary: 5000, dailyRate: 190, hireDate: '2025-02-12', password: 'emp' },
-  { id: 'emp-06', name: 'Mariama Koroma', role: 'Polisher', phone: '+232 79 000 1111', email: 'mariama.k@swedsfree.com', status: 'Active', baseSalary: 4800, dailyRate: 180, hireDate: '2025-05-10', password: 'emp' },
+  { id: 'emp-01', name: 'Mr Paul Bindi', role: 'Admin', phone: '+232 76 442590', email: 'paul.bindi@swedsfree.com', status: 'Active', hireDate: '2024-01-10', password: 'admin' },
+  { id: 'emp-02', name: 'David Mansaray', role: 'Manager', phone: '+232 78 222 3333', email: 'david.m@swedsfree.com', status: 'Active', hireDate: '2024-03-15', password: 'manager' },
+  { id: 'emp-03', name: 'Fatmata Sesay', role: 'Auditor', phone: '+232 30 444 5555', email: 'fatmata.s@swedsfree.com', status: 'Active', hireDate: '2024-06-01', password: 'auditor' },
+  { id: 'emp-04', name: 'Ibrahim Bangura', role: 'Carpenter', phone: '+232 77 666 7777', email: 'ibrahim.b@swedsfree.com', status: 'Active', hireDate: '2024-08-20', password: 'emp' },
+  { id: 'emp-05', name: 'Alimamy Kamara', role: 'Carver', phone: '+232 88 888 9999', email: 'alimamy.k@swedsfree.com', status: 'Active', hireDate: '2025-02-12', password: 'emp' },
+  { id: 'emp-06', name: 'Mariama Koroma', role: 'Polisher', phone: '+232 79 000 1111', email: 'mariama.k@swedsfree.com', status: 'Active', hireDate: '2025-05-10', password: 'emp' },
 ];
 
 export const INITIAL_JOBS: Job[] = [

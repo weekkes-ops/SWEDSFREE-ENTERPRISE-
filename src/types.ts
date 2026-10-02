@@ -62,8 +62,8 @@ export interface Employee {
   phone: string;
   email: string;
   status: EmployeeStatus;
-  baseSalary: number; // monthly
-  dailyRate: number; // daily base
+  baseSalary?: number; // optional
+  dailyRate?: number; // optional
   hireDate: string;
   password?: string;
 }

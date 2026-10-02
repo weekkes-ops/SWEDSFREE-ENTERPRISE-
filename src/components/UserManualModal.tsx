@@ -99,7 +99,7 @@ const CHAPTERS: ManualChapter[] = [
             ['Invoicing & Receipts', 'Full Access', 'Full Access', 'Read-Only', 'No Access'],
             ['Payment Audit Trail', 'Full Access', 'Full Access', 'Audit View', 'No Access'],
             ['Financial Cash Ledger', 'Full Access', 'Full Access', 'Audit View', 'No Access'],
-            ['Employee Payroll & Wage', 'Full Access', 'Full Access', 'Read-Only', 'No Access'],
+            ['Employee Staff Registry', 'Full Access', 'Full Access', 'Read-Only', 'No Access'],
             ['Backup & Restore (Settings)', 'Full Access', 'Full Access', 'No Access', 'No Access'],
             ['Database Fresh Start', 'Admin Only', 'No Access', 'No Access', 'No Access']
           ]
@@ -263,14 +263,14 @@ const CHAPTERS: ManualChapter[] = [
   {
     id: 'ch10',
     num: '10',
-    title: 'Human Resources, Attendance & Wage Management',
+    title: 'Human Resources & Artisan Staff Registry',
     icon: Users,
     badge: 'Workforce',
-    summary: 'Employee profiles, compensation in Le (daily/hourly/monthly), overtime multipliers, and disciplinary records.',
+    summary: 'Artisan profiles, specialist role assignments, active project commissions, and formal disciplinary warning records.',
     content: [
       {
-        heading: 'Compensation & Wage Calculations in Le',
-        text: 'All workforce payments are strictly formatted in Sierra Leone Leones (Le). The system calculates base compensation, logs overtime hours with multipliers, and records formal written warning letters for workshop discipline.'
+        heading: 'Staff Profiles & Artisan Registry',
+        text: 'The employee section registers artisans, specialists, and supervisors across joinery, framing, carving, polishing, and operations, managing project assignments and disciplinary warning letters cleanly.'
       }
     ]
   },

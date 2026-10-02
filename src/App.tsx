@@ -69,8 +69,6 @@ const LIVE_ADMIN_EMPLOYEE: Employee = {
   phone: '+232 76 442590',
   email: 'paul.bindi@swedsfree.com',
   status: 'Active',
-  baseSalary: 9500,
-  dailyRate: 350,
   hireDate: new Date().toISOString().split('T')[0],
   password: 'admin'
 };
@@ -431,7 +429,7 @@ export default function App() {
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>(() => getStoredData('swedsfree_registration_requests', []));
   const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters', []));
   const [paymentAuditLogs, setPaymentAuditLogs] = useState<PaymentAuditLogEntry[]>(() => getStoredData('swedsfree_payment_audit_logs', []));
-  const [officialDocuments, setOfficialDocuments] = useState<OfficialDocument[]>(() => getStoredData('swedsfree_official_documents', INITIAL_OFFICIAL_DOCUMENTS));
+  const [officialDocuments, setOfficialDocuments] = useState<OfficialDocument[]>(() => getStoredData('swedsfree_official_documents', []));
 
   // 1-minute inactivity timeout configuration (60,000ms = 1 minute)
   const [inactivityNotice, setInactivityNotice] = useState<string | null>(null);
@@ -551,7 +549,7 @@ export default function App() {
       const finalReqs = reqs;
       const finalWarns = warns;
       const finalInvs = invs;
-      const finalDocs = docs.length > 0 ? docs : INITIAL_OFFICIAL_DOCUMENTS;
+      const finalDocs = docs;
 
       setInventory(finalInv);
       setCustomers(finalCust);
@@ -762,38 +760,6 @@ export default function App() {
     };
     setInventory(prev => [newItem, ...prev]);
     saveDocument('inventory', newItem);
-
-    // Log inwards transaction & financial expenditure if initial stock > 0
-    if (item.currentStock > 0) {
-      const txId = `tx-inv-init-${Date.now()}`;
-      const totalValue = item.currentStock * item.unitCost;
-      const initTx: InventoryTransaction = {
-        id: txId,
-        itemId: itemId,
-        itemName: item.name,
-        type: 'INWARDS',
-        quantity: item.currentStock,
-        unitCost: item.unitCost,
-        totalValue: totalValue,
-        date: dateStr,
-        purpose: 'Initial Stock Registration'
-      };
-      setInventoryTransactions(prev => [...prev, initTx]);
-      saveDocument('inventoryTransactions', initTx);
-
-      const finId = `fin-inv-init-${Date.now()}`;
-      const finTx: FinancialTransaction = {
-        id: finId,
-        type: 'EXPENDITURE',
-        category: 'Material Purchase',
-        amount: totalValue,
-        date: dateStr,
-        description: `Initial Stock Registration: ${item.currentStock} units of ${item.name}`,
-        referenceId: txId
-      };
-      setFinancialTransactions(prev => [...prev, finTx]);
-      saveDocument('financialTransactions', finTx);
-    }
   };
 
   const handleLogTransaction = (tx: Omit<InventoryTransaction, 'id' | 'date'>) => {
@@ -981,20 +947,6 @@ export default function App() {
       }
       return job;
     }));
-
-    // 4. Log as raw material expenditure in financial ledger
-    const financialId = `fin-exp-job-${Date.now()}`;
-    const finTx: FinancialTransaction = {
-      id: financialId,
-      type: 'EXPENDITURE',
-      category: 'Material Purchase',
-      amount: jobMaterial.totalCost,
-      date: dateStr,
-      description: `Consumed ${jobMaterial.quantity} units of ${jobMaterial.name} on Job ID: ${jobId}`,
-      referenceId: jobId
-    };
-    setFinancialTransactions(prev => [...prev, finTx]);
-    saveDocument('financialTransactions', finTx);
   };
 
   // Record Payment received from customer on custom woodwork job
@@ -1153,49 +1105,8 @@ export default function App() {
 
   // Record Updators
   const handleUpdateInventoryItem = (updatedItem: InventoryItem) => {
-    const originalItem = inventory.find(item => item.id === updatedItem.id);
-    
     setInventory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
     saveDocument('inventory', updatedItem);
-
-    // Log adjustment if stock level changed
-    if (originalItem && originalItem.currentStock !== updatedItem.currentStock) {
-      const stockDiff = updatedItem.currentStock - originalItem.currentStock;
-      const absDiff = Math.abs(stockDiff);
-      const isUp = stockDiff > 0;
-      
-      const txId = `tx-inv-adj-${Date.now()}`;
-      const dateStr = new Date().toISOString().split('T')[0];
-      const totalValue = absDiff * updatedItem.unitCost;
-
-      const adjTx: InventoryTransaction = {
-        id: txId,
-        itemId: updatedItem.id,
-        itemName: updatedItem.name,
-        type: isUp ? 'INWARDS' : 'OUTWARDS',
-        quantity: absDiff,
-        unitCost: updatedItem.unitCost,
-        totalValue: totalValue,
-        date: dateStr,
-        purpose: `Manual Stock Adjustment (${originalItem.currentStock} -> ${updatedItem.currentStock})`
-      };
-      setInventoryTransactions(prev => [...prev, adjTx]);
-      saveDocument('inventoryTransactions', adjTx);
-
-      // Post the adjustment to the financial ledger as EXPENDITURE/Loss
-      const finId = `fin-inv-adj-${Date.now()}`;
-      const finTx: FinancialTransaction = {
-        id: finId,
-        type: 'EXPENDITURE',
-        category: 'Material Purchase',
-        amount: totalValue,
-        date: dateStr,
-        description: `Manual Stock Adjustment: ${originalItem.currentStock} -> ${updatedItem.currentStock} units of ${updatedItem.name}`,
-        referenceId: txId
-      };
-      setFinancialTransactions(prev => [...prev, finTx]);
-      saveDocument('financialTransactions', finTx);
-    }
   };
 
   const handleDeleteInventoryItem = (id: string) => {
@@ -1407,23 +1318,6 @@ export default function App() {
       return;
     }
 
-    let baseSalary = 3500;
-    let dailyRate = 120;
-    if (req.role === 'Admin') { baseSalary = 9500; dailyRate = 350; }
-    else if (req.role === 'Manager') { baseSalary = 8000; dailyRate = 280; }
-    else if (req.role === 'Supervisor') { baseSalary = 7500; dailyRate = 260; }
-    else if (req.role === 'Auditor') { baseSalary = 6500; dailyRate = 220; }
-    else if (req.role === 'Contractor') { baseSalary = 6000; dailyRate = 210; }
-    else if (req.role === 'Designer') { baseSalary = 6000; dailyRate = 200; }
-    else if (req.role === 'Welder') { baseSalary = 5200; dailyRate = 190; }
-    else if (req.role === 'Carpenter') { baseSalary = 5200; dailyRate = 190; }
-    else if (req.role === 'Carver') { baseSalary = 4800; dailyRate = 175; }
-    else if (req.role === 'Marketer') { baseSalary = 4800; dailyRate = 170; }
-    else if (req.role === 'Driver') { baseSalary = 3800; dailyRate = 135; }
-    else if (req.role === 'Polisher') { baseSalary = 3800; dailyRate = 130; }
-    else if (req.role === 'Security') { baseSalary = 3200; dailyRate = 110; }
-    else if (req.role === 'Sander') { baseSalary = 3200; dailyRate = 110; }
-
     const newEmp: Employee = {
       id: `emp-${Date.now()}`,
       name: req.name,
@@ -1431,8 +1325,6 @@ export default function App() {
       phone: req.phone,
       email: req.email,
       status: 'Active',
-      baseSalary,
-      dailyRate,
       hireDate: new Date().toISOString().split('T')[0],
       password: req.password || '1234'
     };

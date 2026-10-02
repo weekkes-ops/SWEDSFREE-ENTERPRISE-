@@ -131,7 +131,7 @@ export default function OfficialDocumentsManager({
   // Auto-generate Reference Number suggestion
   const handleGenerateRefSuggestion = (cat: OfficialDocumentCategory) => {
     const year = new Date().getFullYear();
-    const random = Math.floor(1000 + Math.random() * 9000);
+    const seq = String(documents.length + 1).padStart(3, '0');
     let prefix = 'SWED-DOC';
     if (cat === 'Contracts & Agreements') prefix = 'AGR';
     else if (cat === 'Permits & Regulatory') prefix = 'PERM';
@@ -139,7 +139,7 @@ export default function OfficialDocumentsManager({
     else if (cat === 'Client Commission Documents') prefix = 'COMM';
     else if (cat === 'Safety & HR Compliance') prefix = 'SAF';
     else if (cat === 'Company & Legal Registration') prefix = 'REG';
-    setNewRefNumber(`${prefix}-${year}-${random}`);
+    setNewRefNumber(`${prefix}-${year}-${seq}`);
   };
 
   const resetUploadForm = () => {

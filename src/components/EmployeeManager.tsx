@@ -8,7 +8,6 @@ import {
   Mail, 
   ShieldCheck, 
   Briefcase, 
-  Banknote, 
   Calendar, 
   CheckCircle, 
   XCircle, 
@@ -81,16 +80,12 @@ export default function EmployeeManager({
   const [role, setRole] = useState<EmployeeRole>('Carpenter');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [baseSalary, setBaseSalary] = useState(3500);
-  const [dailyRate, setDailyRate] = useState(120);
 
   // Form states - Edit Employee
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState<EmployeeRole>('Carpenter');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editBaseSalary, setEditBaseSalary] = useState(3500);
-  const [editDailyRate, setEditDailyRate] = useState(120);
 
   // Form states - Warning Letter
   const [warnType, setWarnType] = useState('First Written Warning');
@@ -111,8 +106,6 @@ export default function EmployeeManager({
     setEditRole(emp.role);
     setEditPhone(emp.phone);
     setEditEmail(emp.email);
-    setEditBaseSalary(emp.baseSalary);
-    setEditDailyRate(emp.dailyRate);
     setShowEditModal(true);
   };
 
@@ -126,8 +119,6 @@ export default function EmployeeManager({
       role: editRole,
       phone: editPhone,
       email: editEmail,
-      baseSalary: editBaseSalary,
-      dailyRate: editDailyRate,
     };
 
     if (onUpdateEmployee) {
@@ -168,9 +159,7 @@ export default function EmployeeManager({
       role,
       phone,
       email,
-      status: 'Active',
-      baseSalary,
-      dailyRate
+      status: 'Active'
     });
 
     // Reset Form
@@ -178,8 +167,6 @@ export default function EmployeeManager({
     setRole('Carpenter');
     setPhone('');
     setEmail('');
-    setBaseSalary(3500);
-    setDailyRate(120);
 
     setShowRegisterModal(false);
     if (onCloseRegisterModal) onCloseRegisterModal();
@@ -576,34 +563,6 @@ export default function EmployeeManager({
                     <p className="text-gray-700 font-mono text-xs font-semibold">{selectedEmployee.hireDate}</p>
                   </div>
                 </div>
-
-                {/* Compensation Package card */}
-                <div className="bg-wood-50/50 p-5 rounded-2xl border border-wood-100">
-                  <h4 className="text-xs font-bold uppercase text-wood-800 mb-3 tracking-wider flex items-center gap-1">
-                    <Banknote className="w-3.5 h-3.5" /> Wage & Compensation Settings
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-white p-4 rounded-xl border border-wood-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-gray-400 font-bold uppercase">Monthly Base Salary</span>
-                        <p className="text-lg font-bold font-mono text-gray-800 mt-1">
-                          {formatCurrency(selectedEmployee.baseSalary, 0)}
-                        </p>
-                      </div>
-                      <span className="text-[10px] bg-wood-50 text-wood-700 font-extrabold px-2 py-1 rounded">FIXED</span>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-xl border border-wood-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-gray-400 font-bold uppercase">Daily Overtime Rate</span>
-                        <p className="text-lg font-bold font-mono text-gray-800 mt-1">
-                          {formatCurrency(selectedEmployee.dailyRate, 0)}/day
-                        </p>
-                      </div>
-                      <span className="text-[10px] bg-wood-50 text-wood-700 font-extrabold px-2 py-1 rounded">WAGE/DAY</span>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Assignments / Project portfolio */}
@@ -757,66 +716,6 @@ export default function EmployeeManager({
                   </div>
                 </div>
 
-                {/* Payroll estimations based on role */}
-                <div className="bg-wood-50/50 p-5 rounded-2xl border border-wood-100">
-                  <h4 className="text-xs font-bold uppercase text-wood-800 mb-3 tracking-wider flex items-center gap-1">
-                    <Banknote className="w-3.5 h-3.5" /> Estimated Payroll Configuration
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-white p-4 rounded-xl border border-wood-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-gray-400 font-bold uppercase">Base Monthly Salary</span>
-                        <p className="text-lg font-bold font-mono text-gray-800 mt-1">
-                          {formatCurrency(
-                            selectedReq.role === 'Admin' ? 9500 :
-                            selectedReq.role === 'Manager' ? 8000 :
-                            selectedReq.role === 'Supervisor' ? 7500 :
-                            selectedReq.role === 'Auditor' ? 6500 :
-                            selectedReq.role === 'Contractor' ? 6000 :
-                            selectedReq.role === 'Designer' ? 6000 :
-                            selectedReq.role === 'Welder' ? 5200 :
-                            selectedReq.role === 'Carpenter' ? 5200 :
-                            selectedReq.role === 'Carver' ? 4800 :
-                            selectedReq.role === 'Marketer' ? 4800 :
-                            selectedReq.role === 'Driver' ? 3800 :
-                            selectedReq.role === 'Polisher' ? 3800 :
-                            selectedReq.role === 'Security' ? 3200 :
-                            selectedReq.role === 'Sander' ? 3200 : 3500,
-                            0
-                          )}
-                        </p>
-                      </div>
-                      <span className="text-[10px] bg-wood-50 text-wood-700 font-extrabold px-2 py-1 rounded">PROPOSED</span>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-xl border border-wood-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-gray-400 font-bold uppercase">Daily Overtime Rate</span>
-                        <p className="text-lg font-bold font-mono text-gray-800 mt-1">
-                          {formatCurrency(
-                            selectedReq.role === 'Admin' ? 350 :
-                            selectedReq.role === 'Manager' ? 280 :
-                            selectedReq.role === 'Supervisor' ? 260 :
-                            selectedReq.role === 'Auditor' ? 220 :
-                            selectedReq.role === 'Contractor' ? 210 :
-                            selectedReq.role === 'Designer' ? 200 :
-                            selectedReq.role === 'Welder' ? 190 :
-                            selectedReq.role === 'Carpenter' ? 190 :
-                            selectedReq.role === 'Carver' ? 175 :
-                            selectedReq.role === 'Marketer' ? 170 :
-                            selectedReq.role === 'Driver' ? 135 :
-                            selectedReq.role === 'Polisher' ? 130 :
-                            selectedReq.role === 'Security' ? 110 :
-                            selectedReq.role === 'Sander' ? 110 : 120,
-                            0
-                          )}/day
-                        </p>
-                      </div>
-                      <span className="text-[10px] bg-wood-50 text-wood-700 font-extrabold px-2 py-1 rounded">PROPOSED</span>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Workflow Actions */}
                 <div className="pt-2">
                   {selectedReq.status === 'Pending' ? (
@@ -892,7 +791,7 @@ export default function EmployeeManager({
               <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
                 <div>
                   <h3 className="font-display font-bold text-lg">Edit Artisan Details</h3>
-                  <p className="text-xs text-wood-200">Modify properties, role, and salary parameters.</p>
+                  <p className="text-xs text-wood-200">Modify artisan details, role, and contact information.</p>
                 </div>
                 <button 
                   onClick={() => setShowEditModal(false)}
@@ -959,32 +858,6 @@ export default function EmployeeManager({
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Monthly Base Salary (Le)</label>
-                    <input
-                      type="number"
-                      required
-                      min={100}
-                      value={editBaseSalary}
-                      onChange={(e) => setEditBaseSalary(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Daily Rate Overtime (Le)</label>
-                    <input
-                      type="number"
-                      required
-                      min={10}
-                      value={editDailyRate}
-                      onChange={(e) => setEditDailyRate(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
                 </div>
@@ -1160,23 +1033,7 @@ export default function EmployeeManager({
                     <label className="text-xs font-bold text-gray-500 uppercase">Specialist Role *</label>
                     <select
                       value={role}
-                      onChange={(e) => {
-                        const newRole = e.target.value as EmployeeRole;
-                        setRole(newRole);
-                        if (newRole === 'Supervisor') { setBaseSalary(7500); setDailyRate(260); }
-                        else if (newRole === 'Welder') { setBaseSalary(5200); setDailyRate(190); }
-                        else if (newRole === 'Contractor') { setBaseSalary(6000); setDailyRate(210); }
-                        else if (newRole === 'Marketer') { setBaseSalary(4800); setDailyRate(170); }
-                        else if (newRole === 'Driver') { setBaseSalary(3800); setDailyRate(135); }
-                        else if (newRole === 'Security') { setBaseSalary(3200); setDailyRate(110); }
-                        else if (newRole === 'Carpenter') { setBaseSalary(5200); setDailyRate(190); }
-                        else if (newRole === 'Carver') { setBaseSalary(4800); setDailyRate(175); }
-                        else if (newRole === 'Designer') { setBaseSalary(6000); setDailyRate(200); }
-                        else if (newRole === 'Sander') { setBaseSalary(3200); setDailyRate(110); }
-                        else if (newRole === 'Polisher') { setBaseSalary(3800); setDailyRate(130); }
-                        else if (newRole === 'Manager') { setBaseSalary(8000); setDailyRate(280); }
-                        else if (newRole === 'Apprentice') { setBaseSalary(2500); setDailyRate(90); }
-                      }}
+                      onChange={(e) => setRole(e.target.value as EmployeeRole)}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 bg-white"
                     >
                       <option value="Carpenter">Carpenter (Joints & Framing)</option>
@@ -1218,32 +1075,6 @@ export default function EmployeeManager({
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Monthly Base Salary (Le) *</label>
-                    <input
-                      type="number"
-                      required
-                      min={100}
-                      value={baseSalary}
-                      onChange={(e) => setBaseSalary(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Daily Rate Overtime (Le) *</label>
-                    <input
-                      type="number"
-                      required
-                      min={10}
-                      value={dailyRate}
-                      onChange={(e) => setDailyRate(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
                 </div>

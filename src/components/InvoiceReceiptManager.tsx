@@ -1247,7 +1247,9 @@ export default function InvoiceReceiptManager({
     };
     
     setActiveInvoice(blankJob);
-    setInvoiceNo(`INV-${Math.floor(1000 + Math.random() * 9000)}`);
+    const nextSeq = String((savedInvoices?.length || 0) + 1).padStart(4, '0');
+    const invYear = new Date().getFullYear();
+    setInvoiceNo(`INV-${invYear}-${nextSeq}`);
     setInvoiceDate(new Date().toISOString().split('T')[0]);
     setInvoiceTerms("COD / Payment Clear");
     setInvoiceCustomerName("");
