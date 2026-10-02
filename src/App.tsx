@@ -626,6 +626,15 @@ export default function App() {
       localStorage.setItem('swedsfree_initial_purge_done', 'true');
     }
 
+    // Flush any stale inventory local storage cache to match the cleared Firestore collection
+    if (localStorage.getItem('swedsfree_inventory_purged_flag_v1') !== 'true') {
+      localStorage.setItem('swedsfree_inventory', JSON.stringify([]));
+      localStorage.setItem('swedsfree_inv_transactions', JSON.stringify([]));
+      setInventory([]);
+      setInventoryTransactions([]);
+      localStorage.setItem('swedsfree_inventory_purged_flag_v1', 'true');
+    }
+
     return () => {
       unsubs.forEach(unsub => unsub());
     };

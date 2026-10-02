@@ -1,15 +1,6 @@
 import { InventoryItem, InventoryTransaction, Customer, Employee, Job, FinancialTransaction, DailyWorkLog, RegistrationRequest, WarningLetter, SavedInvoice, PaymentAuditLogEntry, OfficialDocument } from './types';
 
-export const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: 'inv-101', name: 'Mahogany Timber Planks (2x10x12)', category: 'Lumber', unit: 'Board Feet', currentStock: 450, minStockThreshold: 100, unitCost: 45, lastUpdated: '2026-08-04' },
-  { id: 'inv-102', name: 'Oak Hardwood Beams (4x4x10)', category: 'Lumber', unit: 'Board Feet', currentStock: 280, minStockThreshold: 80, unitCost: 65, lastUpdated: '2026-08-05' },
-  { id: 'inv-103', name: 'Teak Marine Plywood (18mm)', category: 'Plywood', unit: 'Sheets', currentStock: 65, minStockThreshold: 20, unitCost: 180, lastUpdated: '2026-08-03' },
-  { id: 'inv-104', name: 'Polyurethane High-Gloss Varnish', category: 'Finishes', unit: 'Liters', currentStock: 40, minStockThreshold: 15, unitCost: 35, lastUpdated: '2026-08-02' },
-  { id: 'inv-105', name: 'Heavy Duty Stainless Steel Hinges', category: 'Hardware', unit: 'Pieces', currentStock: 220, minStockThreshold: 50, unitCost: 12, lastUpdated: '2026-08-01' },
-  { id: 'inv-106', name: 'Industrial Grade PVA Wood Glue', category: 'Adhesives', unit: 'Liters', currentStock: 30, minStockThreshold: 10, unitCost: 28, lastUpdated: '2026-08-05' },
-  { id: 'inv-107', name: 'Tungsten Carbide CNC Router Bits', category: 'Hardware', unit: 'Pieces', currentStock: 18, minStockThreshold: 5, unitCost: 95, lastUpdated: '2026-08-04' },
-  { id: 'inv-108', name: 'Softwood Framing Timber (2x4x12)', category: 'Lumber', unit: 'Board Feet', currentStock: 600, minStockThreshold: 150, unitCost: 22, lastUpdated: '2026-08-05' },
-];
+export const INITIAL_INVENTORY: InventoryItem[] = [];
 
 export const INITIAL_CUSTOMERS: Customer[] = [
   { id: 'cust-201', name: 'Sierra Mining Corporation', company: 'Sierra Mining Corp', phone: '+232 78 555 101', email: 'procurement@sierramining.sl', address: '14 Wilberforce Street, Freetown', notes: 'Corporate contract client for office furniture', registrationDate: '2026-01-15' },
@@ -122,13 +113,7 @@ export const INITIAL_JOBS: Job[] = [
   }
 ];
 
-export const INITIAL_INVENTORY_TRANSACTIONS: InventoryTransaction[] = [
-  { id: 'itrans-501', itemId: 'inv-101', itemName: 'Mahogany Timber Planks', type: 'INWARDS', quantity: 500, unitCost: 45, totalValue: 22500, date: '2026-07-01', purpose: 'Bulk lumber shipment arrival' },
-  { id: 'itrans-502', itemId: 'inv-101', itemName: 'Mahogany Timber Planks', type: 'OUTWARDS', quantity: 180, unitCost: 45, totalValue: 8100, date: '2026-07-12', purpose: 'Allocated for Job job-301 Sierra Mining Table', referenceId: 'job-301' },
-  { id: 'itrans-503', itemId: 'inv-102', itemName: 'Oak Hardwood Beams', type: 'INWARDS', quantity: 350, unitCost: 65, totalValue: 22750, date: '2026-07-05', purpose: 'Warehouse oak timber restock' },
-  { id: 'itrans-504', itemId: 'inv-102', itemName: 'Oak Hardwood Beams', type: 'OUTWARDS', quantity: 200, unitCost: 65, totalValue: 13000, date: '2026-07-20', purpose: 'Allocated for Job job-302 Freetown Grand Hotel Doors', referenceId: 'job-302' },
-  { id: 'itrans-505', itemId: 'inv-103', itemName: 'Teak Marine Plywood', type: 'INWARDS', quantity: 100, unitCost: 180, totalValue: 18000, date: '2026-08-01', purpose: 'New plywood shipment received' },
-];
+export const INITIAL_INVENTORY_TRANSACTIONS: InventoryTransaction[] = [];
 
 export const INITIAL_FINANCIALS: FinancialTransaction[] = [
   { id: 'fin-601', type: 'INCOME', category: 'Job Payment', amount: 25000, date: '2026-07-10', description: 'Sierra Mining Corp Boardroom Table initial deposit', referenceId: 'job-301' },

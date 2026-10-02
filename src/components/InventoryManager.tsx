@@ -464,8 +464,15 @@ export default function InventoryManager({
                   <tbody className="divide-y divide-gray-100 font-medium">
                     {sortedInventory.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="text-center py-12 text-gray-400">
-                          No inventory items match your filters.
+                        <td colSpan={7} className="text-center py-16 text-gray-400">
+                          {inventory.length === 0 ? (
+                            <div className="space-y-2">
+                              <p className="font-semibold text-gray-600">No inventory items in stock.</p>
+                              <p className="text-xs text-gray-400">All inventory data has been cleared. Click "+ Add New Item" to record new timber, lumber, or hardware stock.</p>
+                            </div>
+                          ) : (
+                            'No inventory items match your filters.'
+                          )}
                         </td>
                       </tr>
                     ) : (
@@ -582,8 +589,15 @@ export default function InventoryManager({
             /* Cards Display Grid */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {sortedInventory.length === 0 ? (
-                <div className="col-span-full text-center py-12 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400">
-                  <p>No inventory items match your filters.</p>
+                <div className="col-span-full text-center py-16 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400">
+                  {inventory.length === 0 ? (
+                    <div className="space-y-2">
+                      <p className="font-semibold text-gray-600">No inventory items in stock.</p>
+                      <p className="text-xs text-gray-400">All inventory data has been cleared. Click "+ Add New Item" to record new timber, lumber, or hardware stock.</p>
+                    </div>
+                  ) : (
+                    <p>No inventory items match your filters.</p>
+                  )}
                 </div>
               ) : (
                 sortedInventory.map(item => {
