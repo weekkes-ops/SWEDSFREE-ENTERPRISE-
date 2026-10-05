@@ -48,7 +48,6 @@ export default function InventoryManager({
   const [newItemCategory, setNewItemCategory] = useState<WoodCategory>('Lumber');
   const [newItemUnit, setNewItemUnit] = useState<WoodUnit>('Board Feet');
   const [newItemMinThreshold, setNewItemMinThreshold] = useState(20);
-  const [newItemUnitCost, setNewItemUnitCost] = useState(10);
   const [newItemInitialStock, setNewItemInitialStock] = useState(100);
 
   // Form states - Edit Item
@@ -56,7 +55,6 @@ export default function InventoryManager({
   const [editItemCategory, setEditItemCategory] = useState<WoodCategory>('Lumber');
   const [editItemUnit, setEditItemUnit] = useState<WoodUnit>('Board Feet');
   const [editItemMinThreshold, setEditItemMinThreshold] = useState(20);
-  const [editItemUnitCost, setEditItemUnitCost] = useState(10);
   const [editItemCurrentStock, setEditItemCurrentStock] = useState(100);
 
   const handleOpenEditModal = (item: InventoryItem) => {
@@ -65,7 +63,6 @@ export default function InventoryManager({
     setEditItemCategory(item.category);
     setEditItemUnit(item.unit);
     setEditItemMinThreshold(item.minStockThreshold);
-    setEditItemUnitCost(item.unitCost);
     setEditItemCurrentStock(item.currentStock);
     setShowEditItemModal(true);
   };
@@ -81,7 +78,7 @@ export default function InventoryManager({
         category: editItemCategory,
         unit: editItemUnit,
         minStockThreshold: editItemMinThreshold,
-        unitCost: editItemUnitCost,
+        unitCost: editingItem.unitCost || 0,
         currentStock: editItemCurrentStock,
         lastUpdated: new Date().toISOString().split('T')[0]
       });
@@ -100,19 +97,18 @@ export default function InventoryManager({
       unit: newItemUnit,
       currentStock: newItemInitialStock,
       minStockThreshold: newItemMinThreshold,
-      unitCost: newItemUnitCost
+      unitCost: 0
     });
 
     // Reset Form
     setNewItemName('');
     setNewItemMinThreshold(20);
-    setNewItemUnitCost(10);
     setNewItemInitialStock(100);
     setShowNewItemModal(false);
   };
 
   // Sorting states
-  type StockSortField = 'name' | 'category' | 'currentStock' | 'unitCost' | 'minStockThreshold' | 'status' | 'date';
+  type StockSortField = 'name' | 'category' | 'currentStock' | 'minStockThreshold' | 'status' | 'date';
   const [stockSortField, setStockSortField] = useState<StockSortField>('name');
   const [stockSortDirection, setStockSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -121,7 +117,7 @@ export default function InventoryManager({
       setStockSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setStockSortField(field);
-      setStockSortDirection(field === 'date' || field === 'currentStock' || field === 'unitCost' ? 'desc' : 'asc');
+      setStockSortDirection(field === 'date' || field === 'currentStock' ? 'desc' : 'asc');
     }
   };
 
@@ -304,18 +300,6 @@ export default function InventoryManager({
                       </div>
                     </th>
                     <th 
-                      onClick={() => handleStockSort('unitCost')} 
-                      className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                      title="Click to sort by unit rate"
-                    >
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span>Unit rate</span>
-                        {stockSortField === 'unitCost' ? (
-                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                      </div>
-                    </th>
-                    <th 
                       onClick={() => handleStockSort('minStockThreshold')} 
                       className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
                       title="Click to sort by minimum threshold"
@@ -345,7 +329,7 @@ export default function InventoryManager({
                 <tbody className="divide-y divide-gray-100 font-medium">
                   {sortedInventory.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-16 text-gray-400">
+                      <td colSpan={6} className="text-center py-16 text-gray-400">
                         {inventory.length === 0 ? (
                           <div className="space-y-2">
                             <p className="font-semibold text-gray-600">No inventory items in stock.</p>
@@ -378,9 +362,6 @@ export default function InventoryManager({
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono font-bold text-sm">
                             {item.currentStock} <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-mono">
-                            {formatCurrency(item.unitCost)}
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono text-gray-500">
                             {item.minStockThreshold} {item.unit}
@@ -516,15 +497,15 @@ export default function InventoryManager({
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-[10px] text-gray-400 font-semibold uppercase">Est. Unit Cost</p>
-                          <p className="text-sm font-bold font-mono text-gray-800">
-                            {formatCurrency(item.unitCost)}
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase">Min Alert Level</p>
+                          <p className="text-sm font-bold font-mono text-gray-700">
+                            {item.minStockThreshold} <span className="text-xs font-sans text-gray-400 font-normal">{item.unit}</span>
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-dashed border-gray-100 text-[10px]">
-                        <span className="text-gray-400 font-medium">Min Threshold: {item.minStockThreshold} {item.unit}</span>
+                        <span className="text-gray-400 font-medium font-mono">ID: {item.id}</span>
                         <div className="flex items-center gap-1.5">
                           {confirmDeleteId === item.id ? (
                             <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
@@ -650,41 +631,28 @@ export default function InventoryManager({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Current Stock</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Current Stock</label>
                     <input
                       type="number"
                       required
                       min={0}
                       value={editItemCurrentStock}
                       onChange={(e) => setEditItemCurrentStock(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Unit Cost (Le)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0.1}
-                      step={0.1}
-                      value={editItemUnitCost}
-                      onChange={(e) => setEditItemUnitCost(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Min Alert Level</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Min Alert Level (Threshold)</label>
                     <input
                       type="number"
                       required
                       min={1}
                       value={editItemMinThreshold}
                       onChange={(e) => setEditItemMinThreshold(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
                 </div>
@@ -783,41 +751,28 @@ export default function InventoryManager({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Initial Stock</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Initial Stock</label>
                     <input
                       type="number"
                       required
                       min={0}
                       value={newItemInitialStock}
                       onChange={(e) => setNewItemInitialStock(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Est. Unit Cost</label>
-                    <input
-                      type="number"
-                      required
-                      min={0.1}
-                      step={0.1}
-                      value={newItemUnitCost}
-                      onChange={(e) => setNewItemUnitCost(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Min Alert Level</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Min Alert Level (Threshold)</label>
                     <input
                       type="number"
                       required
                       min={1}
                       value={newItemMinThreshold}
                       onChange={(e) => setNewItemMinThreshold(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
                 </div>
