@@ -1005,7 +1005,7 @@ export default function EmployeeManager({
               <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
                 <div>
                   <h3 className="font-display font-bold text-lg">Add Swedsfree Craftsman</h3>
-                  <p className="text-xs text-wood-200">Submit employee specifications, roles, and compensation agreements.</p>
+                  <p className="text-xs text-wood-200">Submit employee specifications, roles, and workshop details.</p>
                 </div>
                 <button 
                   onClick={handleCloseModal}

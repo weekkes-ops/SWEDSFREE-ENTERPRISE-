@@ -348,7 +348,7 @@ export default function DashboardOverview({
               <p className="text-2xl font-mono font-bold text-slate-900 mt-1">
                 {formatCurrency(mtdExpenditure)}
               </p>
-              <p className="text-[10px] text-slate-500 mt-1">Materials, wages & ops</p>
+              <p className="text-[10px] text-slate-500 mt-1">Materials, utilities & ops</p>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -454,24 +454,24 @@ export default function DashboardOverview({
           </>
         ) : (
           <>
-            {/* Monthly Wage Card */}
+            {/* Artisan Profile Card */}
             <motion.div 
               variants={itemVariants}
               whileHover={{ y: -3 }}
               className="bg-white p-6 rounded-2xl border border-wood-100 shadow-xs flex items-center justify-between"
             >
               <div className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">My Base Salary</span>
-                <h3 className="text-2xl font-bold font-mono text-wood-900">
-                  {formatCurrency(currentUser?.baseSalary || 0)}
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">My Specialist Role</span>
+                <h3 className="text-2xl font-bold font-display text-wood-900">
+                  {currentUser?.role || 'Craftsman'}
                 </h3>
                 <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span>Daily rate: {formatCurrency(currentUser?.dailyRate || 0)}</span>
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Status: {currentUser?.status || 'Active'}</span>
                 </div>
               </div>
-              <div className="p-3.5 bg-emerald-50 rounded-xl text-emerald-600 border border-emerald-100">
-                <DollarSign className="w-6 h-6" />
+              <div className="p-3.5 bg-wood-50 rounded-xl text-wood-700 border border-wood-100">
+                <Users className="w-6 h-6" />
               </div>
             </motion.div>
 

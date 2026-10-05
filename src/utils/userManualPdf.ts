@@ -334,8 +334,8 @@ export function generateUserManualPDFDoc(): jsPDF {
     { num: '06', title: 'Commission & Job Order Management', desc: 'Project specs, custom quote pricing, stages, material allocation & staff assignments' },
     { num: '07', title: 'Invoices, Receipts & Installment Clearance', desc: 'Branded invoice generation, multi-item line quotes, installment records & audit trail' },
     { num: '08', title: 'Daily Workshop & Site Activity Logs', desc: 'Photographic progress records, bench assembly logs, and site installation diaries' },
-    { num: '09', title: 'Financial Accounting & Cash Flow Ledgers', desc: '6 Inwards and 8 Outwards categories, expense vouchers, cash flow analysis in Le' },
-    { num: '10', title: 'Human Resources, Attendance & Wage Management', desc: 'Artisan roster, wage structures in Le, overtime tracking, and warning records' },
+    { num: '09', title: 'Financial Accounting & Cash Flow Ledgers', desc: '6 Inwards and 7 Outwards categories, expense vouchers, cash flow analysis in Le' },
+    { num: '10', title: 'Human Resources, Attendance & Staff Management', desc: 'Artisan roster, specialist assignments, role tracking, and compliance warning records' },
     { num: '11', title: 'Audit Reports & Monthly Trends Analytics', desc: 'Printable executive audit dossiers and interactive Recharts monthly trajectory' },
     { num: '12', title: 'Settings, Data Backups & Zero Data Loss Protocol', desc: 'JSON offline backup creation, data restoration, cloud sync and disaster recovery' },
     { num: '13', title: 'Frequently Asked Questions & Troubleshooting', desc: 'Network dropouts, balance updates, currency formatting, and technical support' }
@@ -696,7 +696,6 @@ export function generateUserManualPDFDoc(): jsPDF {
       ['Bed (Bedframes, headboards, wardrobes)', 'Material Purchase (Hardware, fasteners, varnishes, glues)'],
       ['Wood Construction (Roof trusses, decking)', 'Tools and Maintenance (Blade sharpening, machine repairs)'],
       ['others (Bespoke commissions & restoration)', 'Cast (Foundry, metal framing & brackets)'],
-      ['', 'Salary (Artisan wages, casual labor, allowances)'],
       ['', 'others (Sundry workshop consumables)']
     ],
     [87, 87]

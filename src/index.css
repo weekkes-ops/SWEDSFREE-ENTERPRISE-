@@ -279,19 +279,8 @@ button.bg-wood-700:hover {
     margin: 8mm 10mm !important;
   }
 
-  /* Reset layout for clean pure white printout and ensure complete pagination without clipping */
-  html, 
-  body, 
-  #root, 
-  #root > div,
-  main, 
-  .fixed, 
-  .absolute, 
-  div[class*="fixed"],
-  div[class*="inset-0"],
-  #print-area, 
-  .sweds-paper-invoice {
-    display: block !important;
+  /* Reset body and page background */
+  html, body {
     background-color: #ffffff !important;
     background: #ffffff !important;
     color: #000000 !important;
@@ -299,19 +288,91 @@ button.bg-wood-700:hover {
     line-height: 1.35 !important;
     margin: 0 !important;
     padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide all regular UI chrome when printing */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Expose ONLY the active document print container and all its descendants */
+  #print-area,
+  #print-area *,
+  #proforma-print-area,
+  #proforma-print-area *,
+  #bulk-print-area,
+  #bulk-print-area * {
+    visibility: visible !important;
+  }
+
+  /* Position the document at the absolute top of the print layout */
+  #print-area,
+  #proforma-print-area,
+  #bulk-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     overflow: visible !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
-    position: static !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    display: block !important;
+  }
+
+  /* Ensure headers for invoice, proforma, and receipt are pinned strictly at the top of page */
+  .proforma-header-container,
+  .invoice-header-container,
+  .receipt-header-container {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    top: 0 !important;
+  }
+
+  /* Bulk print page items: ensure each invoice or receipt starts at the top of a new page */
+  .bulk-page-item {
+    page-break-after: always !important;
+    break-after: page !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  .bulk-page-item:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Completely suppress all watermark logos, background overlays, or backdrop blur elements on print */
+  *[class*="watermark" i],
+  .watermark,
+  .watermark-logo,
+  img[alt*="watermark" i],
+  div[class*="opacity-[0.0" i],
+  div[class*="backdrop-blur" i] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Remove shadows and glowing text effects on print */
   #print-area *,
+  #proforma-print-area *,
+  #bulk-print-area *,
   .sweds-paper-invoice * {
     box-shadow: none !important;
     text-shadow: none !important;
@@ -341,6 +402,8 @@ button.bg-wood-700:hover {
   .bg-red-50,
   .bg-purple-50,
   .sweds-paper-invoice,
+  #proforma-print-area,
+  #bulk-print-area,
   #print-area {
     background-color: #ffffff !important;
     background: #ffffff !important;
@@ -523,9 +586,13 @@ button.bg-wood-700:hover {
     visibility: hidden !important;
   }
 
-  /* Ensure the main print container lays out flat on white background */
-  #print-area {
-    position: static !important;
+  /* Ensure the main print containers lay out flat on pure white background anchored at the very top */
+  #print-area,
+  #proforma-print-area,
+  #bulk-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;

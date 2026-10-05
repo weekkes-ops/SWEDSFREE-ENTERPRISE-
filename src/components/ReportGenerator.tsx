@@ -172,19 +172,12 @@ export default function ReportGenerator({
     [customers, selectedPeriod, selectedMonth, selectedYear, selectedDate]
   );
 
-  // 2. Employees & Artisan Wages Paid Metric
+  // 2. Employees Metric
   const activeStaff = employees.filter(e => e.status === 'Active');
   
-  // Wages from Financial Ledger (Employee Wages category or description mentioning wages/payroll/artisan)
-  const ledgerWages = periodFinTx
-    .filter(t => t.category === 'Employee Wages' || (t.type === 'EXPENDITURE' && /wage|salary|payroll|artisan|craftsman|labor/i.test(t.description || '')))
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  // Direct Job Labor Cost allocated to artisans for commissions active in this period
+  // Direct Job Labor Cost allocated for commissions active in this period
   const jobLaborCost = periodJobs.reduce((sum, j) => sum + (j.laborCost || 0), 0);
-
-  // Tally artisan wages: prioritize verified ledger payroll payouts, with fallback to direct commissioned job labor costs
-  const PeriodWagesCost = ledgerWages > 0 ? ledgerWages : jobLaborCost;
+  const PeriodWagesCost = jobLaborCost;
 
   // 3. Customer Revenue Metric
   // Inflow from financial ledger
@@ -698,7 +691,7 @@ export default function ReportGenerator({
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold text-gray-900 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-wood-600" />
-              Artisan Productivity & Payroll Audit ({selectedPeriod})
+              Artisan Productivity & Workshop Roster ({selectedPeriod})
             </h3>
             <span className="text-xs bg-wood-50 text-wood-800 font-extrabold px-2.5 py-1 rounded border border-wood-100">
               {employees.length} artisans certified
@@ -713,7 +706,7 @@ export default function ReportGenerator({
                   <th className="py-2.5 px-3">Workshop Role</th>
                   <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3 text-right">Commissions assigned</th>
-                  <th className="py-2.5 px-3 text-right">Compensation setting</th>
+                  <th className="py-2.5 px-3 text-right">Phone & Hire Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 text-gray-700">
@@ -732,7 +725,7 @@ export default function ReportGenerator({
                         {empJobs.length} active logs
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-gray-800">
-                        Base: {formatCurrency(emp.baseSalary, 0)} / Overtime: {formatCurrency(emp.dailyRate, 0)}/day
+                        {emp.phone} • {emp.hireDate}
                       </td>
                     </tr>
                   );

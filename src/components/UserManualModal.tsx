@@ -253,7 +253,6 @@ const CHAPTERS: ManualChapter[] = [
             ['Bed', 'Material Purchase'],
             ['Wood Construction', 'Tools and Maintenance'],
             ['others', 'Cast'],
-            ['', 'Salary'],
             ['', 'others']
           ]
         }

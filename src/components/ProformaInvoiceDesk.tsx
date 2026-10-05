@@ -306,47 +306,27 @@ export default function ProformaInvoiceDesk({
       setSaveToast(`⚡ Proforma prepared for ${cust.name} using commission "${targetJob.title}"!`);
       setTimeout(() => setSaveToast(null), 3500);
     } else {
-      // Customer has no jobs yet: auto-prepare custom proforma tailored to their profile & site address
+      // Customer has no jobs yet: prepare clean blank proforma for manual entry
       setLinkedJobId(null);
       const title = cust.company 
-        ? `${cust.company} — Architectural Joinery & Fit-Out` 
-        : `Bespoke Solid Hardwood Joinery Suite for ${cust.name}`;
+        ? `${cust.company} — Custom Woodwork Order` 
+        : `Custom Woodwork Order for ${cust.name}`;
       setProjectTitle(title);
-      setProjectDescription(
-        cust.notes 
-          ? `Client Requirements: ${cust.notes}\nSite Delivery & Installation: ${cust.address || 'Freetown, Sierra Leone'}`
-          : `Kiln-dried hardwood joinery, structural mortise-and-tenon construction, site delivery to ${cust.address || 'Freetown, Sierra Leone'}, and architectural fitting.`
-      );
+      setProjectDescription(cust.notes ? `Client Requirements: ${cust.notes}` : '');
 
       setItems([
         {
-          id: `p-item-auto-${Date.now()}-1`,
-          description: cust.company 
-            ? `Commercial Joinery & Executive Fit-Out Suite (${cust.company})`
-            : `Handcrafted Architectural Hardwood Suite for ${cust.name}`,
-          woodSpecies: 'Kiln-Dried African Mahogany & Burma Teak (<12% Moisture)',
-          dimensions: 'Site-verified measurements per preliminary inspection',
+          id: `item-${Date.now()}-1`,
+          description: '',
+          woodSpecies: '',
+          dimensions: '',
           quantity: 1,
-          unitPrice: 15500000,
-          total: 15500000
-        },
-        {
-          id: `p-item-auto-${Date.now()}-2`,
-          description: `Site Delivery, Fitting & Protective Marine Polyurethane Finish`,
-          woodSpecies: 'Weather-Resistant Protective Treatment & Anti-Fungal Seal',
-          dimensions: `Direct delivery and installation at ${cust.address || 'Client Site'}`,
-          quantity: 1,
-          unitPrice: 2800000,
-          total: 2800000
+          unitPrice: 0,
+          total: 0
         }
       ]);
 
-      setNotes(
-        `1. Moisture Content Guarantee: All timber is kiln-dried to <12% moisture content to prevent warping.\n2. Structural Guarantee: 5-year warranty on all structural timber joinery.\n3. Site Delivery & Inspection: Direct delivery to ${cust.address || 'Freetown, Sierra Leone'}.\n4. Authorized Client Contact: ${cust.name} (${cust.phone}).`
-      );
-
-      setSaveToast(`⚡ Proforma prepared using ${cust.name}'s profile & site details!`);
-      setTimeout(() => setSaveToast(null), 3500);
+      setNotes('');
     }
   };
 
@@ -1483,7 +1463,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                 </div>
                 <div className="space-y-1 flex-1 min-w-0">
                   <p className="text-xs font-bold text-gray-800">Swedswood Official Crest</p>
-                  <p className="text-[11px] text-gray-500">Appears on the Proforma header, watermark, and PDF download.</p>
+                  <p className="text-[11px] text-gray-500">Appears on the Proforma header and PDF download.</p>
                   <div className="flex items-center gap-2 pt-1">
                     <label className="px-2.5 py-1 bg-wood-950 hover:bg-wood-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition shadow-2xs shrink-0">
                       <Upload className="w-3 h-3 text-amber-400" />
@@ -1856,26 +1836,76 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
       {/* A4 Executive Preview Mode (Interactive Document Display) */}
       {viewMode === 'PREVIEW' && (
         <div className="flex flex-col items-center">
+          {/* Print style overrides for Proforma invoice */}
+          <style>{`
+            @media print {
+              @page {
+                size: A4 portrait;
+                margin: 8mm 10mm !important;
+              }
+              html, body {
+                background-color: #ffffff !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              body * {
+                visibility: hidden;
+              }
+              #proforma-print-area,
+              #proforma-print-area * {
+                visibility: visible !important;
+              }
+              #proforma-print-area {
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                min-height: 0 !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+              }
+              .proforma-header-container {
+                padding-top: 0 !important;
+                margin-top: 0 !important;
+                top: 0 !important;
+              }
+              aside,
+              nav,
+              header:not(.print-header),
+              footer:not(.print-footer),
+              .no-print,
+              button,
+              *[class*="watermark" i],
+              .watermark,
+              .watermark-logo,
+              img[alt*="watermark" i],
+              div[class*="backdrop-blur" i] {
+                display: none !important;
+                visibility: hidden !important;
+              }
+            }
+          `}</style>
+
           {/* A4 Document Container */}
           <div
             id="proforma-print-area"
-            className="w-full max-w-[850px] bg-white text-slate-900 shadow-2xl rounded-2xl p-8 sm:p-12 border border-amber-900/20 relative overflow-hidden"
+            className="w-full max-w-[850px] bg-white text-slate-900 shadow-2xl rounded-2xl p-8 sm:p-12 border border-amber-900/20 relative overflow-hidden print:!p-0 print:!m-0 print:!border-none print:!shadow-none print:!min-h-0"
             style={{ minHeight: '1100px' }}
           >
-            {/* Watermark Crest in Center Background */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-[0.035] pointer-events-none select-none">
-              <img 
-                src={logoUrl || '/logo.svg'} 
-                alt="Watermark Logo" 
-                className="w-96 h-96 object-contain grayscale"
-              />
-            </div>
+            {/* Top Border Gold/Navy Accent Stripe (Hidden on print to keep header at top) */}
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-wood-950 via-amber-500 to-wood-900 print:hidden" />
 
-            {/* Top Border Gold/Navy Accent Stripe */}
-            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-wood-950 via-amber-500 to-wood-900" />
-
-            {/* Header: Company & Proforma Badge */}
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b-2 border-slate-900 pb-6 mb-8">
+            {/* Header: Company & Proforma Badge (Anchored cleanly at top) */}
+            <div className="proforma-header-container flex flex-col sm:flex-row justify-between items-start gap-6 border-b-2 border-slate-900 pb-6 mb-8 print:!pt-0 print:!mt-0 print:!pb-3 print:!mb-4">
               {/* Left: Sweds Wood Branding */}
               <div className="space-y-2">
                 <div className="flex items-center gap-3.5">

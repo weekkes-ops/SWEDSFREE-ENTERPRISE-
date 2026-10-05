@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, FormEvent, ChangeEvent, KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, useMemo, FormEvent, ChangeEvent, KeyboardEvent } from 'react';
 import { Job, Customer, Employee, formatCurrency, JobPayment, FinancialCategory, SavedInvoice, SavedInvoiceItem, PaymentAuditLogEntry } from '../types';
 import { subscribeToCollection, saveDocument, deleteDocument, saveBatchDocuments } from '../lib/firestoreService';
 import { 
@@ -393,13 +393,49 @@ export default function InvoiceReceiptManager({
   const [activeInvoice, setActiveInvoice] = useState<Job | null>(null);
   const [activeReceipt, setActiveReceipt] = useState<{ job: Job; payment: JobPayment } | null>(null);
 
-  // Bulk PDF Export States
+  // Bulk Print & Export States
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkActiveTab, setBulkActiveTab] = useState<'INVOICES' | 'RECEIPTS'>('INVOICES');
   const [selectedBulkJobIds, setSelectedBulkJobIds] = useState<string[]>([]);
+  const [selectedBulkReceiptIds, setSelectedBulkReceiptIds] = useState<string[]>([]);
+  const [bulkPrintTarget, setBulkPrintTarget] = useState<'INVOICES' | 'RECEIPTS' | null>(null);
   const [bulkSearchTerm, setBulkSearchTerm] = useState('');
   const [bulkTemplate, setBulkTemplate] = useState<'SWEDS_WOOD' | 'MODERN'>('SWEDS_WOOD');
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+
+  // Flattened list of all individual payment receipts across all woodwork jobs
+  const allSystemReceipts = useMemo(() => {
+    const list: Array<{
+      id: string;
+      job: Job;
+      payment: JobPayment;
+      receiptNo: string;
+      customerName: string;
+      projectTitle: string;
+      amount: number;
+      date: string;
+      method: string;
+    }> = [];
+
+    jobs.forEach(job => {
+      (job.payments || []).forEach(p => {
+        list.push({
+          id: `${job.id}::${p.id}`,
+          job,
+          payment: p,
+          receiptNo: `REC-${p.id.toUpperCase()}`,
+          customerName: job.customerName,
+          projectTitle: job.title,
+          amount: p.amount,
+          date: p.date,
+          method: p.method
+        });
+      });
+    });
+
+    return list;
+  }, [jobs]);
 
   // PDF Preview Modes: 'VIEW' (A4 mockup) or 'EDIT' (Interactive inputs)
   const [invoicePdfMode, setInvoicePdfMode] = useState<'VIEW' | 'EDIT'>('VIEW');
@@ -1757,25 +1793,108 @@ export default function InvoiceReceiptManager({
     }
   };
 
+  const handleBulkPrintInvoices = () => {
+    if (selectedBulkJobIds.length === 0) {
+      alert("Please select at least one invoice to print.");
+      return;
+    }
+    setIsBulkModalOpen(false);
+    setBulkPrintTarget('INVOICES');
+    setTimeout(() => {
+      window.print();
+    }, 300);
+  };
+
+  const handleBulkPrintReceipts = () => {
+    if (selectedBulkReceiptIds.length === 0) {
+      alert("Please select at least one receipt to print.");
+      return;
+    }
+    setIsBulkModalOpen(false);
+    setBulkPrintTarget('RECEIPTS');
+    setTimeout(() => {
+      window.print();
+    }, 300);
+  };
+
+  const handleBulkReceiptPdfExport = async () => {
+    if (selectedBulkReceiptIds.length === 0) return;
+    setIsExporting(true);
+    setExportProgress(0);
+
+    try {
+      const zip = new JSZip();
+      const selectedReceipts = allSystemReceipts.filter(r => selectedBulkReceiptIds.includes(r.id));
+      const logoDataUrl = await getLogoDataUrl(invoiceLogoUrl);
+
+      let count = 0;
+      for (const item of selectedReceipts) {
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        const customer = customers.find(c => c.id === item.job.customerId);
+
+        buildReceiptPdfContent(
+          doc,
+          item.job,
+          item.payment,
+          customer,
+          undefined,
+          item.receiptNo,
+          item.date,
+          item.customerName,
+          item.method,
+          item.projectTitle,
+          item.amount,
+          undefined,
+          invoiceCompany || "SWEDS WOOD ENTERPRISE",
+          undefined,
+          logoDataUrl
+        );
+
+        const pdfArrayBuffer = doc.output('arraybuffer');
+        const cleanCustomer = item.customerName.replace(/[^a-zA-Z0-9]/g, '_');
+        const filename = `Receipt_${item.receiptNo}_${cleanCustomer}.pdf`;
+        zip.file(filename, pdfArrayBuffer);
+
+        count++;
+        setExportProgress(Math.round((count / selectedReceipts.length) * 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SwedsWood_Bulk_Receipts_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setIsBulkModalOpen(false);
+      setSelectedBulkReceiptIds([]);
+    } catch (error) {
+      console.error("Bulk receipt export failed:", error);
+      alert("Something went wrong during bulk receipt export. Please try again.");
+    } finally {
+      setIsExporting(false);
+      setExportProgress(0);
+    }
+  };
+
   return (
     <div className="space-y-6">
       
-      {/* Print styles override (Ensures print-area prints all pages cleanly on white paper with crisp dark text) */}
+      {/* Print styles override (Ensures print-area and bulk-print-area print cleanly on pure white paper with top header & zero watermarks) */}
       <style>{`
         @media print {
-          /* Hide non-print elements completely from document flow */
-          aside,
-          nav,
-          header:not(.print-header),
-          footer:not(.print-footer),
-          .no-print,
-          .print\\:hidden,
-          *[class*="print:hidden"] {
-            display: none !important;
-            visibility: hidden !important;
-            height: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
+          @page {
+            size: A4 portrait;
+            margin: 8mm 10mm !important;
           }
 
           html, body {
@@ -1792,44 +1911,77 @@ export default function InvoiceReceiptManager({
             print-color-adjust: exact !important;
           }
 
-          #root, #root > div, main {
-            display: block !important;
-            position: static !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            min-height: 0 !important;
-            overflow: visible !important;
-            background: #ffffff !important;
+          body * {
+            visibility: hidden;
           }
 
-          /* Ensure modal backdrop wrapper does not create blank space or overlays */
-          div[class*="fixed"][class*="inset-0"] {
-            position: static !important;
-            display: block !important;
-            background: #ffffff !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            overflow: visible !important;
-            height: auto !important;
-            min-height: 0 !important;
+          #print-area,
+          #print-area *,
+          #bulk-print-area,
+          #bulk-print-area * {
+            visibility: visible !important;
           }
 
-          #print-area {
-            position: static !important;
-            display: block !important;
+          #print-area,
+          #bulk-print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
             background: #ffffff !important;
+            background-color: #ffffff !important;
             color: #000000 !important;
             padding: 0 !important;
             margin: 0 !important;
             box-shadow: none !important;
             border: none !important;
             overflow: visible !important;
-            page-break-inside: auto !important;
-            break-inside: auto !important;
+            display: block !important;
+          }
+
+          .invoice-header-container,
+          .receipt-header-container {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+            top: 0 !important;
+          }
+
+          .bulk-page-item {
+            page-break-after: always !important;
+            break-after: page !important;
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+          }
+
+          .bulk-page-item:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+
+          /* Hide non-print elements completely from document flow */
+          aside,
+          nav,
+          header:not(.print-header),
+          footer:not(.print-footer),
+          .no-print,
+          .print\\:hidden,
+          *[class*="print:hidden"],
+          *[class*="watermark" i],
+          .watermark,
+          .watermark-logo,
+          img[alt*="watermark" i],
+          div[class*="opacity-[0.0" i],
+          div[class*="backdrop-blur" i] {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
 
           .print-footer-summary {
@@ -2051,14 +2203,21 @@ export default function InvoiceReceiptManager({
 
           <button
             onClick={() => {
-              setSelectedBulkJobIds(jobs.map(j => j.id));
+              if (subTab === 'RECEIPT') {
+                setBulkActiveTab('RECEIPTS');
+                setSelectedBulkReceiptIds(allSystemReceipts.map(r => r.id));
+              } else {
+                setBulkActiveTab('INVOICES');
+                setSelectedBulkJobIds(jobs.map(j => j.id));
+              }
               setBulkTemplate(invoiceTemplate);
               setIsBulkModalOpen(true);
             }}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-black uppercase transition shadow-xs cursor-pointer"
+            title="Bulk print or export multiple invoices and receipts"
           >
-            <FolderArchive className="w-4 h-4 text-amber-500" />
-            <span>Bulk PDF Export</span>
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>Bulk Print & Export</span>
           </button>
 
           <button
@@ -2909,9 +3068,32 @@ export default function InvoiceReceiptManager({
         {/* Left Column: Commission Orders Selector */}
         <div className="lg:col-span-1 bg-white rounded-2xl border border-wood-100 shadow-xs flex flex-col h-[650px] overflow-hidden">
           <div className="p-4 border-b border-gray-100">
-            <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block mb-2">
-              Select Woodwork Commission Order
-            </span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">
+                {subTab === 'RECEIPT' ? 'Select Order for Receipts' : 'Select Commission Order'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkActiveTab(subTab === 'RECEIPT' ? 'RECEIPTS' : 'INVOICES');
+                  if (subTab === 'RECEIPT') {
+                    setSelectedBulkReceiptIds(allSystemReceipts.map(r => r.id));
+                  } else {
+                    setSelectedBulkJobIds(jobs.map(j => j.id));
+                  }
+                  setIsBulkModalOpen(true);
+                }}
+                className={`px-2 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1 transition cursor-pointer shadow-2xs ${
+                  subTab === 'RECEIPT'
+                    ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border border-emerald-300'
+                    : 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300'
+                }`}
+                title={subTab === 'RECEIPT' ? 'Open Bulk Receipts Print Hub' : 'Open Bulk Invoices Print Hub'}
+              >
+                <Printer className="w-3 h-3" />
+                <span>{subTab === 'RECEIPT' ? 'Bulk Print Receipts' : 'Bulk Print Invoices'}</span>
+              </button>
+            </div>
             <div className="relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
               <input
@@ -3579,7 +3761,7 @@ export default function InvoiceReceiptManager({
       <AnimatePresence>
         {activeInvoice && (
           <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white">
-            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-4xl p-6 my-8 shadow-2xl relative print:!static print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
+            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-4xl p-6 my-8 shadow-2xl relative print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
               
               {/* TOP WORKSPACE TOOLBAR (Hides on standard print) */}
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-4 border-b border-gray-200/60 no-print">
@@ -3783,7 +3965,7 @@ export default function InvoiceReceiptManager({
                      ========================================== */
                   <div className="space-y-6 print:!space-y-3 text-[#1e3a8a] font-sans antialiased">
                     {/* Logo Header Banner */}
-                    <div className="flex flex-col md:flex-row md:items-stretch justify-between gap-6 pb-4 border-b-2 border-gray-300 print:!gap-2 print:!pb-2 print:!border-b">
+                    <div className="invoice-header-container flex flex-col md:flex-row md:items-stretch justify-between gap-6 pb-4 border-b-2 border-gray-300 print:!gap-2 print:!pb-2 print:!border-b print:!mt-0 print:!pt-0">
                       <div className="flex flex-col justify-between">
                         {/* Company Logo and Name */}
                         <div className="flex items-center gap-3">
@@ -4286,7 +4468,7 @@ export default function InvoiceReceiptManager({
                      ========================================== */
                   <>
                     {/* Letterhead Header */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b-2 border-wood-950">
+                    <div className="invoice-header-container grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b-2 border-wood-950 print:!mt-0 print:!pt-0">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <div className="relative group shrink-0">
@@ -4755,7 +4937,7 @@ export default function InvoiceReceiptManager({
       <AnimatePresence>
         {activeReceipt && (
           <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white">
-            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-2xl p-6 my-8 shadow-2xl relative print:!static print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
+            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-2xl p-6 my-8 shadow-2xl relative print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
               
               {/* TOP WORKSPACE TOOLBAR (Hides on standard print) */}
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-4 border-b border-gray-200/60 no-print">
@@ -4926,7 +5108,7 @@ export default function InvoiceReceiptManager({
               <div className="bg-white p-8 sm:p-10 border border-gray-200 rounded-xl shadow-xl space-y-6 print:p-0 print:border-none print:shadow-none print:rounded-none">
                 
                 {/* Letterhead Header */}
-                <div className="flex flex-col items-center text-center pb-6 border-b border-gray-200 space-y-2">
+                <div className="receipt-header-container flex flex-col items-center text-center pb-6 border-b border-gray-200 space-y-2 print:!pt-0 print:!mt-0 print:!pb-2">
                   <div className="flex items-center justify-center gap-3">
                     <div className="relative group shrink-0">
                       <img
@@ -5227,7 +5409,7 @@ export default function InvoiceReceiptManager({
       </AnimatePresence>
 
       {/* ==========================================
-         BULK PDF EXPORT HUB MODAL
+         BULK PRINT & EXPORT HUB MODAL & PRINT ENGINE
          ========================================== */}
       <AnimatePresence>
         {isBulkModalOpen && (
@@ -5237,140 +5419,289 @@ export default function InvoiceReceiptManager({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="bg-white text-slate-800 rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+              className="bg-white text-slate-800 rounded-2xl w-full max-w-3xl p-6 shadow-2xl relative flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150"
             >
               
               {/* Modal Header */}
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <span className="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-200">
-                    <FolderArchive className="w-5 h-5" />
+                <div className="flex items-center gap-3">
+                  <span className="p-2.5 bg-amber-500/10 text-amber-800 rounded-xl border border-amber-500/20">
+                    <Printer className="w-5 h-5 text-amber-700" />
                   </span>
                   <div>
-                    <h3 className="font-display font-black text-sm text-gray-900 uppercase tracking-wider">Bulk PDF Export Hub</h3>
-                    <p className="text-[10px] text-gray-500 font-bold">Download multiple commission invoices as a single zipped archive.</p>
+                    <h3 className="font-display font-black text-sm text-gray-900 uppercase tracking-wider">
+                      Bulk Print & Export Hub
+                    </h3>
+                    <p className="text-[10px] text-gray-500 font-bold">
+                      Batch print or download high-fidelity invoices and payment receipts with zero watermarks & top headers.
+                    </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsBulkModalOpen(false)}
-                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition"
+                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition cursor-pointer"
                 >
                   <Plus className="w-5 h-5 rotate-45" />
+                </button>
+              </div>
+
+              {/* Mode Switcher Tabs */}
+              <div className="flex items-center gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setBulkActiveTab('INVOICES')}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-2 transition cursor-pointer border ${
+                    bulkActiveTab === 'INVOICES'
+                      ? 'bg-wood-950 text-white border-wood-900 shadow-xs'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200'
+                  }`}
+                >
+                  <FileText className="w-4 h-4 text-amber-400" />
+                  <span>Bulk Invoices ({jobs.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBulkActiveTab('RECEIPTS')}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-2 transition cursor-pointer border ${
+                    bulkActiveTab === 'RECEIPTS'
+                      ? 'bg-emerald-950 text-white border-emerald-900 shadow-xs'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200'
+                  }`}
+                >
+                  <Receipt className="w-4 h-4 text-emerald-400" />
+                  <span>Bulk Receipts ({allSystemReceipts.length})</span>
                 </button>
               </div>
 
               {/* Modal Body */}
               <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
                 
-                {/* Search & Style Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Search bar inside modal */}
-                  <div className="space-y-1">
-                    <label className="text-[9px] text-gray-400 font-black uppercase tracking-wider block">Search Orders/Clients</label>
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
-                      <input
-                        type="text"
-                        placeholder="Search standard orders..."
-                        value={bulkSearchTerm}
-                        onChange={(e) => setBulkSearchTerm(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-medium text-gray-800"
-                      />
-                    </div>
-                  </div>
+                {bulkActiveTab === 'INVOICES' ? (
+                  <>
+                    {/* Search & Style Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] text-gray-400 font-black uppercase tracking-wider block">Search Orders / Clients</label>
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                          <input
+                            type="text"
+                            placeholder="Search by client or job title..."
+                            value={bulkSearchTerm}
+                            onChange={(e) => setBulkSearchTerm(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-medium text-gray-800"
+                          />
+                        </div>
+                      </div>
 
-                  {/* Template selector */}
-                  <div className="space-y-1">
-                    <label className="text-[9px] text-gray-400 font-black uppercase tracking-wider block">PDF Template Style</label>
-                    <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200">
-                      <button
-                        type="button"
-                        onClick={() => setBulkTemplate('SWEDS_WOOD')}
-                        className="flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg bg-white text-wood-950 shadow-2xs border border-wood-200"
-                      >
-                        Official Sweds Wood Invoice Format
-                      </button>
+                      <div className="space-y-1">
+                        <label className="text-[9px] text-gray-400 font-black uppercase tracking-wider block">Print Template Format</label>
+                        <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200">
+                          <button
+                            type="button"
+                            onClick={() => setBulkTemplate('SWEDS_WOOD')}
+                            className="flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg bg-white text-wood-950 shadow-2xs border border-wood-200"
+                          >
+                            Official Sweds Wood Paper Format
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Bulk Select Options Row */}
-                <div className="flex items-center justify-between text-xs bg-wood-50/50 p-3 rounded-xl border border-wood-100">
-                  <div className="flex items-center gap-1">
-                    <span className="font-bold text-wood-900 font-mono">{selectedBulkJobIds.length}</span>
-                    <span className="text-gray-500 font-semibold">of {jobs.length} invoices selected</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBulkJobIds(jobs.map(j => j.id))}
-                      className="px-2 py-1 bg-white hover:bg-gray-50 text-[10px] text-wood-900 border border-gray-200 rounded-lg font-bold transition uppercase"
-                    >
-                      Select All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBulkJobIds([])}
-                      className="px-2 py-1 bg-white hover:bg-gray-50 text-[10px] text-red-700 border border-gray-200 rounded-lg font-bold transition uppercase"
-                    >
-                      Deselect All
-                    </button>
-                  </div>
-                </div>
-
-                {/* Checklist Container */}
-                <div className="border border-gray-150 rounded-2xl overflow-hidden max-h-[250px] overflow-y-auto divide-y divide-gray-100 bg-slate-50/35">
-                  {jobs.filter(j => {
-                    const searchStr = `${j.title} ${j.customerName} ${j.id}`.toLowerCase();
-                    return searchStr.includes(bulkSearchTerm.toLowerCase());
-                  }).length === 0 ? (
-                    <div className="text-center py-8 text-gray-400 text-xs font-bold">
-                      No matching commission orders.
+                    {/* Bulk Select Options Row */}
+                    <div className="flex items-center justify-between text-xs bg-wood-50/50 p-3 rounded-xl border border-wood-100">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-wood-900 font-mono">{selectedBulkJobIds.length}</span>
+                        <span className="text-gray-500 font-semibold">of {jobs.length} commission invoices selected</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBulkJobIds(jobs.map(j => j.id))}
+                          className="px-2.5 py-1 bg-white hover:bg-gray-50 text-[10px] text-wood-900 border border-gray-200 rounded-lg font-bold transition uppercase cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBulkJobIds([])}
+                          className="px-2.5 py-1 bg-white hover:bg-gray-50 text-[10px] text-red-700 border border-gray-200 rounded-lg font-bold transition uppercase cursor-pointer"
+                        >
+                          Deselect All
+                        </button>
+                      </div>
                     </div>
-                  ) : (
-                    jobs
-                      .filter(j => {
+
+                    {/* Checklist Container */}
+                    <div className="border border-gray-150 rounded-2xl overflow-hidden max-h-[260px] overflow-y-auto divide-y divide-gray-100 bg-slate-50/35">
+                      {jobs.filter(j => {
                         const searchStr = `${j.title} ${j.customerName} ${j.id}`.toLowerCase();
                         return searchStr.includes(bulkSearchTerm.toLowerCase());
-                      })
-                      .map(job => {
-                        const isChecked = selectedBulkJobIds.includes(job.id);
-                        return (
-                          <div 
-                            key={job.id} 
-                            onClick={() => {
-                              if (isChecked) {
-                                setSelectedBulkJobIds(selectedBulkJobIds.filter(id => id !== job.id));
-                              } else {
-                                setSelectedBulkJobIds([...selectedBulkJobIds, job.id]);
-                              }
-                            }}
-                            className="p-3 hover:bg-wood-50/10 transition flex items-center justify-between cursor-pointer text-xs"
-                          >
-                            <div className="flex items-center gap-3">
-                              <button type="button" className="text-wood-800 transition">
-                                {isChecked ? (
-                                  <CheckSquare className="w-5 h-5 text-wood-900 fill-wood-50" />
-                                ) : (
-                                  <Square className="w-5 h-5 text-gray-300" />
-                                )}
-                              </button>
-                              <div>
-                                <h5 className="font-bold text-gray-800 leading-tight">{job.title}</h5>
-                                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
-                                  Client: {job.customerName} &bull; <span className="font-mono">{job.startDate}</span>
-                                </p>
-                              </div>
-                            </div>
+                      }).length === 0 ? (
+                        <div className="text-center py-8 text-gray-400 text-xs font-bold">
+                          No matching commission orders found.
+                        </div>
+                      ) : (
+                        jobs
+                          .filter(j => {
+                            const searchStr = `${j.title} ${j.customerName} ${j.id}`.toLowerCase();
+                            return searchStr.includes(bulkSearchTerm.toLowerCase());
+                          })
+                          .map(job => {
+                            const isChecked = selectedBulkJobIds.includes(job.id);
+                            const totalPaid = (job.payments || []).reduce((sum, p) => sum + p.amount, 0);
+                            const isCleared = totalPaid >= job.quoteAmount && job.quoteAmount > 0;
+                            return (
+                              <div 
+                                key={job.id} 
+                                onClick={() => {
+                                  if (isChecked) {
+                                    setSelectedBulkJobIds(selectedBulkJobIds.filter(id => id !== job.id));
+                                  } else {
+                                    setSelectedBulkJobIds([...selectedBulkJobIds, job.id]);
+                                  }
+                                }}
+                                className="p-3 hover:bg-wood-50/15 transition flex items-center justify-between cursor-pointer text-xs"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <button type="button" className="text-wood-800 transition">
+                                    {isChecked ? (
+                                      <CheckSquare className="w-5 h-5 text-wood-900 fill-wood-50" />
+                                    ) : (
+                                      <Square className="w-5 h-5 text-gray-300" />
+                                    )}
+                                  </button>
+                                  <div>
+                                    <h5 className="font-bold text-gray-800 leading-tight">{job.title}</h5>
+                                    <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
+                                      Client: <span className="text-gray-700 font-bold">{job.customerName}</span> &bull; <span className="font-mono">{job.startDate}</span>
+                                    </p>
+                                  </div>
+                                </div>
 
-                            <div className="text-right font-mono font-bold text-gray-700">
-                              {formatCurrency(job.quoteAmount, 0)}
-                            </div>
-                          </div>
-                        );
-                      })
-                  )}
-                </div>
+                                <div className="text-right">
+                                  <div className="font-mono font-bold text-gray-800">
+                                    {formatCurrency(job.quoteAmount, 0)}
+                                  </div>
+                                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.2 rounded ${
+                                    isCleared ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
+                                  }`}>
+                                    {isCleared ? 'Cleared' : 'Due'}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* RECEIPTS TAB */}
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-gray-400 font-black uppercase tracking-wider block">Search Receipts</label>
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                        <input
+                          type="text"
+                          placeholder="Search by receipt reference, client, or job title..."
+                          value={bulkSearchTerm}
+                          onChange={(e) => setBulkSearchTerm(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 focus:border-emerald-300 focus:bg-white rounded-xl outline-hidden font-medium text-gray-800"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bulk Select Options Row */}
+                    <div className="flex items-center justify-between text-xs bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-emerald-950 font-mono">{selectedBulkReceiptIds.length}</span>
+                        <span className="text-gray-500 font-semibold">of {allSystemReceipts.length} payment clearance receipts selected</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBulkReceiptIds(allSystemReceipts.map(r => r.id))}
+                          className="px-2.5 py-1 bg-white hover:bg-gray-50 text-[10px] text-emerald-950 border border-gray-200 rounded-lg font-bold transition uppercase cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBulkReceiptIds([])}
+                          className="px-2.5 py-1 bg-white hover:bg-gray-50 text-[10px] text-red-700 border border-gray-200 rounded-lg font-bold transition uppercase cursor-pointer"
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Receipts Checklist Container */}
+                    <div className="border border-gray-150 rounded-2xl overflow-hidden max-h-[260px] overflow-y-auto divide-y divide-gray-100 bg-slate-50/35">
+                      {allSystemReceipts.filter(r => {
+                        const searchStr = `${r.receiptNo} ${r.customerName} ${r.projectTitle} ${r.method}`.toLowerCase();
+                        return searchStr.includes(bulkSearchTerm.toLowerCase());
+                      }).length === 0 ? (
+                        <div className="text-center py-8 text-gray-400 text-xs font-bold">
+                          No payment receipts found. Add payments to commission orders to generate official receipts.
+                        </div>
+                      ) : (
+                        allSystemReceipts
+                          .filter(r => {
+                            const searchStr = `${r.receiptNo} ${r.customerName} ${r.projectTitle} ${r.method}`.toLowerCase();
+                            return searchStr.includes(bulkSearchTerm.toLowerCase());
+                          })
+                          .map(receipt => {
+                            const isChecked = selectedBulkReceiptIds.includes(receipt.id);
+                            return (
+                              <div 
+                                key={receipt.id} 
+                                onClick={() => {
+                                  if (isChecked) {
+                                    setSelectedBulkReceiptIds(selectedBulkReceiptIds.filter(id => id !== receipt.id));
+                                  } else {
+                                    setSelectedBulkReceiptIds([...selectedBulkReceiptIds, receipt.id]);
+                                  }
+                                }}
+                                className="p-3 hover:bg-emerald-50/20 transition flex items-center justify-between cursor-pointer text-xs"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <button type="button" className="text-emerald-800 transition">
+                                    {isChecked ? (
+                                      <CheckSquare className="w-5 h-5 text-emerald-800 fill-emerald-50" />
+                                    ) : (
+                                      <Square className="w-5 h-5 text-gray-300" />
+                                    )}
+                                  </button>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono font-black text-emerald-950 text-xs">{receipt.receiptNo}</span>
+                                      <span className="text-[9px] px-1.5 py-0.2 bg-emerald-100 text-emerald-800 font-bold rounded">
+                                        {receipt.method}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 font-semibold mt-0.5">
+                                      Client: <strong className="text-gray-800">{receipt.customerName}</strong> &bull; {receipt.projectTitle}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="text-right">
+                                  <div className="font-mono font-bold text-emerald-800 text-xs">
+                                    {formatCurrency(receipt.amount, 0)}
+                                  </div>
+                                  <span className="text-[9px] text-gray-400 font-mono">
+                                    {receipt.date}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                      )}
+                    </div>
+                  </>
+                )}
 
               </div>
 
@@ -5393,7 +5724,7 @@ export default function InvoiceReceiptManager({
               )}
 
               {/* Modal Footer */}
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={() => setIsBulkModalOpen(false)}
@@ -5401,24 +5732,398 @@ export default function InvoiceReceiptManager({
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  onClick={handleBulkPdfExport}
-                  disabled={selectedBulkJobIds.length === 0 || isExporting}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition cursor-pointer shadow-md ${
-                    selectedBulkJobIds.length === 0
-                      ? 'bg-gray-150 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none'
-                      : 'bg-wood-950 hover:bg-wood-900 text-white'
-                  }`}
-                >
-                  <FileDown className="w-4 h-4 text-amber-500" />
-                  <span>Export Zipped Archive ({selectedBulkJobIds.length})</span>
-                </button>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {bulkActiveTab === 'INVOICES' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleBulkPdfExport}
+                        disabled={selectedBulkJobIds.length === 0 || isExporting}
+                        className={`px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition cursor-pointer border ${
+                          selectedBulkJobIds.length === 0
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
+                            : 'bg-white hover:bg-gray-50 text-gray-800 border-gray-300 shadow-2xs'
+                        }`}
+                        title="Download selected invoices as a single ZIP of PDF files"
+                      >
+                        <FileDown className="w-4 h-4 text-amber-600" />
+                        <span>Export ZIP ({selectedBulkJobIds.length})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleBulkPrintInvoices}
+                        disabled={selectedBulkJobIds.length === 0 || isExporting}
+                        className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-2 transition cursor-pointer shadow-md ${
+                          selectedBulkJobIds.length === 0
+                            ? 'bg-gray-150 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none'
+                            : 'bg-wood-950 hover:bg-wood-900 text-white'
+                        }`}
+                        title="Print selected invoices directly (each formatted on its own page with top header)"
+                      >
+                        <Printer className="w-4 h-4 text-amber-400" />
+                        <span>Print Bulk Invoices ({selectedBulkJobIds.length})</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleBulkReceiptPdfExport}
+                        disabled={selectedBulkReceiptIds.length === 0 || isExporting}
+                        className={`px-3.5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition cursor-pointer border ${
+                          selectedBulkReceiptIds.length === 0
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
+                            : 'bg-white hover:bg-gray-50 text-gray-800 border-gray-300 shadow-2xs'
+                        }`}
+                        title="Download selected receipts as a single ZIP of PDF files"
+                      >
+                        <FileDown className="w-4 h-4 text-emerald-600" />
+                        <span>Export ZIP ({selectedBulkReceiptIds.length})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleBulkPrintReceipts}
+                        disabled={selectedBulkReceiptIds.length === 0 || isExporting}
+                        className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-2 transition cursor-pointer shadow-md ${
+                          selectedBulkReceiptIds.length === 0
+                            ? 'bg-gray-150 text-gray-400 cursor-not-allowed border border-gray-200 shadow-none'
+                            : 'bg-emerald-900 hover:bg-emerald-800 text-white'
+                        }`}
+                        title="Print selected receipts directly (each formatted on its own page with official letterhead)"
+                      >
+                        <Printer className="w-4 h-4 text-emerald-400" />
+                        <span>Print Bulk Receipts ({selectedBulkReceiptIds.length})</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* ==========================================
+         DEDICATED BULK PRINT CONTAINER (#bulk-print-area)
+         Pinned at top: 0 with zero watermarks & page breaks
+         ========================================== */}
+      {bulkPrintTarget && (
+        <div id="bulk-print-area" className="fixed inset-0 z-50 bg-slate-100 overflow-y-auto print:!static print:!block print:!overflow-visible print:!bg-white">
+          {/* Top screen control toolbar (Hidden on printout) */}
+          <div className="sticky top-0 z-50 bg-slate-900 text-white p-4 shadow-xl flex items-center justify-between no-print">
+            <div className="flex items-center gap-3">
+              <span className={`p-2 rounded-xl ${bulkPrintTarget === 'INVOICES' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                <Printer className="w-5 h-5" />
+              </span>
+              <div>
+                <h4 className="font-display font-black text-sm uppercase tracking-wider text-white">
+                  {bulkPrintTarget === 'INVOICES' ? 'Bulk Invoices Print Preview' : 'Bulk Receipts Print Preview'}
+                </h4>
+                <p className="text-[11px] text-gray-300">
+                  {bulkPrintTarget === 'INVOICES'
+                    ? `${selectedBulkJobIds.length} Invoices ready. Each invoice starts at the top of a new page with zero watermarks.`
+                    : `${selectedBulkReceiptIds.length} Receipts ready. Each receipt starts at the top of a new page with official clearance seal.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-2 transition cursor-pointer shadow-lg active:scale-95 ${
+                  bulkPrintTarget === 'INVOICES'
+                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
+                    : 'bg-emerald-400 hover:bg-emerald-300 text-slate-950'
+                }`}
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print Document Now</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBulkPrintTarget(null)}
+                className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+
+          {/* Paginated Paper List */}
+          <div className="p-4 sm:p-8 space-y-8 print:p-0 print:m-0 print:space-y-0">
+            {bulkPrintTarget === 'INVOICES' && (
+              jobs
+                .filter(job => selectedBulkJobIds.includes(job.id))
+                .map((job, idx, arr) => {
+                  const customer = customers.find(c => c.id === job.customerId);
+                  const totalPaid = (job.payments || []).reduce((sum, p) => sum + p.amount, 0);
+                  const outstanding = Math.max(0, job.quoteAmount - totalPaid);
+                  const invNumber = `INV-${job.id.slice(4).toUpperCase()}`;
+                  const invDate = job.startDate || new Date().toISOString().split('T')[0];
+
+                  return (
+                    <div 
+                      key={job.id} 
+                      className="bulk-page-item sweds-paper-invoice bg-white text-[#1e3a8a] font-sans antialiased p-8 sm:p-12 border border-gray-200 rounded-xl shadow-xl max-w-4xl mx-auto print:!p-0 print:!m-0 print:!border-none print:!shadow-none print:!rounded-none print:!max-w-none space-y-6 print:!space-y-3"
+                      style={{
+                        pageBreakAfter: idx < arr.length - 1 ? 'always' : 'auto',
+                        breakAfter: idx < arr.length - 1 ? 'page' : 'auto'
+                      }}
+                    >
+                      {/* Logo Header Banner */}
+                      <div className="invoice-header-container flex flex-col md:flex-row md:items-stretch justify-between gap-6 pb-4 border-b-2 border-gray-300 print:!gap-2 print:!pb-2 print:!border-b print:!mt-0 print:!pt-0">
+                        <div className="flex flex-col justify-between">
+                          <div className="flex items-center gap-3">
+                            <img src={invoiceLogoUrl || '/logo.svg'} alt="Swedswood Enterprise Official Logo" className="w-14 h-14 print:w-11 print:h-11 object-contain shrink-0" />
+                            <div className="flex flex-col">
+                              <h1 className="font-sans font-black text-2xl print:text-xl tracking-tight text-[#0f52ba] uppercase">
+                                Sweds Wood Enterprise
+                              </h1>
+                              <div className="w-full h-[3px] bg-[#0f52ba] mt-0.5" />
+                            </div>
+                          </div>
+
+                          {/* Metadata Table */}
+                          <div className="mt-4 print:!mt-2 w-72 border border-gray-400 bg-white text-xs text-[#1e3a8a] rounded-xs shadow-xs overflow-hidden">
+                            <table className="w-full border-collapse">
+                              <tbody>
+                                <tr className="border-b border-gray-300">
+                                  <td className="p-1.5 print:p-1 font-bold bg-[#e0f2fe] border-r border-gray-300 w-28 uppercase text-[10px]">Invoice No.</td>
+                                  <td className="p-1.5 print:p-1 font-mono font-bold text-gray-800">{invNumber}</td>
+                                </tr>
+                                <tr className="border-b border-gray-300">
+                                  <td className="p-1.5 print:p-1 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Address</td>
+                                  <td className="p-1.5 print:p-1 text-gray-700 font-semibold">{invoiceCompanyContact.split('\n')[2] || '2 Swed Free Avenue, Sussex'}</td>
+                                </tr>
+                                <tr className="border-b border-gray-300">
+                                  <td className="p-1.5 print:p-1 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Date</td>
+                                  <td className="p-1.5 print:p-1 font-mono text-gray-800">{invDate}</td>
+                                </tr>
+                                <tr>
+                                  <td className="p-1.5 print:p-1 font-bold bg-[#e0f2fe] border-r border-gray-300 uppercase text-[10px]">Terms</td>
+                                  <td className="p-1.5 print:p-1 text-gray-700 font-mono">Payment Clear / Standard Log</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Customer Bill-To Card */}
+                        <div className="flex flex-col justify-end w-full md:w-80">
+                          <div className="border border-gray-400 bg-white rounded-xs p-3 print:!p-2 shadow-xs space-y-1">
+                            <span className="font-sans font-black text-xs uppercase tracking-wider text-[#0f52ba] block border-b border-gray-300 pb-1 mb-1">
+                              Bill To:
+                            </span>
+                            <p className="font-bold text-gray-900 text-sm">{job.customerName}</p>
+                            {customer?.company && (
+                              <p className="text-xs text-gray-600 font-semibold">{customer.company}</p>
+                            )}
+                            <p className="text-xs text-gray-500 font-mono">{customer?.phone || 'Phone on file'}</p>
+                            <p className="text-xs text-gray-500">{customer?.address || 'Site delivery'}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Items Table */}
+                      <div className="border border-gray-400 rounded-xs overflow-hidden shadow-xs print-table-container">
+                        <table className="w-full text-xs text-left border-collapse">
+                          <thead>
+                            <tr className="bg-[#0f52ba] text-white font-sans font-bold uppercase tracking-wider border-b border-gray-400 text-[11px] print:bg-[#0f52ba] print:text-white">
+                              <th className="p-2.5 print:p-1.5 border-r border-gray-300 w-12 text-center">No.</th>
+                              <th className="p-2.5 print:p-1.5 border-r border-gray-300">Description of Work / Timber Specification</th>
+                              <th className="p-2.5 print:p-1.5 border-r border-gray-300 w-16 text-center">Qty</th>
+                              <th className="p-2.5 print:p-1.5 border-r border-gray-300 w-28 text-right">Unit Rate (Le)</th>
+                              <th className="p-2.5 print:p-1.5 w-28 text-right">Amount (Le)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-300 font-medium">
+                            <tr className="bg-white">
+                              <td className="p-2 print:p-1.5 text-center font-mono font-bold border-r border-gray-300">1</td>
+                              <td className="p-2 print:p-1.5 font-bold text-gray-800 border-r border-gray-300">
+                                {job.title}
+                              </td>
+                              <td className="p-2 print:p-1.5 text-center font-mono font-black border-r border-gray-300">1</td>
+                              <td className="p-2 print:p-1.5 text-right font-mono font-bold text-gray-800 border-r border-gray-300">
+                                {formatCurrency(job.quoteAmount, 0)}
+                              </td>
+                              <td className="p-2 print:p-1.5 text-right font-mono font-black text-gray-900">
+                                {formatCurrency(job.quoteAmount, 0)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Summary and Payment Terms */}
+                      <div className="grid grid-cols-12 gap-3 pt-3 page-break-inside-avoid print:!break-inside-avoid print-footer-summary">
+                        <div className="col-span-7 print:!col-span-7 flex flex-col justify-stretch print-customer-message-col">
+                          <div className="border border-gray-400 bg-white rounded-xs p-3 text-xs print:!p-2 print:!border-gray-500">
+                            <span className="font-sans font-black text-[10px] uppercase text-[#0f52ba] block mb-1">
+                              Payment & Settlement Notice
+                            </span>
+                            <p className="text-gray-700 italic leading-normal text-xs">
+                              Thank you for your business. All commissions are constructed with seasoned hardwood timber. Delivery is authorized upon settlement.
+                            </p>
+                            <p className="text-[10px] text-gray-500 mt-2 font-mono">
+                              Bank: Standard Chartered / Rokel Bank • Account Name: Sweds Wood Enterprise
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="col-span-5 print:!col-span-5 flex flex-col justify-end print-totals-col">
+                          <div className="border-2 border-slate-900 bg-slate-900 rounded-xs overflow-hidden shadow-xs print:!border-slate-900 print:!border-2 print-total-card">
+                            <div className="bg-slate-900 text-white flex justify-between items-center px-4 py-3 print:px-3 print:py-2.5 print-total-card-header">
+                              <span className="font-sans font-black text-xs uppercase tracking-wider !text-white">Total Invoice Amount</span>
+                              <span className="font-mono font-black text-base !text-white">
+                                {formatCurrency(job.quoteAmount, 0)}
+                              </span>
+                            </div>
+                            <div className="bg-white p-2.5 space-y-1.5 text-xs text-gray-700">
+                              <div className="flex justify-between print-total-card-row">
+                                <span className="font-semibold">Payments Received:</span>
+                                <span className="font-mono font-bold text-emerald-700">{formatCurrency(totalPaid, 0)}</span>
+                              </div>
+                              <div className="flex justify-between border-t border-gray-200 pt-1 font-bold print-total-card-row">
+                                <span className="text-gray-900 font-black uppercase text-[10px]">Outstanding Balance:</span>
+                                <span className="font-mono font-black text-amber-900">{formatCurrency(outstanding, 0)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })
+            )}
+
+            {bulkPrintTarget === 'RECEIPTS' && (
+              allSystemReceipts
+                .filter(r => selectedBulkReceiptIds.includes(r.id))
+                .map((item, idx, arr) => {
+                  const totalContract = item.job.quoteAmount;
+                  const totalPaidCaptured = (item.job.payments || []).reduce((s, p) => s + p.amount, 0);
+                  const balanceRemaining = Math.max(0, totalContract - totalPaidCaptured);
+
+                  return (
+                    <div 
+                      key={item.id} 
+                      className="bulk-page-item bg-white p-8 sm:p-10 border border-gray-200 rounded-xl shadow-xl max-w-3xl mx-auto print:!p-0 print:!m-0 print:!border-none print:!shadow-none print:!rounded-none print:!max-w-none space-y-6 print:!space-y-4"
+                      style={{
+                        pageBreakAfter: idx < arr.length - 1 ? 'always' : 'auto',
+                        breakAfter: idx < arr.length - 1 ? 'page' : 'auto'
+                      }}
+                    >
+                      {/* Letterhead Header */}
+                      <div className="receipt-header-container flex flex-col items-center text-center pb-6 border-b border-gray-200 space-y-2 print:!pt-0 print:!mt-0 print:!pb-2">
+                        <div className="flex items-center justify-center gap-3">
+                          <img
+                            src={invoiceLogoUrl || '/logo.svg'}
+                            alt="Swedswood Enterprise Official Logo"
+                            className="w-14 h-14 object-contain shrink-0"
+                          />
+                          <div className="flex flex-col text-left sm:text-center">
+                            <span className="font-display font-black text-lg uppercase tracking-wider text-emerald-950">
+                              {invoiceCompany || "SWEDS WOOD ENTERPRISE"}
+                            </span>
+                            <div className="w-full h-[2.5px] bg-emerald-800 my-0.5" />
+                          </div>
+                        </div>
+
+                        <h2 className="text-sm font-black text-gray-700 font-display uppercase tracking-wider">OFFICIAL CLEARANCE RECEIPT</h2>
+                        <p className="text-[10px] text-gray-500 font-semibold">Custom Hardwood Carpentry, Bespoke Furniture & Timber Logistics</p>
+                      </div>
+
+                      {/* Receipt Details Box */}
+                      <div className="my-6 p-6 bg-emerald-50/30 rounded-2xl border border-emerald-100/50 space-y-4 text-xs font-semibold text-gray-600">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-[9px] text-gray-400 uppercase font-extrabold block">Receipt Reference</span>
+                            <span className="font-mono text-sm text-gray-800 font-bold">{item.receiptNo}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[9px] text-gray-400 uppercase font-extrabold block">Date Cleared</span>
+                            <span className="font-mono text-sm text-gray-800 font-bold">{item.date}</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-[9px] text-gray-400 uppercase font-extrabold block">Received From (Client)</span>
+                            <span className="text-gray-900 text-xs font-black">{item.customerName}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[9px] text-gray-400 uppercase font-extrabold block">Payment Method</span>
+                            <span className="text-emerald-800 text-xs uppercase font-extrabold">{item.method}</span>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-dashed border-emerald-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-[9px] text-gray-400 uppercase font-extrabold block">Bespoke Carpentry Project</span>
+                            <span className="text-gray-800 text-xs font-bold leading-relaxed">{item.projectTitle}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[9px] text-gray-400 uppercase font-extrabold block">Cleared Value This Voucher</span>
+                            <span className="text-sm font-black font-mono text-emerald-800 block mt-1">
+                              {formatCurrency(item.amount, 0)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Contract Balance Tracking */}
+                        <div className="border-t border-emerald-200 pt-3 bg-emerald-50/40 rounded-xl p-3 space-y-1.5">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-semibold text-gray-600">Total Contract Value:</span>
+                            <span className="font-mono font-bold text-gray-900">{formatCurrency(totalContract, 0)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-semibold text-emerald-800">Total Payments Captured to Date:</span>
+                            <span className="font-mono font-bold text-emerald-800">{formatCurrency(totalPaidCaptured, 0)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs pt-1.5 border-t border-emerald-200">
+                            <span className="font-black uppercase text-emerald-950 text-[11px] tracking-wide">
+                              {balanceRemaining > 0 ? 'Remaining Balance Due:' : 'Account Balance Status:'}
+                            </span>
+                            <span className={`font-mono font-black text-sm ${balanceRemaining > 0 ? 'text-amber-800' : 'text-emerald-700'}`}>
+                              {balanceRemaining > 0 ? formatCurrency(balanceRemaining, 0) : 'Le 0.00 (Fully Settled)'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Official Stamp & Signatory Block */}
+                      <div className="pt-4 border-t border-gray-200 flex items-center justify-between">
+                        <div className="space-y-1 text-left">
+                          <p className="text-[10px] text-gray-400 uppercase font-bold">Authorized Signatory</p>
+                          <p className="font-serif italic font-bold text-sm text-gray-800">Mr Paul Bindi</p>
+                          <p className="text-[9px] text-gray-500 font-mono">Managing Director • Sweds Wood</p>
+                        </div>
+
+                        {/* Circular Verification Seal */}
+                        <div className="w-20 h-20 rounded-full border-2 border-emerald-700 flex flex-col items-center justify-center text-center p-1 text-emerald-800 rotate-[-12deg] shadow-xs">
+                          <span className="text-[7px] font-black uppercase tracking-tighter">SWEDS WOOD</span>
+                          <span className="text-[8px] font-extrabold uppercase my-0.5">OFFICIAL</span>
+                          <span className="text-[6.5px] font-black tracking-widest text-emerald-900">VERIFIED</span>
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] text-gray-400 italic text-center pt-2">
+                        All customized SWEDS WOOD ENTERPRISE timber, carving, and furniture commissions are subject to official delivery clearance terms.
+                      </p>
+                    </div>
+                  );
+                })
+            )}
+          </div>
+        </div>
+      )}
 
         {/* MODAL: Edit Existing Payment Installment */}
         {showEditPaymentModal && editingPaymentItem && (
@@ -5607,7 +6312,6 @@ export default function InvoiceReceiptManager({
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
 
       {/* Email Dispatch Modal */}
       <EmailDispatchModal

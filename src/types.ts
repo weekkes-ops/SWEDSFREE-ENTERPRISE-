@@ -62,8 +62,6 @@ export interface Employee {
   phone: string;
   email: string;
   status: EmployeeStatus;
-  baseSalary?: number; // optional
-  dailyRate?: number; // optional
   hireDate: string;
   password?: string;
 }
@@ -129,7 +127,6 @@ export type FinancialOutwardsCategory =
   | 'Material Purchase' 
   | 'Tools and Maintenance' 
   | 'Cast' 
-  | 'Salary' 
   | 'others';
 
 export type FinancialCategory = 
@@ -138,7 +135,6 @@ export type FinancialCategory =
   | 'Job Payment' 
   | 'Scrap wood sale' 
   | 'Custom Commission' 
-  | 'Employee Wages' 
   | 'Rent' 
   | 'Tools & Maintenance' 
   | 'Overhead' 

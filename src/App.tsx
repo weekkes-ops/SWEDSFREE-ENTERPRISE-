@@ -384,14 +384,32 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  // Helper to load stored data from local cache with fallback
-  const getStoredData = <T,>(key: string, fallback: T[] = []): T[] => {
+  // Strictly identify legacy mock/demo record IDs (short fixed numbers or keywords) vs authentic user records
+  const isDemoId = (id?: string, key?: string): boolean => {
+    if (!id) return false;
+    // Always preserve live Administrator Paul Bindi
+    if ((key === 'swedsfree_employees' || key === 'employees') && id === 'emp-01') return false;
+    // Any short legacy mock ID (e.g., cust-1, cust-01, cust-201, inv-1, inv-101, emp-02, emp-2, job-301, fin-601, itrans-501)
+    if (/^(cust|job|inv|emp|fin|log|warn|reg|itrans|doc)-(\d{1,5})$/i.test(id)) return true;
+    // Any explicit demo/mock/dummy/seed flags in ID
+    if (/demo|sample|mock|dummy|seed/i.test(id)) return true;
+    return false;
+  };
+
+  // Helper to load stored data from local cache with fallback and strict live filter
+  const getStoredData = <T extends { id?: string }>(key: string, fallback: T[] = []): T[] => {
     try {
       const raw = localStorage.getItem(key);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          return parsed;
+          const cleaned = parsed.filter(item => !item || !item.id || !isDemoId(item.id, key));
+          if (key === 'swedsfree_employees') {
+            if (!cleaned.some(e => (e as any).id === 'emp-01')) {
+              return [LIVE_ADMIN_EMPLOYEE as unknown as T, ...cleaned];
+            }
+          }
+          return cleaned;
         }
       }
       if (key === 'swedsfree_employees') return [LIVE_ADMIN_EMPLOYEE] as unknown as T[];
@@ -577,7 +595,7 @@ export default function App() {
       setLastSyncTime(new Date().toLocaleTimeString());
       setSyncStatus('synced');
 
-      alert("SUCCESS: All system data up to today's date (August 5, 2026) has been completely restored from Cloud Firestore!");
+      alert(`SUCCESS: All system data up to today's date (${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}) has been completely restored from Cloud Firestore!`);
     } catch (err) {
       console.error('Error bringing data back from Firestore:', err);
       setSyncStatus('error');
@@ -596,9 +614,11 @@ export default function App() {
       localKey: string
     ) => {
       const unsub = subscribeToCollection<T>(collectionName, (items) => {
-        let finalItems = items || [];
-        if (collectionName === 'employees' && finalItems.length === 0) {
-          finalItems = [LIVE_ADMIN_EMPLOYEE] as unknown as T[];
+        let finalItems = (items || []).filter(item => !item || !item.id || !isDemoId(item.id, collectionName));
+        if (collectionName === 'employees') {
+          if (!finalItems.some(e => (e as any).id === 'emp-01')) {
+            finalItems = [LIVE_ADMIN_EMPLOYEE as unknown as T, ...finalItems];
+          }
         }
 
         setter(finalItems);
@@ -624,13 +644,112 @@ export default function App() {
       localStorage.setItem('swedsfree_initial_purge_done', 'true');
     }
 
-    // Flush any stale inventory local storage cache to match the cleared Firestore collection
-    if (localStorage.getItem('swedsfree_inventory_purged_flag_v1') !== 'true') {
-      localStorage.setItem('swedsfree_inventory', JSON.stringify([]));
-      localStorage.setItem('swedsfree_inv_transactions', JSON.stringify([]));
-      setInventory([]);
-      setInventoryTransactions([]);
-      localStorage.setItem('swedsfree_inventory_purged_flag_v1', 'true');
+    // Purge legacy demo records from local cache to ensure strictly authentic user records exist
+    try {
+      const filterDemo = (key: string, setter: React.Dispatch<React.SetStateAction<any[]>>) => {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            let cleaned = parsed.filter(item => item && item.id && !isDemoId(item.id, key));
+            if (key === 'swedsfree_employees' && !cleaned.some(e => e.id === 'emp-01')) {
+              cleaned = [LIVE_ADMIN_EMPLOYEE, ...cleaned];
+            }
+            if (cleaned.length !== parsed.length) {
+              localStorage.setItem(key, JSON.stringify(cleaned));
+              setter(cleaned);
+            }
+          }
+        }
+      };
+
+      filterDemo('swedsfree_inventory', setInventory);
+      filterDemo('swedsfree_customers', setCustomers);
+      filterDemo('swedsfree_jobs', setJobs);
+      filterDemo('swedsfree_employees', setEmployees);
+      filterDemo('swedsfree_fin_transactions', setFinancialTransactions);
+      filterDemo('swedsfree_daily_work_logs', setDailyWorkLogs);
+      filterDemo('swedsfree_warning_letters', setWarningLetters);
+      filterDemo('swedsfree_registration_requests', setRegistrationRequests);
+      filterDemo('swedsfree_inv_transactions', setInventoryTransactions);
+      filterDemo('swedsfree_payment_audit_logs', setPaymentAuditLogs);
+      filterDemo('swedsfree_official_documents', setOfficialDocuments);
+    } catch (e) {
+      console.error('Error purging demo records from local cache:', e);
+    }
+
+    // Clean any legacy demo records from Firestore database collections in background
+    const collectionsToClean = [
+      'inventory', 'customers', 'employees', 'jobs', 
+      'inventoryTransactions', 'financialTransactions', 
+      'dailyWorkLogs', 'registrationRequests', 'warningLetters', 
+      'paymentAuditLogs', 'officialDocuments'
+    ];
+    collectionsToClean.forEach(col => {
+      fetchCollectionFromFirestore<{ id: string }>(col).then(items => {
+        const demoDocs = (items || []).filter(item => isDemoId(item.id, col));
+        demoDocs.forEach(d => {
+          deleteDocument(col, d.id).catch(() => {});
+        });
+      }).catch(() => {});
+    });
+
+    // Completely remove any residual salary or overtime rates from cached employees and current user
+    try {
+      const rawEmps = localStorage.getItem('swedsfree_employees');
+      if (rawEmps) {
+        const parsedEmps = JSON.parse(rawEmps);
+        if (Array.isArray(parsedEmps)) {
+          let empModified = false;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const sanitizedEmps = parsedEmps.map((emp: any) => {
+            if ('baseSalary' in emp || 'dailyRate' in emp) {
+              empModified = true;
+              const { baseSalary, dailyRate, ...rest } = emp;
+              return rest;
+            }
+            return emp;
+          });
+          if (empModified) {
+            localStorage.setItem('swedsfree_employees', JSON.stringify(sanitizedEmps));
+            setEmployees(sanitizedEmps);
+          }
+        }
+      }
+
+      const rawUser = localStorage.getItem('swedsfree_current_user');
+      if (rawUser) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parsedUser: any = JSON.parse(rawUser);
+        if (parsedUser && ('baseSalary' in parsedUser || 'dailyRate' in parsedUser)) {
+          const { baseSalary, dailyRate, ...rest } = parsedUser;
+          localStorage.setItem('swedsfree_current_user', JSON.stringify(rest));
+          setCurrentUser(rest as Employee);
+        }
+      }
+
+      // Sanitize any financial ledger records having legacy 'Salary' or 'Employee Wages'
+      const rawFin = localStorage.getItem('swedsfree_fin_transactions');
+      if (rawFin) {
+        const parsedFin = JSON.parse(rawFin);
+        if (Array.isArray(parsedFin)) {
+          let finModified = false;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const sanitizedFin = parsedFin.map((tx: any) => {
+            if (tx.category === 'Salary' || tx.category === 'Employee Wages') {
+              finModified = true;
+              return { ...tx, category: 'Utilities', description: tx.description ? tx.description.replace(/salary|payroll|wage/gi, 'workshop utilities') : 'Workshop utility expense' };
+            }
+            return tx;
+          });
+          if (finModified) {
+            localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(sanitizedFin));
+            setFinancialTransactions(sanitizedFin);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error sanitizing cached salary/wage data:', err);
     }
 
     return () => {
@@ -790,48 +909,6 @@ export default function App() {
     // 2. Append transaction log
     setInventoryTransactions(prev => [...prev, newTx]);
     saveDocument('inventoryTransactions', newTx);
-
-    // 3. Post to Financial Ledger correctly (avoiding treating internal consumption as scrap sales income)
-    const financialId = `fin-inv-${Date.now()}`;
-    const isPurchase = tx.type === 'INWARDS';
-    
-    let finType: 'INCOME' | 'EXPENDITURE';
-    let finCategory: FinancialCategory;
-    let finDescription = `${tx.type} LOG: ${tx.quantity} ${tx.itemName}`;
-    
-    if (isPurchase) {
-      finType = 'EXPENDITURE';
-      finCategory = 'Material Purchase';
-      finDescription += ` - Supplier Restock: ${tx.purpose}`;
-    } else {
-      // Check if it is a scrap sale or similar revenue generator
-      const isSale = tx.purpose.toLowerCase().includes('sale') || 
-                     tx.purpose.toLowerCase().includes('sold') || 
-                     tx.purpose.toLowerCase().includes('customer') ||
-                     tx.purpose.toLowerCase().includes('revenue');
-      if (isSale) {
-        finType = 'INCOME';
-        finCategory = 'Scrap wood sale';
-        finDescription += ` - Sale: ${tx.purpose}`;
-      } else {
-        // It's internal consumption, workshop dispatch, damage, or waste
-        finType = 'EXPENDITURE';
-        finCategory = 'Material Purchase';
-        finDescription += ` - Workshop Dispatch / Waste: ${tx.purpose}`;
-      }
-    }
-
-    const newFinTx: FinancialTransaction = {
-      id: financialId,
-      type: finType,
-      category: finCategory,
-      amount: tx.totalValue,
-      date: dateStr,
-      description: finDescription,
-      referenceId: transactionId
-    };
-    setFinancialTransactions(prev => [...prev, newFinTx]);
-    saveDocument('financialTransactions', newFinTx);
   };
 
   // B. Customer mutators

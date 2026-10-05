@@ -237,7 +237,7 @@ export default function FinancialLedger({
             <h3 className="text-xl font-bold font-mono text-red-600 mt-1">
               -{formatCurrency(totalExpenditure)}
             </h3>
-            <p className="text-[10px] text-gray-400 mt-0.5">Wages, raw wood & overheads</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Raw wood, workshop & overheads</p>
           </div>
           <div className="p-3 bg-red-50 rounded-xl text-red-600 border border-red-100">
             <TrendingDown className="w-5 h-5" />
@@ -518,7 +518,6 @@ export default function FinancialLedger({
                           <option value="Material Purchase">Material Purchase</option>
                           <option value="Tools and Maintenance">Tools and Maintenance</option>
                           <option value="Cast">Cast</option>
-                          <option value="Salary">Salary</option>
                           <option value="others">others</option>
                         </>
                       )}
@@ -650,7 +649,6 @@ export default function FinancialLedger({
                           <option value="Material Purchase">Material Purchase</option>
                           <option value="Tools and Maintenance">Tools and Maintenance</option>
                           <option value="Cast">Cast</option>
-                          <option value="Salary">Salary</option>
                           <option value="others">others</option>
                         </>
                       )}
