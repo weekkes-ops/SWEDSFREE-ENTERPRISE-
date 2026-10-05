@@ -753,11 +753,12 @@ export default function InventoryManager({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Initial Stock</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity</label>
                     <input
                       type="number"
                       required
                       min={0}
+                      placeholder="e.g. 100"
                       value={newItemInitialStock}
                       onChange={(e) => setNewItemInitialStock(Number(e.target.value))}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"

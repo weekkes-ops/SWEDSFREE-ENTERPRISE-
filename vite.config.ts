@@ -14,6 +14,9 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    define: {
+      'process.env.FIREBASE_API_KEY': JSON.stringify(process.env.FIREBASE_API_KEY || 'AIzaSyD8GuExFnpkNLqvBFDsVGMrQXDAyHec6oY'),
+    },
     server: {
       host: '0.0.0.0',
       port: 3000,
