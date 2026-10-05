@@ -1,27 +1,24 @@
 import { useState, FormEvent } from 'react';
-import { InventoryItem, InventoryTransaction, WoodCategory, WoodUnit, formatCurrency, Employee } from '../types';
+import { InventoryItem, WoodCategory, WoodUnit, formatCurrency, Employee, InventoryTransaction } from '../types';
 import { 
   Plus, 
-  ArrowDownLeft, 
-  ArrowUpRight, 
   Search, 
   Filter, 
   AlertTriangle, 
-  History, 
-  Flame, 
   Trash2,
   ShieldAlert,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface InventoryManagerProps {
   inventory: InventoryItem[];
-  transactions: InventoryTransaction[];
+  transactions?: InventoryTransaction[];
   onAddInventoryItem: (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => void;
-  onLogTransaction: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
+  onLogTransaction?: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
   onUpdateInventoryItem?: (item: InventoryItem) => void;
   onDeleteInventoryItem?: (id: string) => void;
   onDeleteTransaction?: (id: string) => void;
@@ -30,12 +27,9 @@ interface InventoryManagerProps {
 
 export default function InventoryManager({
   inventory,
-  transactions,
   onAddInventoryItem,
-  onLogTransaction,
   onUpdateInventoryItem,
   onDeleteInventoryItem,
-  onDeleteTransaction,
   currentUser
 }: InventoryManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
@@ -43,8 +37,6 @@ export default function InventoryManager({
   const [selectedCategory, setSelectedCategory] = useState<WoodCategory | 'All'>('All');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [showNewItemModal, setShowNewItemModal] = useState(false);
-  const [showLogModal, setShowLogModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'STOCK' | 'LOGS'>('STOCK');
   const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('TABLE');
 
   const [showEditItemModal, setShowEditItemModal] = useState(false);
@@ -98,35 +90,6 @@ export default function InventoryManager({
     setEditingItem(null);
   };
 
-  // Form states - Log Transaction
-  const [logItemId, setLogItemId] = useState(inventory[0]?.id || '');
-  const [logType, setLogType] = useState<'INWARDS' | 'OUTWARDS'>('INWARDS');
-  const [logQuantity, setLogQuantity] = useState(50);
-  const [logUnitCost, setLogUnitCost] = useState(0);
-  const [logPurpose, setLogPurpose] = useState('');
-
-  // Handle selected item changed in Log Transaction Modal to auto-fill unit cost
-  const handleLogItemChange = (itemId: string) => {
-    setLogItemId(itemId);
-    const item = inventory.find(i => i.id === itemId);
-    if (item) {
-      setLogUnitCost(item.unitCost);
-    }
-  };
-
-  const handleOpenLogModal = (type: 'INWARDS' | 'OUTWARDS', itemId?: string) => {
-    setLogType(type);
-    const targetId = itemId || inventory[0]?.id || '';
-    setLogItemId(targetId);
-    const item = inventory.find(i => i.id === targetId);
-    if (item) {
-      setLogUnitCost(item.unitCost);
-    }
-    setLogQuantity(type === 'INWARDS' ? 50 : 10);
-    setLogPurpose(type === 'INWARDS' ? 'Supplier Restock' : 'Workshop Dispatch');
-    setShowLogModal(true);
-  };
-
   const handleSubmitNewItem = (e: FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
@@ -148,37 +111,10 @@ export default function InventoryManager({
     setShowNewItemModal(false);
   };
 
-  const handleSubmitLogTransaction = (e: FormEvent) => {
-    e.preventDefault();
-    const item = inventory.find(i => i.id === logItemId);
-    if (!item) return;
-
-    if (logType === 'OUTWARDS' && item.currentStock < logQuantity) {
-      alert(`Insufficient Stock! Current stock for ${item.name} is ${item.currentStock} ${item.unit}.`);
-      return;
-    }
-
-    onLogTransaction({
-      itemId: logItemId,
-      itemName: item.name,
-      type: logType,
-      quantity: logQuantity,
-      unitCost: logUnitCost,
-      totalValue: logQuantity * logUnitCost,
-      purpose: logPurpose
-    });
-
-    setShowLogModal(false);
-  };
-
   // Sorting states
   type StockSortField = 'name' | 'category' | 'currentStock' | 'unitCost' | 'minStockThreshold' | 'status' | 'date';
   const [stockSortField, setStockSortField] = useState<StockSortField>('name');
   const [stockSortDirection, setStockSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  type TxSortField = 'date' | 'itemName' | 'type' | 'quantity' | 'unitCost' | 'totalValue';
-  const [txSortField, setTxSortField] = useState<TxSortField>('date');
-  const [txSortDirection, setTxSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const handleStockSort = (field: StockSortField) => {
     if (stockSortField === field) {
@@ -186,15 +122,6 @@ export default function InventoryManager({
     } else {
       setStockSortField(field);
       setStockSortDirection(field === 'date' || field === 'currentStock' || field === 'unitCost' ? 'desc' : 'asc');
-    }
-  };
-
-  const handleTxSort = (field: TxSortField) => {
-    if (txSortField === field) {
-      setTxSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setTxSortField(field);
-      setTxSortDirection(field === 'date' || field === 'quantity' || field === 'totalValue' ? 'desc' : 'asc');
     }
   };
 
@@ -233,20 +160,6 @@ export default function InventoryManager({
     return 0;
   });
 
-  const sortedTransactions = [...transactions].sort((a, b) => {
-    let valA: any = a[txSortField as keyof InventoryTransaction];
-    let valB: any = b[txSortField as keyof InventoryTransaction];
-
-    if (typeof valA === 'string') {
-      const comp = (valA || '').localeCompare(valB || '');
-      return txSortDirection === 'asc' ? comp : -comp;
-    }
-
-    if (valA < valB) return txSortDirection === 'asc' ? -1 : 1;
-    if (valA > valB) return txSortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
-
   return (
     <div className="space-y-6">
       
@@ -257,29 +170,15 @@ export default function InventoryManager({
             Inventory
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Track incoming supplies and outgoing material logs for bespoke woodwork production.
+            Track lumber stock reserves, raw material inventory, and reorder thresholds for bespoke woodwork production.
           </p>
         </div>
         
         {!isAuditor ? (
           <div className="flex flex-wrap gap-2">
             <button 
-              onClick={() => handleOpenLogModal('INWARDS')}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-xl text-xs font-semibold transition"
-            >
-              <ArrowDownLeft className="w-4 h-4" />
-              <span>Log Inwards (Inflow)</span>
-            </button>
-            <button 
-              onClick={() => handleOpenLogModal('OUTWARDS')}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-semibold transition"
-            >
-              <ArrowUpRight className="w-4 h-4" />
-              <span>Log Outwards (Outflow)</span>
-            </button>
-            <button 
               onClick={() => setShowNewItemModal(true)}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs"
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>New Raw Material</span>
@@ -293,592 +192,391 @@ export default function InventoryManager({
         )}
       </div>
 
-      {/* Navigation Sub-Tabs */}
-      <div className="flex border-b border-gray-100">
-        <button
-          onClick={() => setActiveTab('STOCK')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${activeTab === 'STOCK' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-        >
-          Stock Level Reserves
-        </button>
-        <button
-          onClick={() => setActiveTab('LOGS')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${activeTab === 'LOGS' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-        >
-          Inwards & Outwards History
-        </button>
-      </div>
-
-      {activeTab === 'STOCK' ? (
-        <div className="space-y-4">
-          
-          {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-xl border border-wood-100 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-            <div className="flex-1 flex flex-col sm:flex-row gap-2">
-              {/* Search */}
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  placeholder="Search wood or hardware materials..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-medium text-gray-800 placeholder-gray-400"
-                />
-              </div>
-
-              {/* Category Filter */}
-              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2">
-                <Filter className="w-4 h-4 text-gray-400" />
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value as WoodCategory | 'All')}
-                  className="bg-transparent border-0 text-sm font-semibold text-gray-700 focus:ring-0 py-2 focus:outline-hidden"
-                >
-                  <option value="All">All Categories</option>
-                  <option value="Lumber">Lumber / Hardwood</option>
-                  <option value="Plywood">Plywood / Sheets</option>
-                  <option value="Hardware">Hardware / Fittings</option>
-                  <option value="Finishes">Finishes & Polish</option>
-                  <option value="Adhesives">Adhesives & Glues</option>
-                  <option value="Other">Other Accessories</option>
-                </select>
-              </div>
+      <div className="space-y-4">
+        {/* Filters Bar */}
+        <div className="bg-white p-4 rounded-xl border border-wood-100 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div className="flex-1 flex flex-col sm:flex-row gap-2">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+              <input
+                type="text"
+                placeholder="Search wood or hardware materials..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-medium text-gray-800 placeholder-gray-400"
+              />
             </div>
 
-            <div className="flex flex-wrap items-center gap-4">
-              {/* View mode toggle */}
-              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl p-1">
-                <button
-                  onClick={() => setViewMode('TABLE')}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${viewMode === 'TABLE' ? 'bg-white shadow-xs text-wood-950 border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                  Table Row View
-                </button>
-                <button
-                  onClick={() => setViewMode('GRID')}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${viewMode === 'GRID' ? 'bg-white shadow-xs text-wood-950 border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                  Card Grid View
-                </button>
-              </div>
-
-              {/* Low Stock checkbox */}
-              <label className="flex items-center gap-2 cursor-pointer py-1 select-none">
-                <input
-                  type="checkbox"
-                  checked={showLowStockOnly}
-                  onChange={(e) => setShowLowStockOnly(e.target.checked)}
-                  className="rounded border-gray-300 text-wood-600 focus:ring-wood-500 w-4 h-4"
-                />
-                <span className="text-xs font-bold text-amber-700 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Show Low Stock Only
-                </span>
-              </label>
+            {/* Category Filter */}
+            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2">
+              <Filter className="w-4 h-4 text-gray-400" />
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value as WoodCategory | 'All')}
+                className="bg-transparent border-0 text-sm font-semibold text-gray-700 focus:ring-0 py-2 focus:outline-hidden"
+              >
+                <option value="All">All Categories</option>
+                <option value="Lumber">Lumber / Hardwood</option>
+                <option value="Plywood">Plywood / Sheets</option>
+                <option value="Hardware">Hardware / Fittings</option>
+                <option value="Finishes">Finishes & Polish</option>
+                <option value="Adhesives">Adhesives & Glues</option>
+                <option value="Other">Other Accessories</option>
+              </select>
             </div>
           </div>
 
-          {/* Table / Cards Display Grid depending on viewMode */}
-          {viewMode === 'TABLE' ? (
-            <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-500 font-bold select-none">
-                      <th 
-                        onClick={() => handleStockSort('name')} 
-                        className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
-                        title="Click to sort by material name"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span>Material Details</span>
-                          {stockSortField === 'name' ? (
-                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                        </div>
-                      </th>
-                      <th 
-                        onClick={() => handleStockSort('category')} 
-                        className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
-                        title="Click to sort by category"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span>Category</span>
-                          {stockSortField === 'category' ? (
-                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                        </div>
-                      </th>
-                      <th 
-                        onClick={() => handleStockSort('currentStock')} 
-                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                        title="Click to sort by current stock level"
-                      >
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span>Current Stock</span>
-                          {stockSortField === 'currentStock' ? (
-                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                        </div>
-                      </th>
-                      <th 
-                        onClick={() => handleStockSort('unitCost')} 
-                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                        title="Click to sort by unit rate"
-                      >
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span>Unit rate</span>
-                          {stockSortField === 'unitCost' ? (
-                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                        </div>
-                      </th>
-                      <th 
-                        onClick={() => handleStockSort('minStockThreshold')} 
-                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                        title="Click to sort by minimum threshold"
-                      >
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span>Min. Threshold</span>
-                          {stockSortField === 'minStockThreshold' ? (
-                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                        </div>
-                      </th>
-                      <th 
-                        onClick={() => handleStockSort('status')} 
-                        className="py-3 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition"
-                        title="Click to sort by stock status severity"
-                      >
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span>Stock status</span>
-                          {stockSortField === 'status' ? (
-                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                        </div>
-                      </th>
-                      {!isAuditor && <th className="py-3 px-4 text-right">Actions</th>}
+          <div className="flex flex-wrap items-center gap-4">
+            {/* View mode toggle */}
+            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl p-1">
+              <button
+                onClick={() => setViewMode('TABLE')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${viewMode === 'TABLE' ? 'bg-white shadow-xs text-wood-950 border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                Table Row View
+              </button>
+              <button
+                onClick={() => setViewMode('GRID')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${viewMode === 'GRID' ? 'bg-white shadow-xs text-wood-950 border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                Card Grid View
+              </button>
+            </div>
+
+            {/* Low Stock checkbox */}
+            <label className="flex items-center gap-2 cursor-pointer py-1 select-none">
+              <input
+                type="checkbox"
+                checked={showLowStockOnly}
+                onChange={(e) => setShowLowStockOnly(e.target.checked)}
+                className="rounded border-gray-300 text-wood-600 focus:ring-wood-500 w-4 h-4 cursor-pointer"
+              />
+              <span className="text-xs font-bold text-amber-700 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Show Low Stock Only
+              </span>
+            </label>
+          </div>
+        </div>
+
+        {/* Table / Cards Display Grid depending on viewMode */}
+        {viewMode === 'TABLE' ? (
+          <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-500 font-bold select-none">
+                    <th 
+                      onClick={() => handleStockSort('name')} 
+                      className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                      title="Click to sort by material name"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Material Details</span>
+                        {stockSortField === 'name' ? (
+                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleStockSort('category')} 
+                      className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                      title="Click to sort by category"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Category</span>
+                        {stockSortField === 'category' ? (
+                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleStockSort('currentStock')} 
+                      className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                      title="Click to sort by current stock level"
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>Current Stock</span>
+                        {stockSortField === 'currentStock' ? (
+                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleStockSort('unitCost')} 
+                      className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                      title="Click to sort by unit rate"
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>Unit rate</span>
+                        {stockSortField === 'unitCost' ? (
+                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleStockSort('minStockThreshold')} 
+                      className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                      title="Click to sort by minimum threshold"
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>Min. Threshold</span>
+                        {stockSortField === 'minStockThreshold' ? (
+                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleStockSort('status')} 
+                      className="py-3 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition"
+                      title="Click to sort by stock status severity"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>Stock status</span>
+                        {stockSortField === 'status' ? (
+                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                      </div>
+                    </th>
+                    {!isAuditor && <th className="py-3 px-4 text-right">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {sortedInventory.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-16 text-gray-400">
+                        {inventory.length === 0 ? (
+                          <div className="space-y-2">
+                            <p className="font-semibold text-gray-600">No inventory items in stock.</p>
+                            <p className="text-xs text-gray-400">Click "+ New Raw Material" to record new timber, lumber, or hardware stock.</p>
+                          </div>
+                        ) : (
+                          'No inventory items match your filters.'
+                        )}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 font-medium">
-                    {sortedInventory.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="text-center py-16 text-gray-400">
-                          {inventory.length === 0 ? (
-                            <div className="space-y-2">
-                              <p className="font-semibold text-gray-600">No inventory items in stock.</p>
-                              <p className="text-xs text-gray-400">All inventory data has been cleared. Click "+ Add New Item" to record new timber, lumber, or hardware stock.</p>
+                  ) : (
+                    sortedInventory.map(item => {
+                      const isLow = item.currentStock <= item.minStockThreshold;
+                      const isWarningThreshold = item.currentStock < 5;
+                      return (
+                        <tr 
+                          key={item.id} 
+                          className={`transition ${
+                            isWarningThreshold 
+                              ? 'bg-amber-50/80 hover:bg-amber-100/50 text-amber-950 font-semibold border-l-4 border-amber-500' 
+                              : 'hover:bg-gray-50/50 text-gray-700'
+                          }`}
+                        >
+                          <td className="py-3.5 px-4">
+                            <p className="font-bold text-gray-900">{item.name}</p>
+                            <p className="text-[10px] text-gray-400 font-semibold">ID: {item.id} &bull; Updated {item.lastUpdated}</p>
+                          </td>
+                          <td className="py-3.5 px-4 uppercase text-[10px] font-bold text-gray-500">
+                            {item.category}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-sm">
+                            {item.currentStock} <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono">
+                            {formatCurrency(item.unitCost)}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono text-gray-500">
+                            {item.minStockThreshold} {item.unit}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {isWarningThreshold ? (
+                              <span className="inline-flex items-center gap-1 bg-amber-200 text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full border border-amber-300">
+                                STOCK UNDER 5 UNITS
+                              </span>
+                            ) : isLow ? (
+                              <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-red-200">
+                                REORDER LEVEL
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-200">
+                                HEALTHY
+                              </span>
+                            )}
+                          </td>
+                          {!isAuditor && (
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {confirmDeleteId === item.id ? (
+                                  <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
+                                    <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
+                                    <button
+                                      onClick={() => {
+                                        if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
+                                        setConfirmDeleteId(null);
+                                      }}
+                                      className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
+                                    >
+                                      Yes
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmDeleteId(null)}
+                                      className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
+                                    >
+                                      No
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleOpenEditModal(item)}
+                                      className="px-2.5 py-1 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition flex items-center gap-1 cursor-pointer"
+                                      title="Edit Material"
+                                    >
+                                      <Edit2 className="w-3 h-3 text-wood-700" />
+                                      <span>Edit</span>
+                                    </button>
+                                    {onDeleteInventoryItem && (
+                                      <button 
+                                        onClick={() => setConfirmDeleteId(item.id)}
+                                        className="p-1.5 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition cursor-pointer"
+                                        title="Delete Material"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          /* Cards Display Grid */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sortedInventory.length === 0 ? (
+              <div className="col-span-full text-center py-16 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400">
+                {inventory.length === 0 ? (
+                  <div className="space-y-2">
+                    <p className="font-semibold text-gray-600">No inventory items in stock.</p>
+                    <p className="text-xs text-gray-400">Click "+ New Raw Material" to record new timber, lumber, or hardware stock.</p>
+                  </div>
+                ) : (
+                  <p>No inventory items match your filters.</p>
+                )}
+              </div>
+            ) : (
+              sortedInventory.map(item => {
+                const isLow = item.currentStock <= item.minStockThreshold;
+                const isWarningThreshold = item.currentStock < 5;
+                return (
+                  <motion.div
+                    key={item.id}
+                    layoutId={`inv-${item.id}`}
+                    whileHover={{ y: -3 }}
+                    className={`bg-white p-5 rounded-2xl border ${
+                      isWarningThreshold 
+                        ? 'border-amber-300 bg-amber-50/30' 
+                        : isLow 
+                          ? 'border-red-200 bg-red-50/5' 
+                          : 'border-wood-100'
+                    } shadow-xs flex flex-col justify-between h-48`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="px-2.5 py-0.5 bg-wood-50 text-wood-800 text-[10px] font-bold rounded-md border border-wood-100 uppercase">
+                          {item.category}
+                        </span>
+                        {isWarningThreshold ? (
+                          <span className="flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-amber-200 animate-pulse">
+                            <AlertTriangle className="w-3 h-3" />
+                            STOCK &lt; 5 UNITS
+                          </span>
+                        ) : isLow && (
+                          <span className="flex items-center gap-1 bg-red-100 text-red-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-red-200">
+                            <AlertTriangle className="w-3 h-3" />
+                            REORDER LEVEL
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-sm font-bold text-gray-900 mt-2 line-clamp-2 leading-snug">
+                        {item.name}
+                      </h3>
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-50">
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase">Current Stock</p>
+                          <p className="text-xl font-bold font-mono text-wood-950">
+                            {item.currentStock} <span className="text-xs font-sans text-gray-500 font-normal">{item.unit}</span>
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-gray-400 font-semibold uppercase">Est. Unit Cost</p>
+                          <p className="text-sm font-bold font-mono text-gray-800">
+                            {formatCurrency(item.unitCost)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-dashed border-gray-100 text-[10px]">
+                        <span className="text-gray-400 font-medium">Min Threshold: {item.minStockThreshold} {item.unit}</span>
+                        <div className="flex items-center gap-1.5">
+                          {confirmDeleteId === item.id ? (
+                            <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
+                              <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
+                              <button
+                                onClick={() => {
+                                  if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
+                                  setConfirmDeleteId(null);
+                                }}
+                                className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
+                              >
+                                No
+                              </button>
                             </div>
                           ) : (
-                            'No inventory items match your filters.'
-                          )}
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedInventory.map(item => {
-                        const isLow = item.currentStock <= item.minStockThreshold;
-                        const isWarningThreshold = item.currentStock < 5;
-                        return (
-                          <tr 
-                            key={item.id} 
-                            className={`transition ${
-                              isWarningThreshold 
-                                ? 'bg-amber-50/80 hover:bg-amber-100/50 text-amber-950 font-semibold border-l-4 border-amber-500' 
-                                : 'hover:bg-gray-50/50 text-gray-700'
-                            }`}
-                          >
-                            <td className="py-3.5 px-4">
-                              <p className="font-bold text-gray-900">{item.name}</p>
-                              <p className="text-[10px] text-gray-400 font-semibold">ID: {item.id} &bull; Updated {item.lastUpdated}</p>
-                            </td>
-                            <td className="py-3.5 px-4 uppercase text-[10px] font-bold text-gray-500">
-                              {item.category}
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-mono font-bold text-sm">
-                              {item.currentStock} <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-mono">
-                              {formatCurrency(item.unitCost)}
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-mono text-gray-500">
-                              {item.minStockThreshold} {item.unit}
-                            </td>
-                            <td className="py-3.5 px-4 text-center">
-                              {isWarningThreshold ? (
-                                <span className="inline-flex items-center gap-1 bg-amber-200 text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full border border-amber-300">
-                                  STOCK UNDER 5 UNITS
-                                </span>
-                              ) : isLow ? (
-                                <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-red-200">
-                                  REORDER LEVEL
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-200">
-                                  HEALTHY
-                                </span>
+                            <>
+                              {!isAuditor && (
+                                <button
+                                  onClick={() => handleOpenEditModal(item)}
+                                  className="px-2 py-0.5 text-[9px] font-bold uppercase text-wood-700 hover:underline cursor-pointer flex items-center gap-1"
+                                >
+                                  <Edit2 className="w-2.5 h-2.5" />
+                                  <span>Edit</span>
+                                </button>
                               )}
-                            </td>
-                            {!isAuditor && (
-                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {confirmDeleteId === item.id ? (
-                                    <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
-                                      <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
-                                      <button
-                                        onClick={() => {
-                                          if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
-                                          setConfirmDeleteId(null);
-                                        }}
-                                        className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
-                                      >
-                                        Yes
-                                      </button>
-                                      <button
-                                        onClick={() => setConfirmDeleteId(null)}
-                                        className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
-                                      >
-                                        No
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <button
-                                        onClick={() => handleOpenEditModal(item)}
-                                        className="px-2 py-1 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition"
-                                      >
-                                        Edit
-                                      </button>
-                                      <button 
-                                        onClick={() => handleOpenLogModal('INWARDS', item.id)}
-                                        className="p-1 hover:bg-emerald-50 rounded text-emerald-600 border border-transparent hover:border-emerald-100 transition"
-                                        title="Add Inwards Log"
-                                      >
-                                        <Plus className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button 
-                                        onClick={() => handleOpenLogModal('OUTWARDS', item.id)}
-                                        className="p-1 hover:bg-amber-50 rounded text-amber-600 border border-transparent hover:border-amber-100 transition"
-                                        title="Add Outwards Log"
-                                      >
-                                        <ArrowUpRight className="w-3.5 h-3.5" />
-                                      </button>
-                                      {!isAuditor && onDeleteInventoryItem && (
-                                        <button 
-                                          onClick={() => setConfirmDeleteId(item.id)}
-                                          className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition"
-                                          title="Delete Material"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            /* Cards Display Grid */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortedInventory.length === 0 ? (
-                <div className="col-span-full text-center py-16 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400">
-                  {inventory.length === 0 ? (
-                    <div className="space-y-2">
-                      <p className="font-semibold text-gray-600">No inventory items in stock.</p>
-                      <p className="text-xs text-gray-400">All inventory data has been cleared. Click "+ Add New Item" to record new timber, lumber, or hardware stock.</p>
-                    </div>
-                  ) : (
-                    <p>No inventory items match your filters.</p>
-                  )}
-                </div>
-              ) : (
-                sortedInventory.map(item => {
-                  const isLow = item.currentStock <= item.minStockThreshold;
-                  const isWarningThreshold = item.currentStock < 5;
-                  return (
-                    <motion.div
-                      key={item.id}
-                      layoutId={`inv-${item.id}`}
-                      whileHover={{ y: -3 }}
-                      className={`bg-white p-5 rounded-2xl border ${
-                        isWarningThreshold 
-                          ? 'border-amber-300 bg-amber-50/30' 
-                          : isLow 
-                            ? 'border-red-200 bg-red-50/5' 
-                            : 'border-wood-100'
-                      } shadow-xs flex flex-col justify-between h-48`}
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-1">
-                          <span className="px-2.5 py-0.5 bg-wood-50 text-wood-800 text-[10px] font-bold rounded-md border border-wood-100 uppercase">
-                            {item.category}
-                          </span>
-                          {isWarningThreshold ? (
-                            <span className="flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-amber-200 animate-pulse">
-                              <AlertTriangle className="w-3 h-3" />
-                              STOCK &lt; 5 UNITS
-                            </span>
-                          ) : isLow && (
-                            <span className="flex items-center gap-1 bg-red-100 text-red-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-red-200">
-                              <AlertTriangle className="w-3 h-3" />
-                              REORDER LEVEL
-                            </span>
+                              {!isAuditor && onDeleteInventoryItem && (
+                                <button 
+                                  onClick={() => setConfirmDeleteId(item.id)}
+                                  className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition cursor-pointer"
+                                  title="Delete Material"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
-                        <h3 className="text-sm font-bold text-gray-900 mt-2 line-clamp-2 leading-snug">
-                          {item.name}
-                        </h3>
                       </div>
-
-                      <div className="pt-2 border-t border-gray-50">
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <p className="text-[10px] text-gray-400 font-semibold uppercase">Current Stock</p>
-                            <p className="text-xl font-bold font-mono text-wood-950">
-                              {item.currentStock} <span className="text-xs font-sans text-gray-500 font-normal">{item.unit}</span>
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[10px] text-gray-400 font-semibold uppercase">Est. Unit Cost</p>
-                            <p className="text-sm font-bold font-mono text-gray-800">
-                              {formatCurrency(item.unitCost)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-dashed border-gray-100 text-[10px]">
-                          <span className="text-gray-400 font-medium">Min Threshold: {item.minStockThreshold} {item.unit}</span>
-                          <div className="flex items-center gap-1.5">
-                            {confirmDeleteId === item.id ? (
-                              <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
-                                <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
-                                <button
-                                  onClick={() => {
-                                    if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
-                                    setConfirmDeleteId(null);
-                                  }}
-                                  className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
-                                >
-                                  Yes
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDeleteId(null)}
-                                  className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
-                                >
-                                  No
-                                </button>
-                              </div>
-                            ) : (
-                              <>
-                                {!isAuditor && (
-                                  <button
-                                    onClick={() => handleOpenEditModal(item)}
-                                    className="px-2 py-0.5 text-[9px] font-bold uppercase text-wood-700 hover:underline"
-                                  >
-                                    Edit
-                                  </button>
-                                )}
-                                <button 
-                                  onClick={() => handleOpenLogModal('INWARDS', item.id)}
-                                  className="p-1 hover:bg-emerald-50 rounded text-emerald-600 border border-transparent hover:border-emerald-100 transition"
-                                  title="Add Inwards Log"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                </button>
-                                <button 
-                                  onClick={() => handleOpenLogModal('OUTWARDS', item.id)}
-                                  className="p-1 hover:bg-amber-50 rounded text-amber-600 border border-transparent hover:border-amber-100 transition"
-                                  title="Add Outwards Log"
-                                >
-                                  <ArrowUpRight className="w-3.5 h-3.5" />
-                                </button>
-                                {!isAuditor && onDeleteInventoryItem && (
-                                  <button 
-                                    onClick={() => setConfirmDeleteId(item.id)}
-                                    className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition"
-                                    title="Delete Material"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })
-              )}
-            </div>
-          )}
-
-        </div>
-      ) : (
-        /* Logs Section */
-        <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
-          <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-display font-bold text-gray-800 flex items-center gap-1.5">
-              <History className="w-4 h-4 text-wood-600" />
-              Inwards & Outwards Transaction Ledger
-            </h3>
-            <span className="text-xs text-gray-400 font-semibold">
-              Showing {transactions.length} record(s)
-            </span>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100 text-[11px] uppercase tracking-wider text-gray-500 font-bold select-none">
-                  <th 
-                    onClick={() => handleTxSort('date')}
-                    className="py-3.5 px-4 cursor-pointer hover:bg-gray-100/80 transition"
-                    title="Click to sort by transaction date"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Date</span>
-                      {txSortField === 'date' ? (
-                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                    </div>
-                  </th>
-                  <th 
-                    onClick={() => handleTxSort('itemName')}
-                    className="py-3.5 px-4 cursor-pointer hover:bg-gray-100/80 transition"
-                    title="Click to sort by material name"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Material Details</span>
-                      {txSortField === 'itemName' ? (
-                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                    </div>
-                  </th>
-                  <th 
-                    onClick={() => handleTxSort('type')}
-                    className="py-3.5 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition"
-                    title="Click to sort by flow type"
-                  >
-                    <div className="flex items-center justify-center gap-1.5">
-                      <span>Flow Type</span>
-                      {txSortField === 'type' ? (
-                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                    </div>
-                  </th>
-                  <th 
-                    onClick={() => handleTxSort('quantity')}
-                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                    title="Click to sort by quantity"
-                  >
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span>Quantity</span>
-                      {txSortField === 'quantity' ? (
-                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                    </div>
-                  </th>
-                  <th 
-                    onClick={() => handleTxSort('unitCost')}
-                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                    title="Click to sort by unit rate"
-                  >
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span>Unit Rate</span>
-                      {txSortField === 'unitCost' ? (
-                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                    </div>
-                  </th>
-                  <th 
-                    onClick={() => handleTxSort('totalValue')}
-                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                    title="Click to sort by total outflow/inflow"
-                  >
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span>Total Outflow/Inflow</span>
-                      {txSortField === 'totalValue' ? (
-                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                    </div>
-                  </th>
-                  <th className="py-3.5 px-4">Purpose & reference</th>
-                  {!isAuditor && onDeleteTransaction && <th className="py-3.5 px-4 text-center">Action</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
-                {sortedTransactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-12 text-gray-400">
-                      No transactions logged yet.
-                    </td>
-                  </tr>
-                ) : (
-                  sortedTransactions.map(tx => {
-                    const isIn = tx.type === 'INWARDS';
-                    return (
-                      <tr key={tx.id} className="hover:bg-gray-50/50 transition">
-                        <td className="py-3 px-4 font-mono text-xs text-gray-500 whitespace-nowrap">{tx.date}</td>
-                        <td className="py-3 px-4">
-                          <p className="font-bold text-gray-800">{tx.itemName}</p>
-                          <p className="text-[10px] text-gray-400 font-semibold">ID: {tx.itemId}</p>
-                        </td>
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-0.5 px-2.5 py-0.5 text-[10px] font-bold rounded-md border uppercase ${isIn ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                            {isIn ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                            {tx.type}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-bold font-mono text-gray-700">
-                          {tx.quantity}
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono text-gray-500 whitespace-nowrap">
-                          {formatCurrency(tx.unitCost)}
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-gray-800 whitespace-nowrap">
-                          {formatCurrency(tx.totalValue)}
-                        </td>
-                        <td className="py-3 px-4 text-xs text-gray-600 max-w-xs truncate">
-                          <span>{tx.purpose}</span>
-                          {tx.referenceId && (
-                            <span className="block text-[10px] text-wood-600 font-semibold uppercase">
-                              Ref: {tx.referenceId}
-                            </span>
-                          )}
-                        </td>
-                        {!isAuditor && onDeleteTransaction && (
-                          <td className="py-3 px-4 text-center">
-                            <button
-                              onClick={() => {
-                                if (window.confirm(`Delete inventory transaction record for "${tx.itemName}"?`)) {
-                                  onDeleteTransaction(tx.id);
-                                }
-                              }}
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
-                              title="Delete Transaction Record"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* MODAL: Edit Raw Material */}
       <AnimatePresence>
@@ -900,7 +598,7 @@ export default function InventoryManager({
                     setShowEditItemModal(false);
                     setEditingItem(null);
                   }}
-                  className="text-wood-300 hover:text-white font-bold text-xl"
+                  className="text-wood-300 hover:text-white font-bold text-xl cursor-pointer"
                 >
                   &times;
                 </button>
@@ -998,13 +696,13 @@ export default function InventoryManager({
                       setShowEditItemModal(false);
                       setEditingItem(null);
                     }}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs"
+                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs cursor-pointer"
                   >
                     Save Changes
                   </button>
@@ -1015,7 +713,7 @@ export default function InventoryManager({
         )}
       </AnimatePresence>
 
-      {/* MODAL 1: Create New Raw Material */}
+      {/* MODAL: Create New Raw Material */}
       <AnimatePresence>
         {showNewItemModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
@@ -1032,7 +730,7 @@ export default function InventoryManager({
                 </div>
                 <button 
                   onClick={() => setShowNewItemModal(false)}
-                  className="text-wood-300 hover:text-white font-bold"
+                  className="text-wood-300 hover:text-white font-bold cursor-pointer"
                 >
                   &times;
                 </button>
@@ -1128,125 +826,15 @@ export default function InventoryManager({
                   <button 
                     type="button" 
                     onClick={() => setShowNewItemModal(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs"
+                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs cursor-pointer"
                   >
                     Save material
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* MODAL 2: Log Material Inflow / Outflow */}
-      <AnimatePresence>
-        {showLogModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-wood-100 shadow-xl w-full max-w-md overflow-hidden"
-            >
-              <div className={`p-5 text-white flex items-center justify-between ${logType === 'INWARDS' ? 'bg-emerald-800' : 'bg-amber-800'}`}>
-                <div>
-                  <h3 className="font-display font-bold text-lg">
-                    Log {logType === 'INWARDS' ? 'Inwards Stock Restock' : 'Outwards Stock Dispatch'}
-                  </h3>
-                  <p className="text-xs opacity-90">
-                    {logType === 'INWARDS' ? 'Add raw wood or hardware reserves' : 'Dispatch wood to client commissions'}
-                  </p>
-                </div>
-                <button 
-                  onClick={() => setShowLogModal(false)}
-                  className="text-white hover:opacity-75 font-bold"
-                >
-                  &times;
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmitLogTransaction} className="p-6 space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Select Material</label>
-                  <select
-                    value={logItemId}
-                    onChange={(e) => handleLogItemChange(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 bg-white"
-                  >
-                    {inventory.map(i => (
-                      <option key={i.id} value={i.id}>
-                        {i.name} (Available: {i.currentStock} {i.unit})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      value={logQuantity}
-                      onChange={(e) => setLogQuantity(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Unit Cost (Le)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0.1}
-                      step={0.1}
-                      value={logUnitCost}
-                      onChange={(e) => setLogUnitCost(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Purpose / Memo</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Standard supplier restock, or Used in custom wardrobe build"
-                    value={logPurpose}
-                    onChange={(e) => setLogPurpose(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium"
-                  />
-                </div>
-
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between font-mono text-xs text-gray-600">
-                  <span>Total Calculated Value:</span>
-                  <span className="font-bold text-gray-800 text-sm">
-                    {formatCurrency(logQuantity * logUnitCost)}
-                  </span>
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowLogModal(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    className={`flex-1 py-2.5 rounded-xl text-white text-sm font-bold transition shadow-xs ${logType === 'INWARDS' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}`}
-                  >
-                    Post Log Entry
                   </button>
                 </div>
               </form>

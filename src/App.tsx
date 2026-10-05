@@ -1430,9 +1430,8 @@ export default function App() {
     } else if (action === 'register-employee') {
       setActiveTab('employees');
       setQuickActionTrigger('register-employee');
-    } else if (action === 'log-inwards') {
+    } else if (action === 'inventory' || action === 'log-inwards') {
       setActiveTab('inventory');
-      setQuickActionTrigger('log-inwards');
     } else if (action === 'create-job') {
       setActiveTab('jobs');
       setQuickActionTrigger('create-job');
@@ -1914,12 +1913,9 @@ export default function App() {
             {activeTab === 'inventory' && (
               <InventoryManager
                 inventory={inventory}
-                transactions={inventoryTransactions}
                 onAddInventoryItem={handleAddInventoryItem}
-                onLogTransaction={handleLogTransaction}
                 onUpdateInventoryItem={handleUpdateInventoryItem}
                 onDeleteInventoryItem={handleDeleteInventoryItem}
-                onDeleteTransaction={handleDeleteInventoryTransaction}
                 currentUser={currentUser}
               />
             )}

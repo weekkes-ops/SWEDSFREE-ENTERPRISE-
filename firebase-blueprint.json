@@ -94,6 +94,8 @@
         "type": { "type": "string" },
         "category": { "type": "string" },
         "amount": { "type": "number" },
+        "quantity": { "type": "number" },
+        "unitCost": { "type": "number" },
         "date": { "type": "string" },
         "description": { "type": "string" }
       },

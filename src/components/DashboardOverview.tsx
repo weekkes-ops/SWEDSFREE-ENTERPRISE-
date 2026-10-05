@@ -601,10 +601,10 @@ export default function DashboardOverview({
                     <ArrowUpRight className="w-4 h-4 text-gray-400" />
                   </button>
                   <button 
-                    onClick={() => onOpenQuickAction('log-inwards')}
-                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-wood-50 hover:border-wood-200 transition text-sm font-medium text-gray-700"
+                    onClick={() => setActiveTab('inventory')}
+                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-wood-50 hover:border-wood-200 transition text-sm font-medium text-gray-700 cursor-pointer"
                   >
-                    <span>Log Inwards Inventory</span>
+                    <span>Raw Material Inventory</span>
                     <ArrowUpRight className="w-4 h-4 text-gray-400" />
                   </button>
                   <button 

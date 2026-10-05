@@ -145,6 +145,8 @@ export interface FinancialTransaction {
   type: 'INCOME' | 'EXPENDITURE';
   category: FinancialCategory;
   amount: number;
+  quantity?: number;
+  unitCost?: number;
   date: string; // YYYY-MM-DD
   description: string;
   referenceId?: string; // JobId, EmployeeId, or InventoryTransactionId
