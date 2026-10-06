@@ -288,7 +288,7 @@ export default function DashboardOverview({
               >
                 <div className="space-y-0.5 min-w-0">
                   <p className="font-bold text-gray-800 truncate">{item.name}</p>
-                  <p className="text-[10px] text-gray-500">Min Threshold: <span className="font-mono font-bold text-gray-700">{item.minStockThreshold} {item.unit}</span></p>
+                  <p className="text-[10px] text-gray-500 font-semibold uppercase">{item.category} &bull; {item.unit}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <span className="bg-red-100 text-red-800 text-[11px] font-black font-mono px-2 py-0.5 rounded-md border border-red-200">
@@ -687,7 +687,7 @@ export default function DashboardOverview({
                         <p className="text-xs font-mono font-bold text-red-600">
                           {item.currentStock} {item.unit}
                         </p>
-                        <p className="text-[10px] text-gray-400">Min: {item.minStockThreshold}</p>
+                        <p className="text-[10px] text-amber-700 font-bold uppercase">Low Balance</p>
                       </div>
                     </div>
                   ))}

@@ -879,6 +879,22 @@ export default function App() {
     };
     setInventory(prev => [newItem, ...prev]);
     saveDocument('inventory', newItem);
+
+    if (item.currentStock > 0) {
+      const initTx: InventoryTransaction = {
+        id: `tx-inv-${Date.now()}`,
+        itemId,
+        itemName: item.name,
+        type: 'INWARDS',
+        quantity: item.currentStock,
+        unitCost: item.unitCost || 0,
+        totalValue: 0,
+        date: dateStr,
+        purpose: 'Initial Stock Quantity'
+      };
+      setInventoryTransactions(prev => [...prev, initTx]);
+      saveDocument('inventoryTransactions', initTx);
+    }
   };
 
   const handleLogTransaction = (tx: Omit<InventoryTransaction, 'id' | 'date'>) => {
@@ -1913,7 +1929,9 @@ export default function App() {
             {activeTab === 'inventory' && (
               <InventoryManager
                 inventory={inventory}
+                transactions={inventoryTransactions}
                 onAddInventoryItem={handleAddInventoryItem}
+                onLogTransaction={handleLogTransaction}
                 onUpdateInventoryItem={handleUpdateInventoryItem}
                 onDeleteInventoryItem={handleDeleteInventoryItem}
                 currentUser={currentUser}
