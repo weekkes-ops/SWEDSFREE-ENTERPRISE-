@@ -126,7 +126,7 @@ export default function MonthlyTrendsSection({
 
       // Units outwards (consumption)
       const liveOutwardsUnits = monthInvTx
-        .filter(tx => tx.type === 'OUTWARDS')
+        .filter(tx => tx.type === 'STOCK_OUT' || tx.type === 'OUTWARDS')
         .reduce((sum, tx) => sum + tx.quantity, 0);
       const materialConsumedUnits = liveOutwardsUnits > 0 ? liveOutwardsUnits : Math.round(totalMatSpend / m.baseUnitCost);
 

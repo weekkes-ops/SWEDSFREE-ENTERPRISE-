@@ -1924,16 +1924,16 @@ export default function InvoiceReceiptManager({
 
           #print-area,
           #bulk-print-area {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: relative !important;
+            left: auto !important;
+            top: auto !important;
             width: 100% !important;
             max-width: 100% !important;
             background: #ffffff !important;
             background-color: #ffffff !important;
             color: #000000 !important;
             padding: 0 !important;
-            margin: 0 !important;
+            margin: 0 auto !important;
             box-shadow: none !important;
             border: none !important;
             overflow: visible !important;
@@ -4461,6 +4461,62 @@ export default function InvoiceReceiptManager({
                         </div>
                       </div>
                     </div>
+
+                    {/* Official Clearance Instructions & Workshop Settlement Accounts */}
+                    <div className="pt-4 border-t-2 border-gray-300 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs page-break-inside-avoid print:!break-inside-avoid">
+                      <div className="p-3 bg-gray-50 rounded-xs border border-gray-300 space-y-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 block border-b border-gray-200 pb-1">
+                          Official Settlement Bank Accounts
+                        </span>
+                        <div className="space-y-1 text-[11px] text-gray-700">
+                          <p className="font-bold text-slate-900">Sierra Leone Commercial Bank (SLCB)</p>
+                          <p className="font-mono text-gray-600">A/C: 003001099234 &bull; SWIFT: SLCBSLFR</p>
+                          <p className="font-bold text-slate-900 pt-0.5">Rokel Commercial Bank</p>
+                          <p className="font-mono text-gray-600">A/C: 0140293849</p>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-gray-50 rounded-xs border border-gray-300 space-y-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 block border-b border-gray-200 pb-1">
+                          Mobile Money & Settlement Terms
+                        </span>
+                        <div className="space-y-1 text-[11px] text-gray-700">
+                          <p className="font-bold text-slate-900">Orange Money Merchant: <span className="font-mono font-normal">#882910</span></p>
+                          <p className="font-bold text-slate-900">Africell Money Merchant: <span className="font-mono font-normal">#449201</span></p>
+                          <p className="text-[10px] text-gray-500 pt-0.5">Payment Terms: 50% advance before cutting lists initiate; 50% upon delivery & inspection.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dual Official Signature Blocks */}
+                    <div className="grid grid-cols-2 gap-8 pt-6 border-t border-gray-300 page-break-inside-avoid print:!break-inside-avoid">
+                      <div className="space-y-6">
+                        <div className="h-10 border-b border-dashed border-gray-400 flex items-end justify-center pb-1">
+                          <span className="font-serif italic text-sm text-wood-950 font-bold">
+                            {currentUser?.name || 'Master Joiner / Commercial Director'}
+                          </span>
+                        </div>
+                        <div className="text-center text-[10px] space-y-0.5">
+                          <p className="font-black uppercase text-slate-900">Authorized Master Craftsman</p>
+                          <p className="text-gray-500">Sweds Wood Enterprise Management</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="h-10 border-b border-dashed border-gray-400 flex items-end justify-center pb-1">
+                          <span className="text-[11px] text-gray-400 italic">Client Acceptance & Date</span>
+                        </div>
+                        <div className="text-center text-[10px] space-y-0.5">
+                          <p className="font-black uppercase text-slate-900">Client / Customer Acknowledgment</p>
+                          <p className="text-gray-500">{invoiceCustomerName}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Legal Clearance Footer Note */}
+                    <div className="pt-3 text-center text-[9px] text-gray-400 font-mono uppercase tracking-wider border-t border-gray-200 page-break-inside-avoid print:!break-inside-avoid">
+                      Sweds Wood Enterprise &bull; 2 Swed Free Avenue, Sussex &bull; Tel: +232 76 442590 &bull; Official Tax & Commercial Invoice
+                    </div>
                   </div>
                 ) : (
                   /* ==========================================
@@ -5105,7 +5161,7 @@ export default function InvoiceReceiptManager({
                   })()}
                 </div>
               ) : (
-              <div className="bg-white p-8 sm:p-10 border border-gray-200 rounded-xl shadow-xl space-y-6 print:p-0 print:border-none print:shadow-none print:rounded-none">
+              <div className="bg-white p-8 sm:p-10 border border-gray-200 rounded-xl shadow-xl space-y-6 print:!p-0 print:!border-none print:!shadow-none print:!rounded-none print:!w-full print:!max-w-none print:!space-y-4">
                 
                 {/* Letterhead Header */}
                 <div className="receipt-header-container flex flex-col items-center text-center pb-6 border-b border-gray-200 space-y-2 print:!pt-0 print:!mt-0 print:!pb-2">
@@ -5398,6 +5454,36 @@ export default function InvoiceReceiptManager({
                   <p className="text-[11px] text-gray-400 italic">
                     All customized SWEDS WOOD ENTERPRISE timber, carving, hardware assembly, and polishing commissions are subject to official delivery clearance terms.
                   </p>
+                </div>
+
+                {/* Dual Official Signature Blocks for Clearance Receipt */}
+                <div className="grid grid-cols-2 gap-8 pt-6 border-t border-gray-300 page-break-inside-avoid print:!break-inside-avoid">
+                  <div className="space-y-6">
+                    <div className="h-10 border-b border-dashed border-emerald-400 flex items-end justify-center pb-1">
+                      <span className="font-serif italic text-sm text-emerald-950 font-bold">
+                        {currentUser?.name || 'Master Joiner / Finance Officer'}
+                      </span>
+                    </div>
+                    <div className="text-center text-[10px] space-y-0.5">
+                      <p className="font-black uppercase text-emerald-950">Authorized Workshop Clearance</p>
+                      <p className="text-gray-500">Sweds Wood Enterprise Accounts</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="h-10 border-b border-dashed border-gray-400 flex items-end justify-center pb-1">
+                      <span className="text-[11px] text-gray-400 italic">Client Signature & Date</span>
+                    </div>
+                    <div className="text-center text-[10px] space-y-0.5">
+                      <p className="font-black uppercase text-slate-900">Payment Clearance Acceptance</p>
+                      <p className="text-gray-500">{receiptCustomer}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Legal Clearance Footer Note */}
+                <div className="pt-3 text-center text-[9px] text-gray-400 font-mono uppercase tracking-wider border-t border-gray-200 page-break-inside-avoid print:!break-inside-avoid">
+                  Sweds Wood Enterprise Official Clearance Receipt &bull; 2 Swed Free Avenue, Sussex &bull; Tel: +232 76 442590
                 </div>
 
               </div>

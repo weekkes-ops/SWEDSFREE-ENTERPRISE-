@@ -869,7 +869,10 @@ export default function App() {
   // ==========================================
 
   // A. Inventory mutators
-  const handleAddInventoryItem = (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => {
+  const handleAddInventoryItem = (
+    item: Omit<InventoryItem, 'id' | 'lastUpdated'>,
+    stockMovements?: { stockIn: number; stockOut: number; purpose?: string }
+  ) => {
     const itemId = `inv-${Date.now()}`;
     const dateStr = new Date().toISOString().split('T')[0];
     const newItem: InventoryItem = {
@@ -880,20 +883,53 @@ export default function App() {
     setInventory(prev => [newItem, ...prev]);
     saveDocument('inventory', newItem);
 
-    if (item.currentStock > 0) {
-      const initTx: InventoryTransaction = {
+    // If stock movements were explicitly provided from New Raw Material form:
+    if (stockMovements) {
+      if (stockMovements.stockIn > 0) {
+        const inTx: InventoryTransaction = {
+          id: `tx-inv-${Date.now()}-in`,
+          itemId,
+          itemName: newItem.name,
+          type: 'STOCK_IN',
+          quantity: stockMovements.stockIn,
+          unitCost: newItem.unitCost,
+          totalValue: stockMovements.stockIn * newItem.unitCost,
+          date: dateStr,
+          purpose: stockMovements.purpose || 'Initial Stock-In / Opening Balance'
+        };
+        setInventoryTransactions(prev => [inTx, ...prev]);
+        saveDocument('inventoryTransactions', inTx);
+      }
+      if (stockMovements.stockOut > 0) {
+        const outTx: InventoryTransaction = {
+          id: `tx-inv-${Date.now()}-out`,
+          itemId,
+          itemName: newItem.name,
+          type: 'STOCK_OUT',
+          quantity: stockMovements.stockOut,
+          unitCost: newItem.unitCost,
+          totalValue: stockMovements.stockOut * newItem.unitCost,
+          date: dateStr,
+          purpose: 'Initial Stock-Out / Opening Issue'
+        };
+        setInventoryTransactions(prev => [outTx, ...prev]);
+        saveDocument('inventoryTransactions', outTx);
+      }
+    } else if (newItem.currentStock > 0) {
+      // Fallback if stockMovements was not specified
+      const initialTx: InventoryTransaction = {
         id: `tx-inv-${Date.now()}`,
         itemId,
-        itemName: item.name,
-        type: 'INWARDS',
-        quantity: item.currentStock,
-        unitCost: item.unitCost || 0,
-        totalValue: 0,
+        itemName: newItem.name,
+        type: 'STOCK_IN',
+        quantity: newItem.currentStock,
+        unitCost: newItem.unitCost,
+        totalValue: newItem.currentStock * newItem.unitCost,
         date: dateStr,
-        purpose: 'Initial Stock Quantity'
+        purpose: 'Initial Stock / Opening Balance'
       };
-      setInventoryTransactions(prev => [...prev, initTx]);
-      saveDocument('inventoryTransactions', initTx);
+      setInventoryTransactions(prev => [initialTx, ...prev]);
+      saveDocument('inventoryTransactions', initialTx);
     }
   };
 
@@ -910,7 +946,8 @@ export default function App() {
     // 1. Update stock reserves
     setInventory(prev => prev.map(item => {
       if (item.id === tx.itemId) {
-        const stockDiff = tx.type === 'INWARDS' ? tx.quantity : -tx.quantity;
+        const isStockIn = tx.type === 'INWARDS' || (tx.type as string) === 'STOCK_IN';
+        const stockDiff = isStockIn ? tx.quantity : -tx.quantity;
         const updatedItem = {
           ...item,
           currentStock: Math.max(0, item.currentStock + stockDiff),
@@ -1012,12 +1049,12 @@ export default function App() {
       return item;
     }));
 
-    // 2. Append an Outwards inventory transaction log
+    // 2. Append a Stock-Out inventory transaction log
     const invTx: InventoryTransaction = {
       id: txId,
       itemId: jobMaterial.itemId,
       itemName: jobMaterial.name,
-      type: 'OUTWARDS',
+      type: 'STOCK_OUT',
       quantity: jobMaterial.quantity,
       unitCost: jobMaterial.unitCost,
       totalValue: jobMaterial.totalCost,
@@ -1446,8 +1483,9 @@ export default function App() {
     } else if (action === 'register-employee') {
       setActiveTab('employees');
       setQuickActionTrigger('register-employee');
-    } else if (action === 'inventory' || action === 'log-inwards') {
+    } else if (action === 'log-inwards') {
       setActiveTab('inventory');
+      setQuickActionTrigger('log-inwards');
     } else if (action === 'create-job') {
       setActiveTab('jobs');
       setQuickActionTrigger('create-job');
@@ -1506,7 +1544,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col md:flex-row antialiased font-sans relative overflow-x-hidden print:bg-white print:text-black">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col md:flex-row antialiased font-sans relative overflow-x-hidden print:bg-white print:text-black print:!overflow-visible print:!min-h-0 print:!h-auto print:!static print:!block">
       
       {/* 1-Minute Inactivity Security Warning Dialog */}
       {showInactivityWarning && (
@@ -1782,7 +1820,7 @@ export default function App() {
       </aside>
 
       {/* Main Panel Frame */}
-      <main key={sessionKey} className="flex-1 p-4 md:p-8 overflow-y-auto max-w-[1300px] mx-auto w-full relative z-10 print:p-0">
+      <main key={sessionKey} className="flex-1 p-4 md:p-8 overflow-y-auto max-w-[1300px] mx-auto w-full relative z-10 print:!p-0 print:!m-0 print:!max-w-none print:!w-full print:!overflow-visible print:!static print:!block print:!h-auto print:!min-h-0">
         
         {/* Offline & Online Auto-Sync Status Top Banner */}
         {syncBannerMessage && (
@@ -1934,6 +1972,7 @@ export default function App() {
                 onLogTransaction={handleLogTransaction}
                 onUpdateInventoryItem={handleUpdateInventoryItem}
                 onDeleteInventoryItem={handleDeleteInventoryItem}
+                onDeleteTransaction={handleDeleteInventoryTransaction}
                 currentUser={currentUser}
               />
             )}

@@ -1,24 +1,31 @@
 import { useState, FormEvent } from 'react';
-import { InventoryItem, WoodCategory, WoodUnit, formatCurrency, Employee, InventoryTransaction } from '../types';
+import { InventoryItem, InventoryTransaction, WoodCategory, WoodUnit, formatCurrency, Employee } from '../types';
 import { 
   Plus, 
+  ArrowDownLeft, 
+  ArrowUpRight, 
   Search, 
   Filter, 
   AlertTriangle, 
+  History, 
+  Flame, 
   Trash2,
   ShieldAlert,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Edit2
+  TrendingUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface InventoryManagerProps {
   inventory: InventoryItem[];
-  transactions?: InventoryTransaction[];
-  onAddInventoryItem: (item: Omit<InventoryItem, 'id' | 'lastUpdated'>) => void;
-  onLogTransaction?: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
+  transactions: InventoryTransaction[];
+  onAddInventoryItem: (
+    item: Omit<InventoryItem, 'id' | 'lastUpdated'>,
+    stockMovements?: { stockIn: number; stockOut: number; purpose?: string }
+  ) => void;
+  onLogTransaction: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
   onUpdateInventoryItem?: (item: InventoryItem) => void;
   onDeleteInventoryItem?: (id: string) => void;
   onDeleteTransaction?: (id: string) => void;
@@ -27,11 +34,12 @@ interface InventoryManagerProps {
 
 export default function InventoryManager({
   inventory,
-  transactions = [],
+  transactions,
   onAddInventoryItem,
   onLogTransaction,
   onUpdateInventoryItem,
   onDeleteInventoryItem,
+  onDeleteTransaction,
   currentUser
 }: InventoryManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
@@ -39,88 +47,31 @@ export default function InventoryManager({
   const [selectedCategory, setSelectedCategory] = useState<WoodCategory | 'All'>('All');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [showNewItemModal, setShowNewItemModal] = useState(false);
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'STOCK' | 'LOGS'>('STOCK');
   const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('TABLE');
-
-  // Stock Movement Modal states
-  const [showMovementModal, setShowMovementModal] = useState(false);
-  const [movementItemId, setMovementItemId] = useState('');
-  const [movementType, setMovementType] = useState<'INWARDS' | 'OUTWARDS'>('INWARDS');
-  const [movementQty, setMovementQty] = useState(10);
-  const [movementPurpose, setMovementPurpose] = useState('');
 
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Form states - New Item
+  // Form states - New Item with Stock Movement (Stock-In, Stock-Out, and Balance tracking)
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<WoodCategory>('Lumber');
   const [newItemUnit, setNewItemUnit] = useState<WoodUnit>('Board Feet');
+  const [newItemStockIn, setNewItemStockIn] = useState(50);
+  const [newItemStockOut, setNewItemStockOut] = useState(0);
   const [newItemMinThreshold, setNewItemMinThreshold] = useState(20);
-  const [newItemInitialStock, setNewItemInitialStock] = useState(100);
+  const [newItemUnitCost, setNewItemUnitCost] = useState(10);
+  const [newItemPurpose, setNewItemPurpose] = useState('Opening Stock Receipt / Supplier Inward');
 
   // Form states - Edit Item
   const [editItemName, setEditItemName] = useState('');
   const [editItemCategory, setEditItemCategory] = useState<WoodCategory>('Lumber');
   const [editItemUnit, setEditItemUnit] = useState<WoodUnit>('Board Feet');
   const [editItemMinThreshold, setEditItemMinThreshold] = useState(20);
+  const [editItemUnitCost, setEditItemUnitCost] = useState(10);
   const [editItemCurrentStock, setEditItemCurrentStock] = useState(100);
-
-  // Calculate stock movement for each item
-  const getItemStockMetrics = (item: InventoryItem) => {
-    const itemTx = transactions.filter(t => t.itemId === item.id);
-    const loggedIn = itemTx.filter(t => t.type === 'INWARDS').reduce((acc, t) => acc + Number(t.quantity || 0), 0);
-    const loggedOut = itemTx.filter(t => t.type === 'OUTWARDS').reduce((acc, t) => acc + Number(t.quantity || 0), 0);
-
-    // Baseline accounts for items created with an initial stock quantity
-    const baselineIn = Math.max(0, (item.currentStock || 0) + loggedOut - loggedIn);
-    const stockIn = loggedIn + baselineIn;
-    const stockOut = loggedOut;
-    const balance = Math.max(0, stockIn - stockOut);
-
-    return { stockIn, stockOut, balance };
-  };
-
-  const handleOpenMovementModal = (item?: InventoryItem, type: 'INWARDS' | 'OUTWARDS' = 'INWARDS') => {
-    if (item) {
-      setMovementItemId(item.id);
-    } else if (inventory.length > 0) {
-      setMovementItemId(inventory[0].id);
-    }
-    setMovementType(type);
-    setMovementQty(10);
-    setMovementPurpose('');
-    setShowMovementModal(true);
-  };
-
-  const handleSubmitMovement = (e: FormEvent) => {
-    e.preventDefault();
-    const item = inventory.find(i => i.id === movementItemId);
-    if (!item || movementQty <= 0) return;
-
-    if (onLogTransaction) {
-      onLogTransaction({
-        itemId: item.id,
-        itemName: item.name,
-        type: movementType,
-        quantity: movementQty,
-        unitCost: item.unitCost || 0,
-        totalValue: 0,
-        purpose: movementPurpose.trim() || (movementType === 'INWARDS' ? 'Restock / Stock-In' : 'Workshop consumption / Stock-Out')
-      });
-    } else if (onUpdateInventoryItem) {
-      const newStock = movementType === 'INWARDS'
-        ? item.currentStock + movementQty
-        : Math.max(0, item.currentStock - movementQty);
-      onUpdateInventoryItem({
-        ...item,
-        currentStock: newStock,
-        lastUpdated: new Date().toISOString().split('T')[0]
-      });
-    }
-
-    setShowMovementModal(false);
-  };
 
   const handleOpenEditModal = (item: InventoryItem) => {
     setEditingItem(item);
@@ -128,6 +79,7 @@ export default function InventoryManager({
     setEditItemCategory(item.category);
     setEditItemUnit(item.unit);
     setEditItemMinThreshold(item.minStockThreshold);
+    setEditItemUnitCost(item.unitCost);
     setEditItemCurrentStock(item.currentStock);
     setShowEditItemModal(true);
   };
@@ -143,7 +95,7 @@ export default function InventoryManager({
         category: editItemCategory,
         unit: editItemUnit,
         minStockThreshold: editItemMinThreshold,
-        unitCost: editingItem.unitCost || 0,
+        unitCost: editItemUnitCost,
         currentStock: editItemCurrentStock,
         lastUpdated: new Date().toISOString().split('T')[0]
       });
@@ -152,37 +104,137 @@ export default function InventoryManager({
     setEditingItem(null);
   };
 
+  // Form states - Log Transaction
+  const [logItemId, setLogItemId] = useState(inventory[0]?.id || '');
+  const [logType, setLogType] = useState<'STOCK_IN' | 'STOCK_OUT'>('STOCK_IN');
+  const [logQuantity, setLogQuantity] = useState(50);
+  const [logUnitCost, setLogUnitCost] = useState(0);
+  const [logPurpose, setLogPurpose] = useState('');
+
+  // Handle selected item changed in Log Transaction Modal to auto-fill unit cost
+  const handleLogItemChange = (itemId: string) => {
+    setLogItemId(itemId);
+    const item = inventory.find(i => i.id === itemId);
+    if (item) {
+      setLogUnitCost(item.unitCost);
+    }
+  };
+
+  const handleOpenLogModal = (type: 'STOCK_IN' | 'STOCK_OUT', itemId?: string) => {
+    setLogType(type);
+    const targetId = itemId || inventory[0]?.id || '';
+    setLogItemId(targetId);
+    const item = inventory.find(i => i.id === targetId);
+    if (item) {
+      setLogUnitCost(item.unitCost);
+    }
+    setLogQuantity(type === 'STOCK_IN' ? 50 : 10);
+    setLogPurpose(type === 'STOCK_IN' ? 'Supplier Restock / Purchase' : 'Workshop Dispatch / Production Issue');
+    setShowLogModal(true);
+  };
+
   const handleSubmitNewItem = (e: FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
+
+    const safeStockIn = Math.max(0, newItemStockIn);
+    const safeStockOut = Math.min(safeStockIn, Math.max(0, newItemStockOut));
+    const calculatedBalance = Math.max(0, safeStockIn - safeStockOut);
 
     onAddInventoryItem({
       name: newItemName,
       category: newItemCategory,
       unit: newItemUnit,
-      currentStock: newItemInitialStock,
+      currentStock: calculatedBalance,
       minStockThreshold: newItemMinThreshold,
-      unitCost: 0
+      unitCost: newItemUnitCost
+    }, {
+      stockIn: safeStockIn,
+      stockOut: safeStockOut,
+      purpose: newItemPurpose || 'Initial Stock Movement / Opening Balance'
     });
 
     // Reset Form
     setNewItemName('');
     setNewItemMinThreshold(20);
-    setNewItemInitialStock(100);
+    setNewItemUnitCost(10);
+    setNewItemStockIn(50);
+    setNewItemStockOut(0);
+    setNewItemPurpose('Opening Stock Receipt / Supplier Inward');
     setShowNewItemModal(false);
   };
 
+  const handleSubmitLogTransaction = (e: FormEvent) => {
+    e.preventDefault();
+    const item = inventory.find(i => i.id === logItemId);
+    if (!item) return;
+
+    if (logType === 'STOCK_OUT' && item.currentStock < logQuantity) {
+      alert(`Insufficient Stock! Current balance for ${item.name} is ${item.currentStock} ${item.unit}. Cannot stock out ${logQuantity} ${item.unit}.`);
+      return;
+    }
+
+    onLogTransaction({
+      itemId: logItemId,
+      itemName: item.name,
+      type: logType,
+      quantity: logQuantity,
+      unitCost: logUnitCost,
+      totalValue: logQuantity * logUnitCost,
+      purpose: logPurpose
+    });
+
+    setShowLogModal(false);
+  };
+
+  // Helper to compute Stock-In, Stock-Out, and Balance for tracking stock movement
+  const getItemStockMovement = (item: InventoryItem) => {
+    const itemTx = transactions.filter(t => t.itemId === item.id);
+    const recordedIn = itemTx
+      .filter(t => t.type === 'STOCK_IN' || t.type === 'INWARDS')
+      .reduce((sum, t) => sum + t.quantity, 0);
+    const recordedOut = itemTx
+      .filter(t => t.type === 'STOCK_OUT' || t.type === 'OUTWARDS')
+      .reduce((sum, t) => sum + t.quantity, 0);
+
+    // If recordedIn is 0 but item.currentStock > 0, initial stock was recorded on creation
+    const stockIn = recordedIn > 0 ? recordedIn : (item.currentStock + recordedOut);
+    const stockOut = recordedOut;
+    const balance = item.currentStock;
+
+    return { stockIn, stockOut, balance };
+  };
+
+  // Summary KPI values across all inventory
+  const totalStockInUnits = inventory.reduce((sum, item) => sum + getItemStockMovement(item).stockIn, 0);
+  const totalStockOutUnits = inventory.reduce((sum, item) => sum + getItemStockMovement(item).stockOut, 0);
+  const totalBalanceUnits = inventory.reduce((sum, item) => sum + item.currentStock, 0);
+  const totalInventoryValuation = inventory.reduce((sum, item) => sum + (item.currentStock * item.unitCost), 0);
+
   // Sorting states
-  type StockSortField = 'name' | 'category' | 'stockIn' | 'stockOut' | 'balance' | 'status' | 'date';
+  type StockSortField = 'name' | 'category' | 'currentStock' | 'stockIn' | 'stockOut' | 'balance' | 'unitCost' | 'minStockThreshold' | 'status' | 'date';
   const [stockSortField, setStockSortField] = useState<StockSortField>('name');
   const [stockSortDirection, setStockSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  type TxSortField = 'date' | 'itemName' | 'type' | 'quantity' | 'unitCost' | 'totalValue';
+  const [txSortField, setTxSortField] = useState<TxSortField>('date');
+  const [txSortDirection, setTxSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const handleStockSort = (field: StockSortField) => {
     if (stockSortField === field) {
       setStockSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setStockSortField(field);
-      setStockSortDirection(field === 'date' || field === 'stockIn' || field === 'stockOut' || field === 'balance' ? 'desc' : 'asc');
+      setStockSortDirection(field === 'date' || field === 'currentStock' || field === 'stockIn' || field === 'stockOut' || field === 'balance' || field === 'unitCost' ? 'desc' : 'asc');
+    }
+  };
+
+  const handleTxSort = (field: TxSortField) => {
+    if (txSortField === field) {
+      setTxSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setTxSortField(field);
+      setTxSortDirection(field === 'date' || field === 'quantity' || field === 'totalValue' ? 'desc' : 'asc');
     }
   };
 
@@ -190,41 +242,34 @@ export default function InventoryManager({
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || item.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-    const metrics = getItemStockMetrics(item);
-    const matchesLowStock = !showLowStockOnly || metrics.balance < 5;
+    const matchesLowStock = !showLowStockOnly || item.currentStock <= item.minStockThreshold;
     return matchesSearch && matchesCategory && matchesLowStock;
   });
 
   const sortedInventory = [...filteredInventory].sort((a, b) => {
-    const metricsA = getItemStockMetrics(a);
-    const metricsB = getItemStockMetrics(b);
-
-    let valA: any;
-    let valB: any;
+    let valA: any = a[stockSortField as keyof InventoryItem];
+    let valB: any = b[stockSortField as keyof InventoryItem];
 
     if (stockSortField === 'stockIn') {
-      valA = metricsA.stockIn;
-      valB = metricsB.stockIn;
+      valA = getItemStockMovement(a).stockIn;
+      valB = getItemStockMovement(b).stockIn;
     } else if (stockSortField === 'stockOut') {
-      valA = metricsA.stockOut;
-      valB = metricsB.stockOut;
-    } else if (stockSortField === 'balance') {
-      valA = metricsA.balance;
-      valB = metricsB.balance;
+      valA = getItemStockMovement(a).stockOut;
+      valB = getItemStockMovement(b).stockOut;
+    } else if (stockSortField === 'balance' || stockSortField === 'currentStock') {
+      valA = a.currentStock;
+      valB = b.currentStock;
     } else if (stockSortField === 'status') {
-      const getStatusRank = (metrics: { balance: number }) => {
-        if (metrics.balance === 0) return 3;
-        if (metrics.balance < 5) return 2;
+      const getStatusRank = (item: InventoryItem) => {
+        if (item.currentStock < 5) return 3;
+        if (item.currentStock <= item.minStockThreshold) return 2;
         return 1;
       };
-      valA = getStatusRank(metricsA);
-      valB = getStatusRank(metricsB);
+      valA = getStatusRank(a);
+      valB = getStatusRank(b);
     } else if (stockSortField === 'date') {
       valA = a.lastUpdated || '';
       valB = b.lastUpdated || '';
-    } else {
-      valA = a[stockSortField as keyof InventoryItem];
-      valB = b[stockSortField as keyof InventoryItem];
     }
 
     if (typeof valA === 'string') {
@@ -237,6 +282,20 @@ export default function InventoryManager({
     return 0;
   });
 
+  const sortedTransactions = [...transactions].sort((a, b) => {
+    let valA: any = a[txSortField as keyof InventoryTransaction];
+    let valB: any = b[txSortField as keyof InventoryTransaction];
+
+    if (typeof valA === 'string') {
+      const comp = (valA || '').localeCompare(valB || '');
+      return txSortDirection === 'asc' ? comp : -comp;
+    }
+
+    if (valA < valB) return txSortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return txSortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   return (
     <div className="space-y-6">
       
@@ -244,22 +303,28 @@ export default function InventoryManager({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs">
         <div>
           <h1 className="text-2xl font-display font-bold text-wood-900 tracking-tight">
-            Inventory
+            Inventory & Stock Movement
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Track lumber stock reserves, stock movements (Stock-In, Stock-Out, and Balance) for bespoke woodwork production.
+            Track Stock-In, Stock-Out, and current balances to monitor timber and hardware flow.
           </p>
         </div>
         
         {!isAuditor ? (
           <div className="flex flex-wrap gap-2">
             <button 
-              onClick={() => handleOpenMovementModal()}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
-              title="Record Stock-In or Stock-Out movement"
+              onClick={() => handleOpenLogModal('STOCK_IN')}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
             >
-              <ArrowUpDown className="w-4 h-4" />
-              <span>Record Movement</span>
+              <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
+              <span>Log Stock-In (+)</span>
+            </button>
+            <button 
+              onClick={() => handleOpenLogModal('STOCK_OUT')}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
+            >
+              <ArrowUpRight className="w-4 h-4 text-amber-600" />
+              <span>Log Stock-Out (-)</span>
             </button>
             <button 
               onClick={() => setShowNewItemModal(true)}
@@ -277,421 +342,683 @@ export default function InventoryManager({
         )}
       </div>
 
-      <div className="space-y-4">
-        {/* Filters Bar */}
-        <div className="bg-white p-4 rounded-xl border border-wood-100 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          <div className="flex-1 flex flex-col sm:flex-row gap-2">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-              <input
-                type="text"
-                placeholder="Search wood or hardware materials..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-medium text-gray-800 placeholder-gray-400"
-              />
-            </div>
-
-            {/* Category Filter */}
-            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2">
-              <Filter className="w-4 h-4 text-gray-400" />
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value as WoodCategory | 'All')}
-                className="bg-transparent border-0 text-sm font-semibold text-gray-700 focus:ring-0 py-2 focus:outline-hidden"
-              >
-                <option value="All">All Categories</option>
-                <option value="Lumber">Lumber / Hardwood</option>
-                <option value="Plywood">Plywood / Sheets</option>
-                <option value="Hardware">Hardware / Fittings</option>
-                <option value="Finishes">Finishes & Polish</option>
-                <option value="Adhesives">Adhesives & Glues</option>
-                <option value="Other">Other Accessories</option>
-              </select>
-            </div>
+      {/* Stock Movement KPI Highlights */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Stock-In</span>
+            <p className="text-lg font-bold font-mono text-emerald-700 mt-0.5">
+              +{totalStockInUnits.toLocaleString()} <span className="text-xs font-sans text-gray-400 font-normal">units</span>
+            </p>
+            <p className="text-[10px] text-gray-400">Cumulative stock added</p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-4">
-            {/* View mode toggle */}
-            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl p-1">
-              <button
-                onClick={() => setViewMode('TABLE')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${viewMode === 'TABLE' ? 'bg-white shadow-xs text-wood-950 border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
-              >
-                Table Row View
-              </button>
-              <button
-                onClick={() => setViewMode('GRID')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${viewMode === 'GRID' ? 'bg-white shadow-xs text-wood-950 border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
-              >
-                Card Grid View
-              </button>
-            </div>
-
-            {/* Low Stock checkbox */}
-            <label className="flex items-center gap-2 cursor-pointer py-1 select-none">
-              <input
-                type="checkbox"
-                checked={showLowStockOnly}
-                onChange={(e) => setShowLowStockOnly(e.target.checked)}
-                className="rounded border-gray-300 text-wood-600 focus:ring-wood-500 w-4 h-4 cursor-pointer"
-              />
-              <span className="text-xs font-bold text-amber-700 flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Show Low Stock Only
-              </span>
-            </label>
+          <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600 border border-emerald-100">
+            <ArrowDownLeft className="w-5 h-5" />
           </div>
         </div>
 
-        {/* Table / Cards Display Grid depending on viewMode */}
-        {viewMode === 'TABLE' ? (
-          <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-500 font-bold select-none">
-                    <th 
-                      onClick={() => handleStockSort('name')} 
-                      className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
-                      title="Click to sort by material name"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span>Material Details</span>
-                        {stockSortField === 'name' ? (
-                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => handleStockSort('category')} 
-                      className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
-                      title="Click to sort by category"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span>Category</span>
-                        {stockSortField === 'category' ? (
-                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => handleStockSort('stockIn')} 
-                      className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                      title="Total stock received into inventory"
-                    >
-                      <div className="flex items-center justify-end gap-1.5 text-emerald-800">
-                        <span>Stock-In</span>
-                        {stockSortField === 'stockIn' ? (
-                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-700" /> : <ArrowDown className="w-3 h-3 text-emerald-700" />
-                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => handleStockSort('stockOut')} 
-                      className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                      title="Total stock issued or consumed from inventory"
-                    >
-                      <div className="flex items-center justify-end gap-1.5 text-amber-800">
-                        <span>Stock-Out</span>
-                        {stockSortField === 'stockOut' ? (
-                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-amber-700" /> : <ArrowDown className="w-3 h-3 text-amber-700" />
-                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => handleStockSort('balance')} 
-                      className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition bg-wood-50/60"
-                      title="Current remaining stock balance"
-                    >
-                      <div className="flex items-center justify-end gap-1.5 text-wood-950 font-bold">
-                        <span>Balance</span>
-                        {stockSortField === 'balance' ? (
-                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-800" /> : <ArrowDown className="w-3 h-3 text-wood-800" />
-                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => handleStockSort('status')} 
-                      className="py-3 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition"
-                      title="Click to sort by stock status severity"
-                    >
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span>Stock status</span>
-                        {stockSortField === 'status' ? (
-                          stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                        ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                      </div>
-                    </th>
-                    {!isAuditor && <th className="py-3 px-4 text-right">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-medium">
-                  {sortedInventory.length === 0 ? (
-                    <tr>
-                      <td colSpan={isAuditor ? 6 : 7} className="text-center py-16 text-gray-400">
-                        {inventory.length === 0 ? (
-                          <div className="space-y-2">
-                            <p className="font-semibold text-gray-600">No inventory items in stock.</p>
-                            <p className="text-xs text-gray-400">Click "+ New Raw Material" to record new timber, lumber, or hardware stock.</p>
-                          </div>
-                        ) : (
-                          'No inventory items match your filters.'
-                        )}
-                      </td>
-                    </tr>
-                  ) : (
-                    sortedInventory.map(item => {
-                      const metrics = getItemStockMetrics(item);
-                      const isDepleted = metrics.balance === 0;
-                      const isLow = metrics.balance < 5;
-                      return (
-                        <tr 
-                          key={item.id} 
-                          className={`transition ${
-                            isDepleted
-                              ? 'bg-red-50/70 hover:bg-red-100/40 text-red-950 font-semibold border-l-4 border-red-500'
-                              : isLow 
-                              ? 'bg-amber-50/80 hover:bg-amber-100/50 text-amber-950 font-semibold border-l-4 border-amber-500' 
-                              : 'hover:bg-gray-50/50 text-gray-700'
-                          }`}
-                        >
-                          <td className="py-3.5 px-4">
-                            <p className="font-bold text-gray-900">{item.name}</p>
-                            <p className="text-[10px] text-gray-400 font-semibold">ID: {item.id} &bull; Updated {item.lastUpdated}</p>
-                          </td>
-                          <td className="py-3.5 px-4 uppercase text-[10px] font-bold text-gray-500">
-                            {item.category}
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-800">
-                            +{metrics.stockIn} <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-mono font-bold text-amber-800">
-                            {metrics.stockOut > 0 ? `-${metrics.stockOut}` : '0'} <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-mono font-black text-sm bg-wood-50/40">
-                            <span className={metrics.balance === 0 ? 'text-red-600' : metrics.balance < 5 ? 'text-amber-700' : 'text-gray-900'}>
-                              {metrics.balance}
-                            </span> <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            {isDepleted ? (
-                              <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-red-200">
-                                OUT OF STOCK
-                              </span>
-                            ) : isLow ? (
-                              <span className="inline-flex items-center gap-1 bg-amber-200 text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full border border-amber-300">
-                                LOW STOCK (&lt;5)
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-200">
-                                HEALTHY
-                              </span>
-                            )}
-                          </td>
-                          {!isAuditor && (
-                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-1.5">
-                                {confirmDeleteId === item.id ? (
-                                  <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
-                                    <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
-                                    <button
-                                      onClick={() => {
-                                        if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
-                                        setConfirmDeleteId(null);
-                                      }}
-                                      className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
-                                    >
-                                      Yes
-                                    </button>
-                                    <button
-                                      onClick={() => setConfirmDeleteId(null)}
-                                      className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
-                                    >
-                                      No
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleOpenMovementModal(item)}
-                                      className="px-2 py-1 text-[10px] font-black uppercase text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition flex items-center gap-1 cursor-pointer"
-                                      title="Record Stock Movement (Stock-In or Stock-Out)"
-                                    >
-                                      <ArrowUpDown className="w-3 h-3 text-emerald-700" />
-                                      <span>Move</span>
-                                    </button>
-                                    <button
-                                      onClick={() => handleOpenEditModal(item)}
-                                      className="px-2 py-1 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition flex items-center gap-1 cursor-pointer"
-                                      title="Edit Material"
-                                    >
-                                      <Edit2 className="w-3 h-3 text-wood-700" />
-                                      <span>Edit</span>
-                                    </button>
-                                    {onDeleteInventoryItem && (
-                                      <button 
-                                        onClick={() => setConfirmDeleteId(item.id)}
-                                        className="p-1.5 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition cursor-pointer"
-                                        title="Delete Material"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+        <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Stock-Out</span>
+            <p className="text-lg font-bold font-mono text-amber-700 mt-0.5">
+              -{totalStockOutUnits.toLocaleString()} <span className="text-xs font-sans text-gray-400 font-normal">units</span>
+            </p>
+            <p className="text-[10px] text-gray-400">Issued to production</p>
+          </div>
+          <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600 border border-amber-100">
+            <ArrowUpRight className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-wood-100 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Balance</span>
+            <p className="text-lg font-bold font-mono text-wood-950 mt-0.5">
+              {totalBalanceUnits.toLocaleString()} <span className="text-xs font-sans text-gray-400 font-normal">units</span>
+            </p>
+            <p className="text-[10px] text-gray-400">Available on hand</p>
+          </div>
+          <div className="p-2.5 bg-wood-50 rounded-xl text-wood-700 border border-wood-100">
+            <Flame className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Stock Valuation</span>
+            <p className="text-lg font-bold font-mono text-gray-900 mt-0.5">
+              {formatCurrency(totalInventoryValuation)}
+            </p>
+            <p className="text-[10px] text-gray-400">Current reserve value</p>
+          </div>
+          <div className="p-2.5 bg-gray-50 rounded-xl text-gray-600 border border-gray-100">
+            <ArrowUpDown className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Sub-Tabs */}
+      <div className="flex border-b border-gray-100">
+        <button
+          onClick={() => setActiveTab('STOCK')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${activeTab === 'STOCK' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+        >
+          Stock Reserves & Movement Table
+        </button>
+        <button
+          onClick={() => setActiveTab('LOGS')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${activeTab === 'LOGS' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+        >
+          Stock Movement History (Stock-In / Stock-Out)
+        </button>
+      </div>
+
+      {activeTab === 'STOCK' ? (
+        <div className="space-y-4">
+          
+          {/* Filters Bar */}
+          <div className="bg-white p-4 rounded-xl border border-wood-100 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            <div className="flex-1 flex flex-col sm:flex-row gap-2">
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="Search wood or hardware materials..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-medium text-gray-800 placeholder-gray-400"
+                />
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2">
+                <Filter className="w-4 h-4 text-gray-400" />
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value as WoodCategory | 'All')}
+                  className="bg-transparent border-0 text-sm font-semibold text-gray-700 focus:ring-0 py-2 focus:outline-hidden"
+                >
+                  <option value="All">All Categories</option>
+                  <option value="Lumber">Lumber / Hardwood</option>
+                  <option value="Plywood">Plywood / Sheets</option>
+                  <option value="Hardware">Hardware / Fittings</option>
+                  <option value="Finishes">Finishes & Polish</option>
+                  <option value="Adhesives">Adhesives & Glues</option>
+                  <option value="Other">Other Accessories</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              {/* View mode toggle */}
+              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl p-1">
+                <button
+                  onClick={() => setViewMode('TABLE')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${viewMode === 'TABLE' ? 'bg-white shadow-xs text-wood-950 border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  Table Row View
+                </button>
+                <button
+                  onClick={() => setViewMode('GRID')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${viewMode === 'GRID' ? 'bg-white shadow-xs text-wood-950 border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  Card Grid View
+                </button>
+              </div>
+
+              {/* Low Stock checkbox */}
+              <label className="flex items-center gap-2 cursor-pointer py-1 select-none">
+                <input
+                  type="checkbox"
+                  checked={showLowStockOnly}
+                  onChange={(e) => setShowLowStockOnly(e.target.checked)}
+                  className="rounded border-gray-300 text-wood-600 focus:ring-wood-500 w-4 h-4"
+                />
+                <span className="text-xs font-bold text-amber-700 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Show Low Stock Only
+                </span>
+              </label>
             </div>
           </div>
-        ) : (
-          /* Cards Display Grid */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedInventory.length === 0 ? (
-              <div className="col-span-full text-center py-16 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400">
-                {inventory.length === 0 ? (
-                  <div className="space-y-2">
-                    <p className="font-semibold text-gray-600">No inventory items in stock.</p>
-                    <p className="text-xs text-gray-400">Click "+ New Raw Material" to record new timber, lumber, or hardware stock.</p>
-                  </div>
-                ) : (
-                  <p>No inventory items match your filters.</p>
-                )}
-              </div>
-            ) : (
-              sortedInventory.map(item => {
-                const metrics = getItemStockMetrics(item);
-                const isDepleted = metrics.balance === 0;
-                const isLow = metrics.balance < 5;
-                return (
-                  <motion.div
-                    key={item.id}
-                    layoutId={`inv-${item.id}`}
-                    whileHover={{ y: -3 }}
-                    className={`bg-white p-5 rounded-2xl border ${
-                      isDepleted
-                        ? 'border-red-300 bg-red-50/20'
-                        : isLow 
-                        ? 'border-amber-300 bg-amber-50/30' 
-                        : 'border-wood-100'
-                    } shadow-xs flex flex-col justify-between min-h-[220px]`}
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-1">
-                        <span className="px-2.5 py-0.5 bg-wood-50 text-wood-800 text-[10px] font-bold rounded-md border border-wood-100 uppercase">
-                          {item.category}
-                        </span>
-                        {isDepleted ? (
-                          <span className="flex items-center gap-1 bg-red-100 text-red-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-red-200">
-                            <AlertTriangle className="w-3 h-3" />
-                            OUT OF STOCK
-                          </span>
-                        ) : isLow ? (
-                          <span className="flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-amber-200">
-                            <AlertTriangle className="w-3 h-3" />
-                            LOW STOCK (&lt;5)
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md border border-emerald-200">
-                            HEALTHY
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-sm font-bold text-gray-900 mt-2 line-clamp-2 leading-snug">
-                        {item.name}
-                      </h3>
-                    </div>
 
-                    <div className="pt-2 border-t border-gray-50 space-y-2">
-                      <div className="grid grid-cols-3 gap-1 py-1.5 px-2 bg-gray-50/80 rounded-xl text-center">
-                        <div>
-                          <p className="text-[9px] text-emerald-800 font-bold uppercase">Stock-In</p>
-                          <p className="text-sm font-bold font-mono text-emerald-900">+{metrics.stockIn}</p>
-                        </div>
-                        <div className="border-x border-gray-200">
-                          <p className="text-[9px] text-amber-800 font-bold uppercase">Stock-Out</p>
-                          <p className="text-sm font-bold font-mono text-amber-900">-{metrics.stockOut}</p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] text-wood-800 font-bold uppercase">Balance</p>
-                          <p className={`text-sm font-black font-mono ${metrics.balance === 0 ? 'text-red-600' : metrics.balance < 5 ? 'text-amber-700' : 'text-wood-950'}`}>
-                            {metrics.balance}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-dashed border-gray-100 text-[10px]">
-                        <span className="text-gray-400 font-medium font-mono">ID: {item.id}</span>
+          {/* Table / Cards Display Grid depending on viewMode */}
+          {viewMode === 'TABLE' ? (
+            <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-500 font-bold select-none">
+                      <th 
+                        onClick={() => handleStockSort('name')} 
+                        className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by material name"
+                      >
                         <div className="flex items-center gap-1.5">
-                          {confirmDeleteId === item.id ? (
-                            <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
-                              <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
-                              <button
-                                onClick={() => {
-                                  if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
-                                  setConfirmDeleteId(null);
-                                }}
-                                className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
-                              >
-                                Yes
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
-                              >
-                                No
-                              </button>
+                          <span>Material Details</span>
+                          {stockSortField === 'name' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('category')} 
+                        className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by category"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Category</span>
+                          {stockSortField === 'category' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('balance')} 
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition bg-wood-50/50"
+                        title="Click to sort by active In-Stock Balance"
+                      >
+                        <div className="flex items-center justify-end gap-1.5 text-wood-950 font-black">
+                          <span>In Stock / Balance</span>
+                          {stockSortField === 'balance' || stockSortField === 'currentStock' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-wood-300" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('unitCost')} 
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by unit rate"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Unit Rate</span>
+                          {stockSortField === 'unitCost' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      <th 
+                        className="py-3 px-4 text-right font-bold text-gray-500"
+                        title="Total current stock valuation"
+                      >
+                        <span>Total Valuation</span>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('minStockThreshold')} 
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by minimum threshold"
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Min. Threshold</span>
+                          {stockSortField === 'minStockThreshold' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('status')} 
+                        className="py-3 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition"
+                        title="Click to sort by stock status severity"
+                      >
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>Stock Status</span>
+                          {stockSortField === 'status' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                        </div>
+                      </th>
+                      {!isAuditor && <th className="py-3 px-4 text-right">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-medium">
+                    {sortedInventory.length === 0 ? (
+                      <tr>
+                        <td colSpan={isAuditor ? 7 : 8} className="text-center py-16 text-gray-400">
+                          {inventory.length === 0 ? (
+                            <div className="space-y-2">
+                              <p className="font-semibold text-gray-600">No inventory items in stock.</p>
+                              <p className="text-xs text-gray-400">All inventory data has been cleared. Click "+ New Raw Material" or "+ Log Stock-In" to record stock.</p>
                             </div>
                           ) : (
-                            <>
-                              {!isAuditor && (
-                                <button
-                                  onClick={() => handleOpenMovementModal(item)}
-                                  className="px-2 py-0.5 text-[9px] font-bold uppercase text-emerald-700 hover:underline cursor-pointer flex items-center gap-1"
-                                  title="Record Movement"
-                                >
-                                  <ArrowUpDown className="w-2.5 h-2.5" />
-                                  <span>Move</span>
-                                </button>
+                            'No inventory items match your filters.'
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedInventory.map(item => {
+                        const movement = getItemStockMovement(item);
+                        const isLow = movement.balance <= item.minStockThreshold;
+                        const isWarningThreshold = movement.balance < 5;
+                        return (
+                          <tr 
+                            key={item.id} 
+                            className={`transition ${
+                              isWarningThreshold 
+                                ? 'bg-amber-50/80 hover:bg-amber-100/50 text-amber-950 font-semibold border-l-4 border-amber-500' 
+                                : 'hover:bg-gray-50/50 text-gray-700'
+                            }`}
+                          >
+                            <td className="py-3.5 px-4">
+                              <p className="font-bold text-gray-900">{item.name}</p>
+                              <p className="text-[10px] text-gray-400 font-semibold">ID: {item.id} &bull; Updated {item.lastUpdated}</p>
+                            </td>
+                            <td className="py-3.5 px-4 uppercase text-[10px] font-bold text-gray-500">
+                              {item.category}
+                            </td>
+                            {/* In Stock / Balance Column */}
+                            <td className="py-3.5 px-4 text-right font-mono font-black text-sm bg-wood-50/20 whitespace-nowrap">
+                              <span className={movement.balance <= item.minStockThreshold ? 'text-red-700 font-black' : 'text-wood-950 font-black'}>
+                                {movement.balance}
+                              </span> <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
+                            </td>
+                            {/* Unit Rate */}
+                            <td className="py-3.5 px-4 text-right font-mono">
+                              {formatCurrency(item.unitCost)}
+                            </td>
+                            {/* Total Stock Valuation */}
+                            <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-800">
+                              {formatCurrency(movement.balance * item.unitCost)}
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-mono text-gray-500">
+                              {item.minStockThreshold} {item.unit}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {isWarningThreshold ? (
+                                <span className="inline-flex items-center gap-1 bg-amber-200 text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full border border-amber-300">
+                                  STOCK UNDER 5 UNITS
+                                </span>
+                              ) : isLow ? (
+                                <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-red-200">
+                                  REORDER LEVEL
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-200">
+                                  HEALTHY
+                                </span>
                               )}
-                              {!isAuditor && (
-                                <button
-                                  onClick={() => handleOpenEditModal(item)}
-                                  className="px-2 py-0.5 text-[9px] font-bold uppercase text-wood-700 hover:underline cursor-pointer flex items-center gap-1"
-                                >
-                                  <Edit2 className="w-2.5 h-2.5" />
-                                  <span>Edit</span>
-                                </button>
-                              )}
-                              {!isAuditor && onDeleteInventoryItem && (
-                                <button 
-                                  onClick={() => setConfirmDeleteId(item.id)}
-                                  className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition cursor-pointer"
-                                  title="Delete Material"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </>
+                            </td>
+                            {!isAuditor && (
+                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {confirmDeleteId === item.id ? (
+                                    <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
+                                      <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
+                                      <button
+                                        onClick={() => {
+                                          if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
+                                          setConfirmDeleteId(null);
+                                        }}
+                                        className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
+                                      >
+                                        Yes
+                                      </button>
+                                      <button
+                                        onClick={() => setConfirmDeleteId(null)}
+                                        className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <button 
+                                        onClick={() => handleOpenLogModal('STOCK_IN', item.id)}
+                                        className="px-2 py-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition flex items-center gap-1 cursor-pointer"
+                                        title="Record Stock-In (+)"
+                                      >
+                                        <Plus className="w-3 h-3 text-emerald-600" />
+                                        <span>Stock-In</span>
+                                      </button>
+                                      <button 
+                                        onClick={() => handleOpenLogModal('STOCK_OUT', item.id)}
+                                        className="px-2 py-1 text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition flex items-center gap-1 cursor-pointer"
+                                        title="Record Stock-Out (-)"
+                                      >
+                                        <ArrowUpRight className="w-3 h-3 text-amber-600" />
+                                        <span>Stock-Out</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleOpenEditModal(item)}
+                                        className="px-2 py-1 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition cursor-pointer"
+                                      >
+                                        Edit
+                                      </button>
+                                      {!isAuditor && onDeleteInventoryItem && (
+                                        <button 
+                                          onClick={() => setConfirmDeleteId(item.id)}
+                                          className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition cursor-pointer"
+                                          title="Delete Material"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            /* Cards Display Grid */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sortedInventory.length === 0 ? (
+                <div className="col-span-full text-center py-16 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400">
+                  {inventory.length === 0 ? (
+                    <div className="space-y-2">
+                      <p className="font-semibold text-gray-600">No inventory items in stock.</p>
+                      <p className="text-xs text-gray-400">All inventory data has been cleared. Click "+ New Raw Material" or "+ Log Stock-In" to record stock.</p>
+                    </div>
+                  ) : (
+                    <p>No inventory items match your filters.</p>
+                  )}
+                </div>
+              ) : (
+                sortedInventory.map(item => {
+                  const movement = getItemStockMovement(item);
+                  const isLow = movement.balance <= item.minStockThreshold;
+                  const isWarningThreshold = movement.balance < 5;
+                  return (
+                    <motion.div
+                      key={item.id}
+                      layoutId={`inv-${item.id}`}
+                      whileHover={{ y: -3 }}
+                      className={`bg-white p-5 rounded-2xl border ${
+                        isWarningThreshold 
+                          ? 'border-amber-300 bg-amber-50/30' 
+                          : isLow 
+                            ? 'border-red-200 bg-red-50/5' 
+                            : 'border-wood-100'
+                      } shadow-xs flex flex-col justify-between`}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-1">
+                          <span className="px-2.5 py-0.5 bg-wood-50 text-wood-800 text-[10px] font-bold rounded-md border border-wood-100 uppercase">
+                            {item.category}
+                          </span>
+                          {isWarningThreshold ? (
+                            <span className="flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-amber-200 animate-pulse">
+                              <AlertTriangle className="w-3 h-3" />
+                              STOCK &lt; 5 UNITS
+                            </span>
+                          ) : isLow && (
+                            <span className="flex items-center gap-1 bg-red-100 text-red-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-red-200">
+                              <AlertTriangle className="w-3 h-3" />
+                              REORDER LEVEL
+                            </span>
                           )}
                         </div>
+                        <h3 className="text-sm font-bold text-gray-900 mt-2 line-clamp-2 leading-snug">
+                          {item.name}
+                        </h3>
+                        <p className="text-[10px] text-gray-400 font-semibold">ID: {item.id} &bull; Unit: {item.unit}</p>
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })
-            )}
+
+                      {/* Stock Movement 3-Pillar Micro Metric */}
+                      <div className="grid grid-cols-3 gap-2 py-2 px-3 my-2 bg-gray-50 rounded-xl border border-gray-100 text-center font-mono">
+                        <div>
+                          <p className="text-[9px] uppercase font-bold text-emerald-700">Stock-In</p>
+                          <p className="text-xs font-bold text-emerald-700">+{movement.stockIn}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] uppercase font-bold text-amber-700">Stock-Out</p>
+                          <p className="text-xs font-bold text-amber-700">-{movement.stockOut}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] uppercase font-bold text-wood-900">Balance</p>
+                          <p className="text-xs font-black text-wood-950">{movement.balance}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-50">
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-[10px] text-gray-400 font-semibold uppercase">Min. Threshold</p>
+                            <p className="text-xs font-semibold text-gray-700 font-mono">
+                              {item.minStockThreshold} {item.unit}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] text-gray-400 font-semibold uppercase">Est. Unit Cost</p>
+                            <p className="text-sm font-bold font-mono text-gray-800">
+                              {formatCurrency(item.unitCost)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-dashed border-gray-100 text-[10px]">
+                          <div className="flex items-center gap-1">
+                            {!isAuditor && (
+                              <button
+                                onClick={() => handleOpenEditModal(item)}
+                                className="px-2 py-1 text-[9px] font-bold uppercase text-wood-700 hover:bg-wood-50 rounded-md border border-wood-200 transition cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => handleOpenLogModal('STOCK_IN', item.id)}
+                              className="px-2 py-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md border border-emerald-200 transition cursor-pointer"
+                              title="Stock-In"
+                            >
+                              + Stock-In
+                            </button>
+                            <button 
+                              onClick={() => handleOpenLogModal('STOCK_OUT', item.id)}
+                              className="px-2 py-1 text-[9px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md border border-amber-200 transition cursor-pointer"
+                              title="Stock-Out"
+                            >
+                              - Stock-Out
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {confirmDeleteId === item.id ? (
+                              <div className="flex items-center gap-1 bg-red-50 border border-red-200 p-1 rounded-md">
+                                <span className="text-[8px] font-black text-red-700 px-0.5 uppercase">Delete?</span>
+                                <button
+                                  onClick={() => {
+                                    if (onDeleteInventoryItem) onDeleteInventoryItem(item.id);
+                                    setConfirmDeleteId(null);
+                                  }}
+                                  className="px-1.5 py-0.5 text-[8px] font-black uppercase text-white bg-red-600 hover:bg-red-700 rounded-sm transition cursor-pointer"
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  className="px-1.5 py-0.5 text-[8px] font-black uppercase text-gray-500 hover:text-gray-700 cursor-pointer"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                {!isAuditor && onDeleteInventoryItem && (
+                                  <button 
+                                    onClick={() => setConfirmDeleteId(item.id)}
+                                    className="p-1 hover:bg-red-50 rounded text-red-600 border border-transparent hover:border-red-100 transition cursor-pointer"
+                                    title="Delete Material"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+        </div>
+      ) : (
+        /* Logs Section */
+        <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
+          <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="font-display font-bold text-gray-800 flex items-center gap-1.5">
+              <History className="w-4 h-4 text-wood-600" />
+              Stock Movement History Ledger (Stock-In & Stock-Out)
+            </h3>
+            <span className="text-xs text-gray-400 font-semibold">
+              Showing {transactions.length} movement record(s)
+            </span>
           </div>
-        )}
-      </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-[11px] uppercase tracking-wider text-gray-500 font-bold select-none">
+                  <th 
+                    onClick={() => handleTxSort('date')}
+                    className="py-3.5 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by transaction date"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Date</span>
+                      {txSortField === 'date' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('itemName')}
+                    className="py-3.5 px-4 cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by material name"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Material Details</span>
+                      {txSortField === 'itemName' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('type')}
+                    className="py-3.5 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by movement type"
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Movement Type</span>
+                      {txSortField === 'type' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('quantity')}
+                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by quantity"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Quantity</span>
+                      {txSortField === 'quantity' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('unitCost')}
+                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by unit rate"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Unit Rate</span>
+                      {txSortField === 'unitCost' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleTxSort('totalValue')}
+                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
+                    title="Click to sort by total movement valuation"
+                  >
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Total Value</span>
+                      {txSortField === 'totalValue' ? (
+                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
+                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
+                    </div>
+                  </th>
+                  <th className="py-3.5 px-4">Purpose & Reference</th>
+                  {!isAuditor && onDeleteTransaction && <th className="py-3.5 px-4 text-center">Action</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {sortedTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-12 text-gray-400">
+                      No stock movement transactions logged yet. Use "+ Log Stock-In" or "- Log Stock-Out" to record movements.
+                    </td>
+                  </tr>
+                ) : (
+                  sortedTransactions.map(tx => {
+                    const isStockIn = tx.type === 'STOCK_IN' || tx.type === 'INWARDS';
+                    return (
+                      <tr key={tx.id} className="hover:bg-gray-50/50 transition">
+                        <td className="py-3 px-4 font-mono text-xs text-gray-500 whitespace-nowrap">{tx.date}</td>
+                        <td className="py-3 px-4">
+                          <p className="font-bold text-gray-800">{tx.itemName}</p>
+                          <p className="text-[10px] text-gray-400 font-semibold">ID: {tx.itemId}</p>
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-0.5 px-2.5 py-0.5 text-[10px] font-black rounded-md border uppercase ${isStockIn ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                            {isStockIn ? <ArrowDownLeft className="w-3 h-3 text-emerald-600" /> : <ArrowUpRight className="w-3 h-3 text-amber-600" />}
+                            {isStockIn ? 'STOCK-IN' : 'STOCK-OUT'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold font-mono text-gray-700">
+                          {isStockIn ? '+' : '-'}{tx.quantity}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-gray-500 whitespace-nowrap">
+                          {formatCurrency(tx.unitCost)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-gray-800 whitespace-nowrap">
+                          {formatCurrency(tx.totalValue)}
+                        </td>
+                        <td className="py-3 px-4 text-xs text-gray-600 max-w-xs truncate">
+                          <span>{tx.purpose}</span>
+                          {tx.referenceId && (
+                            <span className="block text-[10px] text-wood-600 font-semibold uppercase">
+                              Ref: {tx.referenceId}
+                            </span>
+                          )}
+                        </td>
+                        {!isAuditor && onDeleteTransaction && (
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete inventory transaction record for "${tx.itemName}"?`)) {
+                                  onDeleteTransaction(tx.id);
+                                }
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                              title="Delete Transaction Record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: Edit Raw Material */}
       <AnimatePresence>
@@ -713,7 +1040,7 @@ export default function InventoryManager({
                     setShowEditItemModal(false);
                     setEditingItem(null);
                   }}
-                  className="text-wood-300 hover:text-white font-bold text-xl cursor-pointer"
+                  className="text-wood-300 hover:text-white font-bold text-xl"
                 >
                   &times;
                 </button>
@@ -765,28 +1092,41 @@ export default function InventoryManager({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Current Stock</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase">Current Stock</label>
                     <input
                       type="number"
                       required
                       min={0}
                       value={editItemCurrentStock}
                       onChange={(e) => setEditItemCurrentStock(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Min Alert Level (Threshold)</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase">Unit Cost (Le)</label>
+                    <input
+                      type="number"
+                      required
+                      min={0.1}
+                      step={0.1}
+                      value={editItemUnitCost}
+                      onChange={(e) => setEditItemUnitCost(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Min Alert Level</label>
                     <input
                       type="number"
                       required
                       min={1}
                       value={editItemMinThreshold}
                       onChange={(e) => setEditItemMinThreshold(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
                 </div>
@@ -798,13 +1138,13 @@ export default function InventoryManager({
                       setShowEditItemModal(false);
                       setEditingItem(null);
                     }}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition cursor-pointer"
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs cursor-pointer"
+                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs"
                   >
                     Save Changes
                   </button>
@@ -815,7 +1155,7 @@ export default function InventoryManager({
         )}
       </AnimatePresence>
 
-      {/* MODAL: Create New Raw Material */}
+      {/* MODAL 1: Create New Raw Material */}
       <AnimatePresence>
         {showNewItemModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
@@ -832,7 +1172,7 @@ export default function InventoryManager({
                 </div>
                 <button 
                   onClick={() => setShowNewItemModal(false)}
-                  className="text-wood-300 hover:text-white font-bold cursor-pointer"
+                  className="text-wood-300 hover:text-white font-bold"
                 >
                   &times;
                 </button>
@@ -885,29 +1225,107 @@ export default function InventoryManager({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Stock Movement Tracking Section (Stock-In, Stock-Out, and Balance) */}
+                <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950 uppercase tracking-wide">
+                      <TrendingUp className="w-4 h-4 text-emerald-700" />
+                      <span>Stock Movement & Balance Tracking</span>
+                    </div>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                      newItemStockIn - newItemStockOut > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      Balance: {Math.max(0, newItemStockIn - newItemStockOut)} {newItemUnit}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-emerald-900 flex items-center gap-1">
+                        <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Stock-In (Received)</span>
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        value={newItemStockIn}
+                        onChange={(e) => setNewItemStockIn(Number(e.target.value))}
+                        className="w-full px-3 py-1.5 border border-emerald-300 rounded-lg focus:border-emerald-600 outline-hidden text-sm font-bold text-emerald-950 font-mono bg-white"
+                        placeholder="0"
+                      />
+                      <span className="text-[9px] text-emerald-700">Initial stock received</span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-amber-900 flex items-center gap-1">
+                        <ArrowUpRight className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Stock-Out (Dispatched)</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={newItemStockIn}
+                        value={newItemStockOut}
+                        onChange={(e) => setNewItemStockOut(Math.min(newItemStockIn, Math.max(0, Number(e.target.value))))}
+                        className="w-full px-3 py-1.5 border border-amber-300 rounded-lg focus:border-amber-600 outline-hidden text-sm font-bold text-amber-950 font-mono bg-white"
+                        placeholder="0"
+                      />
+                      <span className="text-[9px] text-amber-700">Initial dispatched/used</span>
+                    </div>
+                  </div>
+
+                  {/* Calculated Balance & Total Valuation Summary Strip */}
+                  <div className="p-2.5 bg-white rounded-lg border border-emerald-200 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-gray-400 block">Stock Balance</span>
+                      <span className="font-mono font-black text-sm text-wood-950">
+                        {Math.max(0, newItemStockIn - newItemStockOut)} <span className="text-xs font-normal text-gray-500">{newItemUnit}</span>
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[9px] uppercase font-bold text-gray-400 block">Total Stock Valuation</span>
+                      <span className="font-mono font-bold text-sm text-emerald-800">
+                        SLL {(Math.max(0, newItemStockIn - newItemStockOut) * newItemUnitCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity</label>
+                    <label className="text-[9px] font-bold text-gray-500 uppercase">Movement Purpose / Inward Note</label>
+                    <input
+                      type="text"
+                      value={newItemPurpose}
+                      onChange={(e) => setNewItemPurpose(e.target.value)}
+                      placeholder="e.g. Opening Stock Receipt / Supplier Inward"
+                      className="w-full px-2.5 py-1 border border-emerald-200 rounded-lg text-xs bg-white text-gray-800 outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Est. Unit Cost (SLL)</label>
                     <input
                       type="number"
                       required
-                      min={0}
-                      placeholder="e.g. 100"
-                      value={newItemInitialStock}
-                      onChange={(e) => setNewItemInitialStock(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                      min={0.1}
+                      step={0.1}
+                      value={newItemUnitCost}
+                      onChange={(e) => setNewItemUnitCost(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Min Alert Level (Threshold)</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase">Min Alert Level</label>
                     <input
                       type="number"
                       required
                       min={1}
                       value={newItemMinThreshold}
                       onChange={(e) => setNewItemMinThreshold(Number(e.target.value))}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
                 </div>
@@ -916,13 +1334,13 @@ export default function InventoryManager({
                   <button 
                     type="button" 
                     onClick={() => setShowNewItemModal(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition cursor-pointer"
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs cursor-pointer"
+                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs"
                   >
                     Save material
                   </button>
@@ -933,9 +1351,9 @@ export default function InventoryManager({
         )}
       </AnimatePresence>
 
-      {/* MODAL: Record Stock Movement */}
+      {/* MODAL 2: Log Material Stock-In / Stock-Out */}
       <AnimatePresence>
-        {showMovementModal && (
+        {showLogModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
@@ -943,112 +1361,137 @@ export default function InventoryManager({
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-2xl border border-wood-100 shadow-xl w-full max-w-md overflow-hidden"
             >
-              <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
+              <div className={`p-5 text-white flex items-center justify-between ${logType === 'STOCK_IN' ? 'bg-emerald-800' : 'bg-amber-800'}`}>
                 <div>
-                  <h3 className="font-display font-bold text-lg">Record Stock Movement</h3>
-                  <p className="text-xs text-wood-200">Log incoming stock or workshop material consumption.</p>
+                  <h3 className="font-display font-bold text-lg flex items-center gap-2">
+                    {logType === 'STOCK_IN' ? (
+                      <>
+                        <ArrowDownLeft className="w-5 h-5 text-emerald-300" />
+                        <span>Log Stock-In (Restock / Add Stock)</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUpRight className="w-5 h-5 text-amber-300" />
+                        <span>Log Stock-Out (Issue / Workshop Dispatch)</span>
+                      </>
+                    )}
+                  </h3>
+                  <p className="text-xs opacity-90 mt-0.5">
+                    {logType === 'STOCK_IN' ? 'Add raw timber or hardware supplies to active balance' : 'Dispatch and deduct material used in production jobs'}
+                  </p>
                 </div>
                 <button 
-                  onClick={() => setShowMovementModal(false)}
-                  className="text-wood-300 hover:text-white font-bold text-xl cursor-pointer"
+                  onClick={() => setShowLogModal(false)}
+                  className="text-white hover:opacity-75 font-bold text-xl cursor-pointer"
                 >
                   &times;
                 </button>
               </div>
 
-              <form onSubmit={handleSubmitMovement} className="p-6 space-y-4">
+              <form onSubmit={handleSubmitLogTransaction} className="p-6 space-y-4">
                 {/* Movement Type Toggle */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Movement Type</label>
-                  <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setMovementType('INWARDS')}
-                      className={`py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                        movementType === 'INWARDS'
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
+                      onClick={() => {
+                        setLogType('STOCK_IN');
+                        setLogPurpose('Supplier Restock / Purchase');
+                      }}
+                      className={`py-2 px-3 text-xs font-bold rounded-xl border flex items-center justify-center gap-1.5 transition cursor-pointer ${logType === 'STOCK_IN' ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
                     >
-                      <ArrowUp className="w-3.5 h-3.5" />
-                      <span>Stock-In (Received)</span>
+                      <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Stock-In (+)</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => setMovementType('OUTWARDS')}
-                      className={`py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                        movementType === 'OUTWARDS'
-                          ? 'bg-amber-600 text-white shadow-xs'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
+                      onClick={() => {
+                        setLogType('STOCK_OUT');
+                        setLogPurpose('Workshop Dispatch / Production Issue');
+                      }}
+                      className={`py-2 px-3 text-xs font-bold rounded-xl border flex items-center justify-center gap-1.5 transition cursor-pointer ${logType === 'STOCK_OUT' ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
                     >
-                      <ArrowDown className="w-3.5 h-3.5" />
-                      <span>Stock-Out (Consumed)</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Stock-Out (-)</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Target Raw Material */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Select Material</label>
                   <select
-                    required
-                    value={movementItemId}
-                    onChange={(e) => setMovementItemId(e.target.value)}
+                    value={logItemId}
+                    onChange={(e) => handleLogItemChange(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 bg-white"
                   >
-                    <option value="" disabled>-- Select inventory item --</option>
-                    {inventory.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} ({item.category} - {item.unit}) &bull; Balance: {item.currentStock} {item.unit}
+                    {inventory.map(i => (
+                      <option key={i.id} value={i.id}>
+                        {i.name} (Current Balance: {i.currentStock} {i.unit})
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Quantity */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity Units</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={logQuantity}
+                      onChange={(e) => setLogQuantity(Number(e.target.value))}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Unit Cost (Le)</label>
+                    <input
+                      type="number"
+                      required
+                      min={0.1}
+                      step={0.1}
+                      value={logUnitCost}
+                      onChange={(e) => setLogUnitCost(Number(e.target.value))}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">
-                    Quantity {movementItemId && inventory.find(i => i.id === movementItemId) ? `(${inventory.find(i => i.id === movementItemId)?.unit})` : ''}
-                  </label>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Purpose / Memo</label>
                   <input
-                    type="number"
+                    type="text"
                     required
-                    min={1}
-                    value={movementQty}
-                    onChange={(e) => setMovementQty(Number(e.target.value))}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    placeholder="e.g. 25"
+                    placeholder="e.g. Standard timber purchase restock, or Used in bespoke dining table"
+                    value={logPurpose}
+                    onChange={(e) => setLogPurpose(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium"
                   />
                 </div>
 
-                {/* Purpose / Reference */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Notes / Purpose (Optional)</label>
-                  <input
-                    type="text"
-                    value={movementPurpose}
-                    onChange={(e) => setMovementPurpose(e.target.value)}
-                    placeholder={movementType === 'INWARDS' ? 'e.g. Lumber delivery from supplier' : 'e.g. Workshop consumption / Job allocation'}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm text-gray-700"
-                  />
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between font-mono text-xs text-gray-600">
+                  <span>Total Calculated Value:</span>
+                  <span className="font-bold text-gray-800 text-sm">
+                    {formatCurrency(logQuantity * logUnitCost)}
+                  </span>
                 </div>
 
                 <div className="flex gap-2 pt-4">
                   <button 
                     type="button" 
-                    onClick={() => setShowMovementModal(false)}
+                    onClick={() => setShowLogModal(false)}
                     className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className={`flex-1 py-2.5 rounded-xl text-white text-sm font-bold transition shadow-xs cursor-pointer ${
-                      movementType === 'INWARDS' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'
-                    }`}
+                    className={`flex-1 py-2.5 rounded-xl text-white text-sm font-bold transition shadow-xs cursor-pointer ${logType === 'STOCK_IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}`}
                   >
-                    Confirm {movementType === 'INWARDS' ? 'Stock-In' : 'Stock-Out'}
+                    {logType === 'STOCK_IN' ? 'Confirm Stock-In (+)' : 'Confirm Stock-Out (-)'}
                   </button>
                 </div>
               </form>

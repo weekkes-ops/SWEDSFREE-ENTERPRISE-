@@ -16,7 +16,7 @@ export interface InventoryTransaction {
   id: string;
   itemId: string;
   itemName: string;
-  type: 'INWARDS' | 'OUTWARDS';
+  type: 'INWARDS' | 'OUTWARDS' | 'STOCK_IN' | 'STOCK_OUT';
   quantity: number;
   unitCost: number;
   totalValue: number;
@@ -150,6 +150,8 @@ export interface FinancialTransaction {
   date: string; // YYYY-MM-DD
   description: string;
   referenceId?: string; // JobId, EmployeeId, or InventoryTransactionId
+  quantity?: number; // Quantity of items/units
+  unitCost?: number; // Unit cost / rate per item (Le)
 }
 
 export type ReportPeriod = 'All Time' | 'Daily' | 'Weekly' | 'Monthly' | 'Yearly';

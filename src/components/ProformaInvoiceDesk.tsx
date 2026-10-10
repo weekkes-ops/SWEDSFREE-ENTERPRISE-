@@ -1860,18 +1860,20 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                 visibility: visible !important;
               }
               #proforma-print-area {
-                margin: 0 !important;
+                margin: 0 auto !important;
                 padding: 0 !important;
                 border: none !important;
                 box-shadow: none !important;
                 background: #ffffff !important;
                 color: #000000 !important;
                 min-height: 0 !important;
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
+                position: relative !important;
+                left: auto !important;
+                top: auto !important;
                 width: 100% !important;
                 max-width: 100% !important;
+                overflow: visible !important;
+                display: block !important;
               }
               .proforma-header-container {
                 padding-top: 0 !important;
@@ -1898,7 +1900,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
           {/* A4 Document Container */}
           <div
             id="proforma-print-area"
-            className="w-full max-w-[850px] bg-white text-slate-900 shadow-2xl rounded-2xl p-8 sm:p-12 border border-amber-900/20 relative overflow-hidden print:!p-0 print:!m-0 print:!border-none print:!shadow-none print:!min-h-0"
+            className="w-full max-w-[850px] bg-white text-slate-900 shadow-2xl rounded-2xl p-8 sm:p-12 border border-amber-900/20 relative overflow-hidden print:!p-0 print:!m-0 print:!border-none print:!shadow-none print:!min-h-0 print:!w-full print:!max-w-none print:!overflow-visible print:!static"
             style={{ minHeight: '1100px' }}
           >
             {/* Top Border Gold/Navy Accent Stripe (Hidden on print to keep header at top) */}

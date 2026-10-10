@@ -288,8 +288,38 @@ button.bg-wood-700:hover {
     line-height: 1.35 !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Unconstrain all React root & layout wrappers to prevent half-page viewport clipping */
+  #root,
+  #root > div,
+  main,
+  div[class*="min-h-screen"],
+  div[class*="fixed"] {
+    position: static !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+    filter: none !important;
   }
 
   /* Hide all regular UI chrome when printing */
@@ -307,16 +337,17 @@ button.bg-wood-700:hover {
     visibility: visible !important;
   }
 
-  /* Position the document at the absolute top of the print layout */
+  /* Flow the document in natural flow across the full A4 page without viewport clipping */
   #print-area,
   #proforma-print-area,
   #bulk-print-area {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 !important;
+    min-width: 100% !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     background-color: #ffffff !important;
     background: #ffffff !important;
@@ -328,6 +359,8 @@ button.bg-wood-700:hover {
     min-height: 0 !important;
     max-height: none !important;
     display: block !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
 
   /* Ensure headers for invoice, proforma, and receipt are pinned strictly at the top of page */
@@ -586,21 +619,22 @@ button.bg-wood-700:hover {
     visibility: hidden !important;
   }
 
-  /* Ensure the main print containers lay out flat on pure white background anchored at the very top */
+  /* Ensure the main print containers lay out flat on pure white background across the full A4 page */
   #print-area,
   #proforma-print-area,
   #bulk-print-area {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     border: none !important;
     background-color: #ffffff !important;
     background: #ffffff !important;
     color: #000000 !important;
+    overflow: visible !important;
   }
 
   /* Branded print header and footer styles */

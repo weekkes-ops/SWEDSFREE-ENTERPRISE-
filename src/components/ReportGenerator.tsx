@@ -216,8 +216,8 @@ export default function ReportGenerator({
   const netEarnings = totalIncome - totalExpense;
 
   // 5. Lumber Consumed Metric
-  // Inventory outwards transactions (timber/materials dispatched from stock)
-  const invOutwards = periodInvTx.filter(t => t.type === 'OUTWARDS');
+  // Inventory stock-out transactions (timber/materials dispatched from stock)
+  const invOutwards = periodInvTx.filter(t => t.type === 'STOCK_OUT' || t.type === 'OUTWARDS');
   const invOutwardsQty = invOutwards.reduce((sum, t) => sum + t.quantity, 0);
   const invOutwardsVal = invOutwards.reduce((sum, t) => sum + t.totalValue, 0);
 
@@ -230,8 +230,8 @@ export default function ReportGenerator({
   const outwardsQty = invOutwardsQty > 0 ? invOutwardsQty : jobMatQty;
   const outwardsVal = invOutwardsVal > 0 ? invOutwardsVal : jobMatVal;
 
-  // Inventory inwards transactions (materials received into workshop stock)
-  const invInwards = periodInvTx.filter(t => t.type === 'INWARDS');
+  // Inventory stock-in transactions (materials received into workshop stock)
+  const invInwards = periodInvTx.filter(t => t.type === 'STOCK_IN' || t.type === 'INWARDS');
   const inwardsQty = invInwards.reduce((sum, t) => sum + t.quantity, 0);
   const inwardsVal = invInwards.reduce((sum, t) => sum + t.totalValue, 0);
 

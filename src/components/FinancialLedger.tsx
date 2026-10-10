@@ -49,14 +49,15 @@ export default function FinancialLedger({
 }: FinancialLedgerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showInlineForm, setShowInlineForm] = useState(true);
   const [activeTab, setActiveTab] = useState<'LEDGER' | 'ANALYTICS'>('LEDGER');
 
   // Form states - Add Transaction
   const [type, setType] = useState<'INCOME' | 'EXPENDITURE'>('INCOME');
   const [category, setCategory] = useState<FinancialCategory>('wood');
-  const [amount, setAmount] = useState(1500);
   const [quantity, setQuantity] = useState<number | ''>('');
   const [unitCost, setUnitCost] = useState<number | ''>('');
+  const [amount, setAmount] = useState(1500);
   const [date, setDate] = useState('2026-07-20');
   const [description, setDescription] = useState('');
 
@@ -64,43 +65,11 @@ export default function FinancialLedger({
   const [editingTransaction, setEditingTransaction] = useState<FinancialTransaction | null>(null);
   const [editType, setEditType] = useState<'INCOME' | 'EXPENDITURE'>('INCOME');
   const [editCategory, setEditCategory] = useState<FinancialCategory>('wood');
-  const [editAmount, setEditAmount] = useState(1500);
   const [editQuantity, setEditQuantity] = useState<number | ''>('');
   const [editUnitCost, setEditUnitCost] = useState<number | ''>('');
+  const [editAmount, setEditAmount] = useState(1500);
   const [editDate, setEditDate] = useState('2026-07-20');
   const [editDescription, setEditDescription] = useState('');
-
-  const handleQuantityChange = (val: string) => {
-    const num = val === '' ? '' : Math.max(0, Number(val));
-    setQuantity(num);
-    if (typeof num === 'number' && num > 0 && typeof unitCost === 'number' && unitCost > 0) {
-      setAmount(Math.round(num * unitCost * 100) / 100);
-    }
-  };
-
-  const handleUnitCostChange = (val: string) => {
-    const num = val === '' ? '' : Math.max(0, Number(val));
-    setUnitCost(num);
-    if (typeof quantity === 'number' && quantity > 0 && typeof num === 'number' && num > 0) {
-      setAmount(Math.round(quantity * num * 100) / 100);
-    }
-  };
-
-  const handleEditQuantityChange = (val: string) => {
-    const num = val === '' ? '' : Math.max(0, Number(val));
-    setEditQuantity(num);
-    if (typeof num === 'number' && num > 0 && typeof editUnitCost === 'number' && editUnitCost > 0) {
-      setEditAmount(Math.round(num * editUnitCost * 100) / 100);
-    }
-  };
-
-  const handleEditUnitCostChange = (val: string) => {
-    const num = val === '' ? '' : Math.max(0, Number(val));
-    setEditUnitCost(num);
-    if (typeof editQuantity === 'number' && editQuantity > 0 && typeof num === 'number' && num > 0) {
-      setEditAmount(Math.round(editQuantity * num * 100) / 100);
-    }
-  };
 
   const handleTypeChange = (newType: 'INCOME' | 'EXPENDITURE') => {
     setType(newType);
@@ -124,9 +93,9 @@ export default function FinancialLedger({
     setEditingTransaction(t);
     setEditType(t.type);
     setEditCategory(t.category);
+    setEditQuantity(t.quantity !== undefined ? t.quantity : '');
+    setEditUnitCost(t.unitCost !== undefined ? t.unitCost : '');
     setEditAmount(t.amount);
-    setEditQuantity(t.quantity ?? '');
-    setEditUnitCost(t.unitCost ?? '');
     setEditDate(t.date);
     setEditDescription(t.description);
   };
@@ -139,10 +108,10 @@ export default function FinancialLedger({
       type,
       category,
       amount,
-      quantity: typeof quantity === 'number' && quantity > 0 ? quantity : undefined,
-      unitCost: typeof unitCost === 'number' && unitCost > 0 ? unitCost : undefined,
       date,
-      description
+      description,
+      quantity: typeof quantity === 'number' && quantity > 0 ? quantity : undefined,
+      unitCost: typeof unitCost === 'number' && unitCost > 0 ? unitCost : undefined
     });
 
     // Reset Form
@@ -163,10 +132,10 @@ export default function FinancialLedger({
         type: editType,
         category: editCategory,
         amount: editAmount,
-        quantity: typeof editQuantity === 'number' && editQuantity > 0 ? editQuantity : undefined,
-        unitCost: typeof editUnitCost === 'number' && editUnitCost > 0 ? editUnitCost : undefined,
         date: editDate,
-        description: editDescription
+        description: editDescription,
+        quantity: typeof editQuantity === 'number' && editQuantity > 0 ? editQuantity : undefined,
+        unitCost: typeof editUnitCost === 'number' && editUnitCost > 0 ? editUnitCost : undefined
       });
     }
 
@@ -245,13 +214,22 @@ export default function FinancialLedger({
         </div>
         
         {!isAuditor ? (
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Cash Transaction</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button 
+              onClick={() => setShowInlineForm(prev => !prev)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-50 text-wood-900 border border-wood-200 hover:bg-wood-100 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
+            >
+              <Plus className="w-4 h-4 text-wood-700" />
+              <span>{showInlineForm ? 'Hide Cash Form' : 'Record Cash Transaction'}</span>
+            </button>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Cash Transaction</span>
+            </button>
+          </div>
         ) : (
           <div className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold font-mono">
             <ShieldAlert className="w-4 h-4 text-slate-500" />
@@ -332,30 +310,236 @@ export default function FinancialLedger({
       </div>
 
       {activeTab === 'LEDGER' ? (
-        /* Ledger List */
-        <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
-          <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-display font-bold text-gray-800 flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4 text-wood-600" />
-              General Cash Ledger
-            </h3>
-            <span className="text-xs text-gray-400 font-semibold">
-              Showing {transactions.length} record(s)
-            </span>
-          </div>
+        <div className="space-y-6">
+          {/* Cash Transaction Entry Form Panel */}
+          {!isAuditor && (
+            <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
+              <div className="p-4 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-wood-100 text-wood-700 rounded-xl">
+                    <DollarSign className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-gray-900 text-sm">
+                      Cash Transaction Form
+                    </h3>
+                    <p className="text-[11px] text-gray-500">
+                      Record cash income or expenditure with dedicated Quantity & Unit Cost calculations
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInlineForm(prev => !prev)}
+                  className="text-xs font-bold text-wood-700 hover:text-wood-900 px-3 py-1.5 bg-wood-50 hover:bg-wood-100 rounded-xl border border-wood-200 transition cursor-pointer"
+                >
+                  {showInlineForm ? 'Hide Form' : 'Show Form'}
+                </button>
+              </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400 font-bold">
-                  <th className="py-3 px-4">Clearance Date</th>
-                  <th className="py-3 px-4">Transaction Details</th>
-                  <th className="py-3 px-4">Cost Category</th>
-                  <th className="py-3 px-4 text-center">Inflow / Outflow</th>
-                  <th className="py-3 px-4 text-right">Cleared Amount</th>
-                  {!isAuditor && <th className="py-3 px-4 text-center">Actions</th>}
-                </tr>
-              </thead>
+              {showInlineForm && (
+                <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 bg-white">
+                  {/* Flow Type selector buttons */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Cash Flow Type</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTypeChange('INCOME')}
+                        className={`py-2 text-xs font-bold rounded-xl border transition cursor-pointer ${type === 'INCOME' ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
+                      >
+                        Cash Inflow (Income)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTypeChange('EXPENDITURE')}
+                        className={`py-2 text-xs font-bold rounded-xl border transition cursor-pointer ${type === 'EXPENDITURE' ? 'bg-red-50 text-red-800 border-red-300 shadow-xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
+                      >
+                        Cash Outflow (Expense)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase">Cost Category</label>
+                      <select
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value as FinancialCategory)}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 bg-white"
+                      >
+                        {type === 'INCOME' ? (
+                          <>
+                            <option value="wood">wood</option>
+                            <option value="sofa">sofa</option>
+                            <option value="Chair">Chair</option>
+                            <option value="Bed">Bed</option>
+                            <option value="Wood Construction">Wood Construction</option>
+                            <option value="others">others</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="Tools and generator">Tools and generator</option>
+                            <option value="Utilities">Utilities</option>
+                            <option value="Transportation">Transportation</option>
+                            <option value="Material Purchase">Material Purchase</option>
+                            <option value="Tools and Maintenance">Tools and Maintenance</option>
+                            <option value="Cast">Cast</option>
+                            <option value="others">others</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase">Clearance Date</label>
+                      <input
+                        type="date"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* DEDICATED QUANTITY & UNIT COST SECTION */}
+                  <div className="p-4 bg-wood-50/60 rounded-xl border border-wood-200/80 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-extrabold text-wood-900 uppercase tracking-wider">
+                          Quantity & Unit Cost Section
+                        </span>
+                        <span className="text-[10px] bg-wood-200/70 text-wood-900 font-bold px-1.5 py-0.5 rounded-sm">
+                          Auto-Calculation
+                        </span>
+                      </div>
+                      {typeof quantity === 'number' && quantity > 0 && typeof unitCost === 'number' && unitCost > 0 ? (
+                        <span className="text-xs text-emerald-800 font-extrabold font-mono bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200 self-start sm:self-auto">
+                          {quantity} × Le {Number(unitCost).toLocaleString()} = Le {(Number(quantity) * Number(unitCost)).toLocaleString()}
+                        </span>
+                      ) : null}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-gray-600 uppercase">Quantity (Units / Items)</label>
+                        <input
+                          type="number"
+                          min={0.01}
+                          step="any"
+                          placeholder="e.g. 10"
+                          value={quantity}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            setQuantity(val);
+                            if (typeof val === 'number' && val > 0 && typeof unitCost === 'number' && unitCost > 0) {
+                              setAmount(Math.round(val * unitCost * 100) / 100);
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-800 font-mono bg-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-gray-600 uppercase">Unit Cost / Rate (Le)</label>
+                        <input
+                          type="number"
+                          min={0.01}
+                          step="any"
+                          placeholder="e.g. 45000"
+                          value={unitCost}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            setUnitCost(val);
+                            if (typeof val === 'number' && val > 0 && typeof quantity === 'number' && quantity > 0) {
+                              setAmount(Math.round(quantity * val * 100) / 100);
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-800 font-mono bg-white"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-gray-500 italic">
+                      Specifying quantity & unit cost automatically computes the Total Cleared Amount below.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase">Total Amount (Le) *</label>
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        value={amount}
+                        onChange={(e) => setAmount(Number(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-bold text-gray-900 font-mono bg-white"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase">Memo / Description *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Timber purchase restock receipt #104"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setDescription('');
+                        setQuantity('');
+                        setUnitCost('');
+                        setAmount(1000);
+                      }}
+                      className="px-4 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-bold transition cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="px-5 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Post Cash Transaction</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* Ledger List */}
+          <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
+            <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-display font-bold text-gray-800 flex items-center gap-1.5">
+                <DollarSign className="w-4 h-4 text-wood-600" />
+                General Cash Ledger
+              </h3>
+              <span className="text-xs text-gray-400 font-semibold">
+                Showing {transactions.length} record(s)
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400 font-bold">
+                    <th className="py-3 px-4">Clearance Date</th>
+                    <th className="py-3 px-4">Transaction Details</th>
+                    <th className="py-3 px-4">Cost Category</th>
+                    <th className="py-3 px-4 text-center">Inflow / Outflow</th>
+                    <th className="py-3 px-4 text-center">Quantity & Unit Cost</th>
+                    <th className="py-3 px-4 text-right">Cleared Amount</th>
+                    {!isAuditor && <th className="py-3 px-4 text-center">Actions</th>}
+                  </tr>
+                </thead>
               <tbody className="divide-y divide-gray-100 text-sm">
                 {[...transactions].reverse().map(t => {
                   const isInc = t.type === 'INCOME';
@@ -364,13 +548,6 @@ export default function FinancialLedger({
                       <td className="py-3.5 px-4 font-mono text-xs text-gray-500 whitespace-nowrap">{t.date}</td>
                       <td className="py-3.5 px-4 font-semibold text-gray-800">
                         {t.description}
-                        {(t.quantity != null || t.unitCost != null) && (
-                          <span className="block text-[11px] font-mono text-gray-500 font-normal mt-0.5">
-                            {t.quantity != null && `Qty: ${t.quantity}`}
-                            {t.quantity != null && t.unitCost != null && ` \u2022 `}
-                            {t.unitCost != null && `Unit Cost: ${formatCurrency(t.unitCost)}`}
-                          </span>
-                        )}
                         {t.referenceId && (
                           <span className="block text-[10px] font-semibold text-wood-600 uppercase">Ref: {t.referenceId}</span>
                         )}
@@ -381,6 +558,22 @@ export default function FinancialLedger({
                           {isInc ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
                           {t.type}
                         </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-mono text-xs whitespace-nowrap">
+                        {t.quantity ? (
+                          <div className="space-y-0.5">
+                            <span className="font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+                              {t.quantity} <span className="text-[10px] font-sans text-gray-500 font-normal">units</span>
+                            </span>
+                            {t.unitCost ? (
+                              <span className="block text-[10px] text-gray-500 font-medium">
+                                @ {formatCurrency(t.unitCost)}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
                       <td className={`py-3.5 px-4 text-right font-mono font-bold whitespace-nowrap ${isInc ? 'text-emerald-700' : 'text-red-700'}`}>
                         {isInc ? '+' : '-'}{formatCurrency(t.amount)}
@@ -422,6 +615,7 @@ export default function FinancialLedger({
             </table>
           </div>
         </div>
+      </div>
       ) : (
         /* Charts / Analytics Tab */
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -530,16 +724,16 @@ export default function FinancialLedger({
                     <button
                       type="button"
                       onClick={() => handleTypeChange('INCOME')}
-                      className={`py-2 text-xs font-bold rounded-xl border transition ${type === 'INCOME' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
+                      className={`py-2 text-xs font-bold rounded-xl border transition cursor-pointer ${type === 'INCOME' ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
                     >
-                      Inwards (Income)
+                      Cash Inflow (Income)
                     </button>
                     <button
                       type="button"
                       onClick={() => handleTypeChange('EXPENDITURE')}
-                      className={`py-2 text-xs font-bold rounded-xl border transition ${type === 'EXPENDITURE' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
+                      className={`py-2 text-xs font-bold rounded-xl border transition cursor-pointer ${type === 'EXPENDITURE' ? 'bg-red-50 text-red-800 border-red-300 shadow-xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
                     >
-                      Outwards (Expense)
+                      Cash Outflow (Expense)
                     </button>
                   </div>
                 </div>
@@ -586,43 +780,62 @@ export default function FinancialLedger({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity (Units)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      placeholder="e.g. 5"
-                      value={quantity}
-                      onChange={(e) => handleQuantityChange(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700"
-                    />
+                <div className="p-3 bg-wood-50/60 rounded-xl border border-wood-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-wood-900 uppercase tracking-wider">
+                      Quantity & Unit Cost Section
+                    </span>
+                    {quantity && unitCost ? (
+                      <span className="text-[10px] text-emerald-700 font-bold font-mono">
+                        {quantity} × Le {Number(unitCost).toLocaleString()} = Le {(Number(quantity) * Number(unitCost)).toLocaleString()}
+                      </span>
+                    ) : null}
                   </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Unit Cost (Le)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.1}
-                      placeholder="e.g. 300"
-                      value={unitCost}
-                      onChange={(e) => handleUnitCostChange(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-500 uppercase">Quantity (Units / Items)</label>
+                      <input
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        placeholder="e.g. 5"
+                        value={quantity}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value);
+                          setQuantity(val);
+                          if (typeof val === 'number' && val > 0 && typeof unitCost === 'number' && unitCost > 0) {
+                            setAmount(Math.round(val * unitCost * 100) / 100);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-500 uppercase">Unit Cost / Rate (Le)</label>
+                      <input
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        placeholder="e.g. 300"
+                        value={unitCost}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value);
+                          setUnitCost(val);
+                          if (typeof val === 'number' && val > 0 && typeof quantity === 'number' && quantity > 0) {
+                            setAmount(Math.round(quantity * val * 100) / 100);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono bg-white"
+                      />
+                    </div>
                   </div>
+                  <p className="text-[10px] text-gray-400 italic">
+                    Entering quantity & unit rate auto-calculates Total Amount below (or enter/adjust total amount manually).
+                  </p>
                 </div>
 
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Amount (Le) *</label>
-                    {typeof quantity === 'number' && typeof unitCost === 'number' && quantity > 0 && unitCost > 0 && (
-                      <span className="text-[10px] text-wood-700 font-semibold">
-                        Calculated ({quantity} &times; {formatCurrency(unitCost)})
-                      </span>
-                    )}
-                  </div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Total Amount (Le) *</label>
                   <input
                     type="number"
                     required
@@ -696,16 +909,16 @@ export default function FinancialLedger({
                     <button
                       type="button"
                       onClick={() => handleEditTypeChange('INCOME')}
-                      className={`py-2 text-xs font-bold rounded-xl border transition ${editType === 'INCOME' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
+                      className={`py-2 text-xs font-bold rounded-xl border transition cursor-pointer ${editType === 'INCOME' ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
                     >
-                      Inwards (Income)
+                      Cash Inflow (Income)
                     </button>
                     <button
                       type="button"
                       onClick={() => handleEditTypeChange('EXPENDITURE')}
-                      className={`py-2 text-xs font-bold rounded-xl border transition ${editType === 'EXPENDITURE' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
+                      className={`py-2 text-xs font-bold rounded-xl border transition cursor-pointer ${editType === 'EXPENDITURE' ? 'bg-red-50 text-red-800 border-red-300 shadow-xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
                     >
-                      Outwards (Expense)
+                      Cash Outflow (Expense)
                     </button>
                   </div>
                 </div>
@@ -752,43 +965,62 @@ export default function FinancialLedger({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Quantity (Units)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      placeholder="e.g. 5"
-                      value={editQuantity}
-                      onChange={(e) => handleEditQuantityChange(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700"
-                    />
+                <div className="p-3 bg-wood-50/60 rounded-xl border border-wood-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-wood-900 uppercase tracking-wider">
+                      Quantity & Unit Cost Section
+                    </span>
+                    {editQuantity && editUnitCost ? (
+                      <span className="text-[10px] text-emerald-700 font-bold font-mono">
+                        {editQuantity} × Le {Number(editUnitCost).toLocaleString()} = Le {(Number(editQuantity) * Number(editUnitCost)).toLocaleString()}
+                      </span>
+                    ) : null}
                   </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Unit Cost (Le)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.1}
-                      placeholder="e.g. 300"
-                      value={editUnitCost}
-                      onChange={(e) => handleEditUnitCostChange(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold font-mono text-gray-700"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-500 uppercase">Quantity (Units / Items)</label>
+                      <input
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        placeholder="e.g. 5"
+                        value={editQuantity}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value);
+                          setEditQuantity(val);
+                          if (typeof val === 'number' && val > 0 && typeof editUnitCost === 'number' && editUnitCost > 0) {
+                            setEditAmount(Math.round(val * editUnitCost * 100) / 100);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-500 uppercase">Unit Cost / Rate (Le)</label>
+                      <input
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        placeholder="e.g. 300"
+                        value={editUnitCost}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Number(e.target.value);
+                          setEditUnitCost(val);
+                          if (typeof val === 'number' && val > 0 && typeof editQuantity === 'number' && editQuantity > 0) {
+                            setEditAmount(Math.round(editQuantity * val * 100) / 100);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono bg-white"
+                      />
+                    </div>
                   </div>
+                  <p className="text-[10px] text-gray-400 italic">
+                    Entering quantity & unit rate auto-calculates Total Amount below (or enter/adjust total amount manually).
+                  </p>
                 </div>
 
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Amount (Le) *</label>
-                    {typeof editQuantity === 'number' && typeof editUnitCost === 'number' && editQuantity > 0 && editUnitCost > 0 && (
-                      <span className="text-[10px] text-wood-700 font-semibold">
-                        Calculated ({editQuantity} &times; {formatCurrency(editUnitCost)})
-                      </span>
-                    )}
-                  </div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Total Amount (Le) *</label>
                   <input
                     type="number"
                     required
