@@ -1887,7 +1887,7 @@ export default function InvoiceReceiptManager({
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${(activeInvoice || activeReceipt || bulkPrintTarget) ? 'print:hidden' : ''}`}>
       
       {/* Print styles override (Ensures print-area and bulk-print-area print cleanly on pure white paper with top header & zero watermarks) */}
       <style>{`
@@ -1922,9 +1922,26 @@ export default function InvoiceReceiptManager({
             visibility: visible !important;
           }
 
+          .print-modal-container {
+            position: static !important;
+            display: block !important;
+            visibility: visible !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            inset: auto !important;
+          }
+
           #print-area,
           #bulk-print-area {
-            position: relative !important;
+            position: static !important;
             left: auto !important;
             top: auto !important;
             width: 100% !important;
@@ -1938,6 +1955,8 @@ export default function InvoiceReceiptManager({
             border: none !important;
             overflow: visible !important;
             display: block !important;
+            page-break-inside: auto !important;
+            break-inside: auto !important;
           }
 
           .invoice-header-container,
@@ -1974,8 +1993,7 @@ export default function InvoiceReceiptManager({
           .watermark,
           .watermark-logo,
           img[alt*="watermark" i],
-          div[class*="opacity-[0.0" i],
-          div[class*="backdrop-blur" i] {
+          div[class*="opacity-[0.0" i] {
             display: none !important;
             visibility: hidden !important;
             height: 0 !important;
@@ -3760,7 +3778,7 @@ export default function InvoiceReceiptManager({
          ========================================== */}
       <AnimatePresence>
         {activeInvoice && (
-          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white">
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white print-modal-container">
             <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-4xl p-6 my-8 shadow-2xl relative print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
               
               {/* TOP WORKSPACE TOOLBAR (Hides on standard print) */}
@@ -4992,7 +5010,7 @@ export default function InvoiceReceiptManager({
          ========================================== */}
       <AnimatePresence>
         {activeReceipt && (
-          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white">
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white print-modal-container">
             <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-2xl p-6 my-8 shadow-2xl relative print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
               
               {/* TOP WORKSPACE TOOLBAR (Hides on standard print) */}

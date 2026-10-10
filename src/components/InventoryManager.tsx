@@ -61,16 +61,12 @@ export default function InventoryManager({
   const [newItemUnit, setNewItemUnit] = useState<WoodUnit>('Board Feet');
   const [newItemStockIn, setNewItemStockIn] = useState(50);
   const [newItemStockOut, setNewItemStockOut] = useState(0);
-  const [newItemMinThreshold, setNewItemMinThreshold] = useState(20);
-  const [newItemUnitCost, setNewItemUnitCost] = useState(10);
   const [newItemPurpose, setNewItemPurpose] = useState('Opening Stock Receipt / Supplier Inward');
 
   // Form states - Edit Item
   const [editItemName, setEditItemName] = useState('');
   const [editItemCategory, setEditItemCategory] = useState<WoodCategory>('Lumber');
   const [editItemUnit, setEditItemUnit] = useState<WoodUnit>('Board Feet');
-  const [editItemMinThreshold, setEditItemMinThreshold] = useState(20);
-  const [editItemUnitCost, setEditItemUnitCost] = useState(10);
   const [editItemCurrentStock, setEditItemCurrentStock] = useState(100);
 
   const handleOpenEditModal = (item: InventoryItem) => {
@@ -78,8 +74,6 @@ export default function InventoryManager({
     setEditItemName(item.name);
     setEditItemCategory(item.category);
     setEditItemUnit(item.unit);
-    setEditItemMinThreshold(item.minStockThreshold);
-    setEditItemUnitCost(item.unitCost);
     setEditItemCurrentStock(item.currentStock);
     setShowEditItemModal(true);
   };
@@ -94,8 +88,6 @@ export default function InventoryManager({
         name: editItemName,
         category: editItemCategory,
         unit: editItemUnit,
-        minStockThreshold: editItemMinThreshold,
-        unitCost: editItemUnitCost,
         currentStock: editItemCurrentStock,
         lastUpdated: new Date().toISOString().split('T')[0]
       });
@@ -116,7 +108,7 @@ export default function InventoryManager({
     setLogItemId(itemId);
     const item = inventory.find(i => i.id === itemId);
     if (item) {
-      setLogUnitCost(item.unitCost);
+      setLogUnitCost(item.unitCost || 0);
     }
   };
 
@@ -126,7 +118,7 @@ export default function InventoryManager({
     setLogItemId(targetId);
     const item = inventory.find(i => i.id === targetId);
     if (item) {
-      setLogUnitCost(item.unitCost);
+      setLogUnitCost(item.unitCost || 0);
     }
     setLogQuantity(type === 'STOCK_IN' ? 50 : 10);
     setLogPurpose(type === 'STOCK_IN' ? 'Supplier Restock / Purchase' : 'Workshop Dispatch / Production Issue');
@@ -146,8 +138,8 @@ export default function InventoryManager({
       category: newItemCategory,
       unit: newItemUnit,
       currentStock: calculatedBalance,
-      minStockThreshold: newItemMinThreshold,
-      unitCost: newItemUnitCost
+      minStockThreshold: 5,
+      unitCost: 0
     }, {
       stockIn: safeStockIn,
       stockOut: safeStockOut,
@@ -156,8 +148,6 @@ export default function InventoryManager({
 
     // Reset Form
     setNewItemName('');
-    setNewItemMinThreshold(20);
-    setNewItemUnitCost(10);
     setNewItemStockIn(50);
     setNewItemStockOut(0);
     setNewItemPurpose('Opening Stock Receipt / Supplier Inward');
@@ -242,7 +232,7 @@ export default function InventoryManager({
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || item.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-    const matchesLowStock = !showLowStockOnly || item.currentStock <= item.minStockThreshold;
+    const matchesLowStock = !showLowStockOnly || item.currentStock <= 5;
     return matchesSearch && matchesCategory && matchesLowStock;
   });
 
@@ -527,36 +517,6 @@ export default function InventoryManager({
                         </div>
                       </th>
                       <th 
-                        onClick={() => handleStockSort('unitCost')} 
-                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                        title="Click to sort by unit rate"
-                      >
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span>Unit Rate</span>
-                          {stockSortField === 'unitCost' ? (
-                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                        </div>
-                      </th>
-                      <th 
-                        className="py-3 px-4 text-right font-bold text-gray-500"
-                        title="Total current stock valuation"
-                      >
-                        <span>Total Valuation</span>
-                      </th>
-                      <th 
-                        onClick={() => handleStockSort('minStockThreshold')} 
-                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                        title="Click to sort by minimum threshold"
-                      >
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span>Min. Threshold</span>
-                          {stockSortField === 'minStockThreshold' ? (
-                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                          ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                        </div>
-                      </th>
-                      <th 
                         onClick={() => handleStockSort('status')} 
                         className="py-3 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition"
                         title="Click to sort by stock status severity"
@@ -574,7 +534,7 @@ export default function InventoryManager({
                   <tbody className="divide-y divide-gray-100 font-medium">
                     {sortedInventory.length === 0 ? (
                       <tr>
-                        <td colSpan={isAuditor ? 7 : 8} className="text-center py-16 text-gray-400">
+                        <td colSpan={isAuditor ? 4 : 5} className="text-center py-16 text-gray-400">
                           {inventory.length === 0 ? (
                             <div className="space-y-2">
                               <p className="font-semibold text-gray-600">No inventory items in stock.</p>
@@ -588,8 +548,8 @@ export default function InventoryManager({
                     ) : (
                       sortedInventory.map(item => {
                         const movement = getItemStockMovement(item);
-                        const isLow = movement.balance <= item.minStockThreshold;
-                        const isWarningThreshold = movement.balance < 5;
+                        const isLow = movement.balance <= 5;
+                        const isWarningThreshold = movement.balance <= 2;
                         return (
                           <tr 
                             key={item.id} 
@@ -608,29 +568,18 @@ export default function InventoryManager({
                             </td>
                             {/* In Stock / Balance Column */}
                             <td className="py-3.5 px-4 text-right font-mono font-black text-sm bg-wood-50/20 whitespace-nowrap">
-                              <span className={movement.balance <= item.minStockThreshold ? 'text-red-700 font-black' : 'text-wood-950 font-black'}>
+                              <span className={movement.balance <= 5 ? 'text-red-700 font-black' : 'text-wood-950 font-black'}>
                                 {movement.balance}
                               </span> <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
-                            </td>
-                            {/* Unit Rate */}
-                            <td className="py-3.5 px-4 text-right font-mono">
-                              {formatCurrency(item.unitCost)}
-                            </td>
-                            {/* Total Stock Valuation */}
-                            <td className="py-3.5 px-4 text-right font-mono font-bold text-emerald-800">
-                              {formatCurrency(movement.balance * item.unitCost)}
-                            </td>
-                            <td className="py-3.5 px-4 text-right font-mono text-gray-500">
-                              {item.minStockThreshold} {item.unit}
                             </td>
                             <td className="py-3.5 px-4 text-center">
                               {isWarningThreshold ? (
                                 <span className="inline-flex items-center gap-1 bg-amber-200 text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full border border-amber-300">
-                                  STOCK UNDER 5 UNITS
+                                  CRITICAL (≤ 2 UNITS)
                                 </span>
                               ) : isLow ? (
                                 <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-red-200">
-                                  REORDER LEVEL
+                                  LOW STOCK (≤ 5 UNITS)
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full border border-emerald-200">
@@ -778,22 +727,7 @@ export default function InventoryManager({
                       </div>
 
                       <div className="pt-2 border-t border-gray-50">
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <p className="text-[10px] text-gray-400 font-semibold uppercase">Min. Threshold</p>
-                            <p className="text-xs font-semibold text-gray-700 font-mono">
-                              {item.minStockThreshold} {item.unit}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[10px] text-gray-400 font-semibold uppercase">Est. Unit Cost</p>
-                            <p className="text-sm font-bold font-mono text-gray-800">
-                              {formatCurrency(item.unitCost)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-dashed border-gray-100 text-[10px]">
+                        <div className="flex items-center justify-between gap-2 mt-1 text-[10px]">
                           <div className="flex items-center gap-1">
                             {!isAuditor && (
                               <button
@@ -1092,43 +1026,16 @@ export default function InventoryManager({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Current Stock</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={editItemCurrentStock}
-                      onChange={(e) => setEditItemCurrentStock(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Unit Cost (Le)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0.1}
-                      step={0.1}
-                      value={editItemUnitCost}
-                      onChange={(e) => setEditItemUnitCost(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Min Alert Level</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      value={editItemMinThreshold}
-                      onChange={(e) => setEditItemMinThreshold(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase">Current Stock ({editItemUnit})</label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={editItemCurrentStock}
+                    onChange={(e) => setEditItemCurrentStock(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
+                  />
                 </div>
 
                 <div className="flex gap-2 pt-4">
@@ -1275,18 +1182,18 @@ export default function InventoryManager({
                     </div>
                   </div>
 
-                  {/* Calculated Balance & Total Valuation Summary Strip */}
+                  {/* Calculated Net Balance & Status Summary Strip */}
                   <div className="p-2.5 bg-white rounded-lg border border-emerald-200 flex items-center justify-between text-xs">
                     <div>
-                      <span className="text-[9px] uppercase font-bold text-gray-400 block">Stock Balance</span>
+                      <span className="text-[9px] uppercase font-bold text-gray-400 block">Net Initial Balance</span>
                       <span className="font-mono font-black text-sm text-wood-950">
                         {Math.max(0, newItemStockIn - newItemStockOut)} <span className="text-xs font-normal text-gray-500">{newItemUnit}</span>
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[9px] uppercase font-bold text-gray-400 block">Total Stock Valuation</span>
-                      <span className="font-mono font-bold text-sm text-emerald-800">
-                        SLL {(Math.max(0, newItemStockIn - newItemStockOut) * newItemUnitCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      <span className="text-[9px] uppercase font-bold text-gray-400 block">Initial Stock Status</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        {Math.max(0, newItemStockIn - newItemStockOut) <= 2 ? 'Critical (≤2)' : Math.max(0, newItemStockIn - newItemStockOut) <= 5 ? 'Low Stock (≤5)' : 'Healthy In-Stock'}
                       </span>
                     </div>
                   </div>
@@ -1299,33 +1206,6 @@ export default function InventoryManager({
                       onChange={(e) => setNewItemPurpose(e.target.value)}
                       placeholder="e.g. Opening Stock Receipt / Supplier Inward"
                       className="w-full px-2.5 py-1 border border-emerald-200 rounded-lg text-xs bg-white text-gray-800 outline-hidden"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Est. Unit Cost (SLL)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0.1}
-                      step={0.1}
-                      value={newItemUnitCost}
-                      onChange={(e) => setNewItemUnitCost(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Min Alert Level</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      value={newItemMinThreshold}
-                      onChange={(e) => setNewItemMinThreshold(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
                     />
                   </div>
                 </div>

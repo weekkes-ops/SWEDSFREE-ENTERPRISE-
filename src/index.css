@@ -337,11 +337,31 @@ button.bg-wood-700:hover {
     visibility: visible !important;
   }
 
+  /* Unroll modal overlays containing print area so they start cleanly at page top */
+  .print-modal-container,
+  div:has(> #print-area),
+  div:has(> #bulk-print-area) {
+    position: static !important;
+    display: block !important;
+    visibility: visible !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    inset: auto !important;
+  }
+
   /* Flow the document in natural flow across the full A4 page without viewport clipping */
   #print-area,
   #proforma-print-area,
   #bulk-print-area {
-    position: relative !important;
+    position: static !important;
     left: auto !important;
     top: auto !important;
     width: 100% !important;
@@ -387,13 +407,12 @@ button.bg-wood-700:hover {
     break-after: auto !important;
   }
 
-  /* Completely suppress all watermark logos, background overlays, or backdrop blur elements on print */
+  /* Completely suppress all watermark logos, background overlays, or non-print controls on print */
   *[class*="watermark" i],
   .watermark,
   .watermark-logo,
   img[alt*="watermark" i],
-  div[class*="opacity-[0.0" i],
-  div[class*="backdrop-blur" i] {
+  div[class*="opacity-[0.0" i] {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;

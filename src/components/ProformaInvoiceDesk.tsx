@@ -774,7 +774,14 @@ export default function ProformaInvoiceDesk({
 
   // Print Proforma
   const handlePrint = () => {
-    window.print();
+    if (viewMode !== 'PREVIEW') {
+      setViewMode('PREVIEW');
+      setTimeout(() => {
+        window.print();
+      }, 150);
+    } else {
+      window.print();
+    }
   };
 
   // Save / Update Record
@@ -1833,76 +1840,76 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
         </div>
       )}
 
-      {/* A4 Executive Preview Mode (Interactive Document Display) */}
-      {viewMode === 'PREVIEW' && (
-        <div className="flex flex-col items-center">
-          {/* Print style overrides for Proforma invoice */}
-          <style>{`
-            @media print {
-              @page {
-                size: A4 portrait;
-                margin: 8mm 10mm !important;
-              }
-              html, body {
-                background-color: #ffffff !important;
-                background: #ffffff !important;
-                color: #000000 !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-              body * {
-                visibility: hidden;
-              }
-              #proforma-print-area,
-              #proforma-print-area * {
-                visibility: visible !important;
-              }
-              #proforma-print-area {
-                margin: 0 auto !important;
-                padding: 0 !important;
-                border: none !important;
-                box-shadow: none !important;
-                background: #ffffff !important;
-                color: #000000 !important;
-                min-height: 0 !important;
-                position: relative !important;
-                left: auto !important;
-                top: auto !important;
-                width: 100% !important;
-                max-width: 100% !important;
-                overflow: visible !important;
-                display: block !important;
-              }
-              .proforma-header-container {
-                padding-top: 0 !important;
-                margin-top: 0 !important;
-                top: 0 !important;
-              }
-              aside,
-              nav,
-              header:not(.print-header),
-              footer:not(.print-footer),
-              .no-print,
-              button,
-              *[class*="watermark" i],
-              .watermark,
-              .watermark-logo,
-              img[alt*="watermark" i],
-              div[class*="backdrop-blur" i] {
-                display: none !important;
-                visibility: hidden !important;
-              }
+      {/* A4 Executive Preview Mode (Interactive Document Display & Always Printable) */}
+      <div className={viewMode === 'PREVIEW' ? 'flex flex-col items-center' : 'hidden print:flex print:flex-col print:items-center'}>
+        {/* Print style overrides for Proforma invoice */}
+        <style>{`
+          @media print {
+            @page {
+              size: A4 portrait;
+              margin: 8mm 10mm !important;
             }
-          `}</style>
+            html, body {
+              background-color: #ffffff !important;
+              background: #ffffff !important;
+              color: #000000 !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body * {
+              visibility: hidden;
+            }
+            #proforma-print-area,
+            #proforma-print-area * {
+              visibility: visible !important;
+            }
+            #proforma-print-area {
+              margin: 0 auto !important;
+              padding: 0 !important;
+              border: none !important;
+              box-shadow: none !important;
+              background: #ffffff !important;
+              color: #000000 !important;
+              min-height: 0 !important;
+              position: static !important;
+              left: auto !important;
+              top: auto !important;
+              width: 100% !important;
+              max-width: 100% !important;
+              overflow: visible !important;
+              display: block !important;
+              page-break-inside: auto !important;
+              break-inside: auto !important;
+            }
+            .proforma-header-container {
+              padding-top: 0 !important;
+              margin-top: 0 !important;
+              top: 0 !important;
+            }
+            aside,
+            nav,
+            header:not(.print-header),
+            footer:not(.print-footer),
+            .no-print,
+            button,
+            *[class*="watermark" i],
+            .watermark,
+            .watermark-logo,
+            img[alt*="watermark" i] {
+              display: none !important;
+              visibility: hidden !important;
+            }
+          }
+        `}</style>
 
-          {/* A4 Document Container */}
-          <div
-            id="proforma-print-area"
-            className="w-full max-w-[850px] bg-white text-slate-900 shadow-2xl rounded-2xl p-8 sm:p-12 border border-amber-900/20 relative overflow-hidden print:!p-0 print:!m-0 print:!border-none print:!shadow-none print:!min-h-0 print:!w-full print:!max-w-none print:!overflow-visible print:!static"
-            style={{ minHeight: '1100px' }}
-          >
+        {/* A4 Document Container */}
+        <div
+          id="proforma-print-area"
+          className="w-full max-w-[850px] bg-white text-slate-900 shadow-2xl rounded-2xl p-8 sm:p-12 border border-amber-900/20 relative overflow-hidden print:!p-0 print:!m-0 print:!border-none print:!shadow-none print:!min-h-0 print:!w-full print:!max-w-none print:!overflow-visible print:!static"
+          style={{ minHeight: '1100px' }}
+        >
             {/* Top Border Gold/Navy Accent Stripe (Hidden on print to keep header at top) */}
             <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-wood-950 via-amber-500 to-wood-900 print:hidden" />
 
@@ -2161,7 +2168,6 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
             </div>
           </div>
         </div>
-      )}
 
       {/* Management & Archive Mode */}
       {viewMode === 'MANAGE' && (

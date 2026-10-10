@@ -145,13 +145,11 @@ export interface FinancialTransaction {
   type: 'INCOME' | 'EXPENDITURE';
   category: FinancialCategory;
   amount: number;
-  quantity?: number;
-  unitCost?: number;
+  quantity?: number; // Quantity of items/units
+  unitCost?: number; // Unit cost / rate per item (Le)
   date: string; // YYYY-MM-DD
   description: string;
   referenceId?: string; // JobId, EmployeeId, or InventoryTransactionId
-  quantity?: number; // Quantity of items/units
-  unitCost?: number; // Unit cost / rate per item (Le)
 }
 
 export type ReportPeriod = 'All Time' | 'Daily' | 'Weekly' | 'Monthly' | 'Yearly';
