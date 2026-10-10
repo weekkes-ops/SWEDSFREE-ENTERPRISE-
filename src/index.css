@@ -407,7 +407,15 @@ button.bg-wood-700:hover {
     break-after: auto !important;
   }
 
-  /* Completely suppress all watermark logos, background overlays, or non-print controls on print */
+  /* Completely suppress all non-print navigation, sidebars, toolbars, buttons, watermarks and overlays */
+  aside,
+  nav,
+  header:not(.print-header),
+  footer:not(.print-footer),
+  .no-print,
+  [class*="no-print"],
+  .print\:hidden,
+  button:not(.allow-print),
   *[class*="watermark" i],
   .watermark,
   .watermark-logo,

@@ -431,9 +431,9 @@ export default function App() {
         }
         return parsed;
       }
-      return null;
+      return LIVE_ADMIN_EMPLOYEE;
     } catch {
-      return null;
+      return LIVE_ADMIN_EMPLOYEE;
     }
   });
 

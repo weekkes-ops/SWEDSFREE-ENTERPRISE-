@@ -1887,7 +1887,9 @@ export default function InvoiceReceiptManager({
   };
 
   return (
-    <div className={`space-y-6 ${(activeInvoice || activeReceipt || bulkPrintTarget) ? 'print:hidden' : ''}`}>
+    <div className="space-y-6">
+      {/* Main Billing Desk Workspace (Hides on print when modal preview or bulk print is open) */}
+      <div className={`space-y-6 ${(activeInvoice || activeReceipt || bulkPrintTarget) ? 'print:hidden' : ''}`}>
       
       {/* Print styles override (Ensures print-area and bulk-print-area print cleanly on pure white paper with top header & zero watermarks) */}
       <style>{`
@@ -1917,6 +1919,8 @@ export default function InvoiceReceiptManager({
 
           #print-area,
           #print-area *,
+          #proforma-print-area,
+          #proforma-print-area *,
           #bulk-print-area,
           #bulk-print-area * {
             visibility: visible !important;
@@ -1940,6 +1944,7 @@ export default function InvoiceReceiptManager({
           }
 
           #print-area,
+          #proforma-print-area,
           #bulk-print-area {
             position: static !important;
             left: auto !important;
@@ -3772,6 +3777,7 @@ export default function InvoiceReceiptManager({
           onSwitchToSavedInvoices={() => setSubTab('SAVED_INVOICES')}
         />
       )}
+      </div>
 
       {/* ==========================================
          PDF WORKSPACE MODAL: FULL INVOICE VIEW/EDIT

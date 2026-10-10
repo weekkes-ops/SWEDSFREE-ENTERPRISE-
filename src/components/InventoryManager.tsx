@@ -862,18 +862,6 @@ export default function InventoryManager({
                     </div>
                   </th>
                   <th 
-                    onClick={() => handleTxSort('unitCost')}
-                    className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
-                    title="Click to sort by unit rate"
-                  >
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span>Unit Rate</span>
-                      {txSortField === 'unitCost' ? (
-                        txSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
-                      ) : <ArrowUpDown className="w-3 h-3 text-gray-300 hover:text-gray-500" />}
-                    </div>
-                  </th>
-                  <th 
                     onClick={() => handleTxSort('totalValue')}
                     className="py-3.5 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition"
                     title="Click to sort by total movement valuation"
@@ -892,7 +880,7 @@ export default function InventoryManager({
               <tbody className="divide-y divide-gray-100 text-sm">
                 {sortedTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-gray-400">
+                    <td colSpan={7} className="text-center py-12 text-gray-400">
                       No stock movement transactions logged yet. Use "+ Log Stock-In" or "- Log Stock-Out" to record movements.
                     </td>
                   </tr>
@@ -914,9 +902,6 @@ export default function InventoryManager({
                         </td>
                         <td className="py-3 px-4 text-right font-bold font-mono text-gray-700">
                           {isStockIn ? '+' : '-'}{tx.quantity}
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono text-gray-500 whitespace-nowrap">
-                          {formatCurrency(tx.unitCost)}
                         </td>
                         <td className="py-3 px-4 text-right font-mono font-bold text-gray-800 whitespace-nowrap">
                           {formatCurrency(tx.totalValue)}

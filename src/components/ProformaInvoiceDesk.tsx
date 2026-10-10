@@ -1842,68 +1842,6 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
 
       {/* A4 Executive Preview Mode (Interactive Document Display & Always Printable) */}
       <div className={viewMode === 'PREVIEW' ? 'flex flex-col items-center' : 'hidden print:flex print:flex-col print:items-center'}>
-        {/* Print style overrides for Proforma invoice */}
-        <style>{`
-          @media print {
-            @page {
-              size: A4 portrait;
-              margin: 8mm 10mm !important;
-            }
-            html, body {
-              background-color: #ffffff !important;
-              background: #ffffff !important;
-              color: #000000 !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            body * {
-              visibility: hidden;
-            }
-            #proforma-print-area,
-            #proforma-print-area * {
-              visibility: visible !important;
-            }
-            #proforma-print-area {
-              margin: 0 auto !important;
-              padding: 0 !important;
-              border: none !important;
-              box-shadow: none !important;
-              background: #ffffff !important;
-              color: #000000 !important;
-              min-height: 0 !important;
-              position: static !important;
-              left: auto !important;
-              top: auto !important;
-              width: 100% !important;
-              max-width: 100% !important;
-              overflow: visible !important;
-              display: block !important;
-              page-break-inside: auto !important;
-              break-inside: auto !important;
-            }
-            .proforma-header-container {
-              padding-top: 0 !important;
-              margin-top: 0 !important;
-              top: 0 !important;
-            }
-            aside,
-            nav,
-            header:not(.print-header),
-            footer:not(.print-footer),
-            .no-print,
-            button,
-            *[class*="watermark" i],
-            .watermark,
-            .watermark-logo,
-            img[alt*="watermark" i] {
-              display: none !important;
-              visibility: hidden !important;
-            }
-          }
-        `}</style>
-
         {/* A4 Document Container */}
         <div
           id="proforma-print-area"
