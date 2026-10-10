@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Customer, Job, Employee, JobPayment, formatCurrency } from '../types';
+import { printDocument } from '../utils/printHelper';
 import { 
   Plus, 
   Search, 
@@ -1191,7 +1192,8 @@ export default function CustomerManager({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-wood-100 shadow-2xl w-full max-w-md overflow-hidden"
+              id="receipt-print-area"
+              className="bg-white rounded-2xl border border-wood-100 shadow-2xl w-full max-w-md overflow-hidden print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white"
             >
               <div className="bg-wood-950 p-5 text-white flex items-center justify-between no-print">
                 <div className="flex items-center gap-2">
@@ -1200,7 +1202,7 @@ export default function CustomerManager({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => window.print()}
+                    onClick={() => printDocument('receipt')}
                     className="p-1.5 bg-wood-800 hover:bg-wood-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer"
                     title="Print Receipt"
                   >

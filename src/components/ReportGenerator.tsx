@@ -10,6 +10,7 @@ import {
   ReportPeriod,
   formatCurrency 
 } from '../types';
+import { printDocument } from '../utils/printHelper';
 import { 
   Printer, 
   Download, 
@@ -238,7 +239,7 @@ export default function ReportGenerator({
   const lowStockCount = inventory.filter(i => i.currentStock <= i.minStockThreshold).length;
 
   const handlePrint = () => {
-    window.print();
+    printDocument('report');
   };
 
   const handleExportCSV = () => {
@@ -463,7 +464,7 @@ export default function ReportGenerator({
   };
 
   return (
-    <div className="space-y-6 print:space-y-4 print:p-0">
+    <div id="report-print-area" className="space-y-6 print:space-y-4 print:p-0">
       
       {/* Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs print:hidden">
