@@ -6,6 +6,9 @@ export interface InventoryItem {
   name: string;
   category: WoodCategory;
   unit: WoodUnit;
+  initialStock?: number;
+  stockIn?: number;
+  stockOut?: number;
   currentStock: number;
   minStockThreshold: number;
   unitCost: number; // typical purchase price per unit

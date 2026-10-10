@@ -23,7 +23,7 @@ interface InventoryManagerProps {
   transactions: InventoryTransaction[];
   onAddInventoryItem: (
     item: Omit<InventoryItem, 'id' | 'lastUpdated'>,
-    stockMovements?: { stockIn: number; stockOut: number; purpose?: string }
+    stockMovements?: { initialStock?: number; stockIn: number; stockOut: number; purpose?: string }
   ) => void;
   onLogTransaction: (transaction: Omit<InventoryTransaction, 'id' | 'date'>) => void;
   onUpdateInventoryItem?: (item: InventoryItem) => void;
@@ -55,11 +55,12 @@ export default function InventoryManager({
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Form states - New Item with Stock Movement (Stock-In, Stock-Out, and Balance tracking)
+  // Form states - New Item with Stock Movement (Stock, Stock-In, Stock-Out, and Balance tracking)
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState<WoodCategory>('Lumber');
   const [newItemUnit, setNewItemUnit] = useState<WoodUnit>('Board Feet');
-  const [newItemStockIn, setNewItemStockIn] = useState(50);
+  const [newItemInitialStock, setNewItemInitialStock] = useState(50);
+  const [newItemStockIn, setNewItemStockIn] = useState(0);
   const [newItemStockOut, setNewItemStockOut] = useState(0);
   const [newItemPurpose, setNewItemPurpose] = useState('Opening Stock Receipt / Supplier Inward');
 
@@ -67,14 +68,39 @@ export default function InventoryManager({
   const [editItemName, setEditItemName] = useState('');
   const [editItemCategory, setEditItemCategory] = useState<WoodCategory>('Lumber');
   const [editItemUnit, setEditItemUnit] = useState<WoodUnit>('Board Feet');
-  const [editItemCurrentStock, setEditItemCurrentStock] = useState(100);
+  const [editItemInitialStock, setEditItemInitialStock] = useState(50);
+  const [editItemStockIn, setEditItemStockIn] = useState(0);
+  const [editItemStockOut, setEditItemStockOut] = useState(0);
+
+  // Helper to compute Stock, Stock-In, Stock-Out, and Balance for tracking stock movement
+  const getItemStockMovement = (item: InventoryItem) => {
+    const itemTx = transactions.filter(t => t.itemId === item.id);
+    const txIn = itemTx
+      .filter(t => t.type === 'STOCK_IN' || t.type === 'INWARDS')
+      .reduce((sum, t) => sum + t.quantity, 0);
+    const txOut = itemTx
+      .filter(t => t.type === 'STOCK_OUT' || t.type === 'OUTWARDS')
+      .reduce((sum, t) => sum + t.quantity, 0);
+
+    const stockIn = Math.max(0, (item.stockIn || 0) + txIn);
+    const stockOut = Math.max(0, (item.stockOut || 0) + txOut);
+    const stock = item.initialStock !== undefined
+      ? item.initialStock
+      : (stockIn > 0 ? stockIn : (item.currentStock + stockOut));
+    const balance = item.currentStock;
+
+    return { stock, stockIn, stockOut, balance };
+  };
 
   const handleOpenEditModal = (item: InventoryItem) => {
+    const movement = getItemStockMovement(item);
     setEditingItem(item);
     setEditItemName(item.name);
     setEditItemCategory(item.category);
     setEditItemUnit(item.unit);
-    setEditItemCurrentStock(item.currentStock);
+    setEditItemInitialStock(movement.stock);
+    setEditItemStockIn(movement.stockIn);
+    setEditItemStockOut(movement.stockOut);
     setShowEditItemModal(true);
   };
 
@@ -82,13 +108,29 @@ export default function InventoryManager({
     e.preventDefault();
     if (!editingItem || !editItemName.trim()) return;
 
+    const itemTx = transactions.filter(t => t.itemId === editingItem.id);
+    const txIn = itemTx
+      .filter(t => t.type === 'STOCK_IN' || t.type === 'INWARDS')
+      .reduce((sum, t) => sum + t.quantity, 0);
+    const txOut = itemTx
+      .filter(t => t.type === 'STOCK_OUT' || t.type === 'OUTWARDS')
+      .reduce((sum, t) => sum + t.quantity, 0);
+
+    const safeStock = Math.max(0, editItemInitialStock);
+    const safeStockIn = Math.max(0, editItemStockIn);
+    const safeStockOut = Math.max(0, editItemStockOut);
+    const calculatedBalance = Math.max(0, safeStock + safeStockIn - safeStockOut);
+
     if (onUpdateInventoryItem) {
       onUpdateInventoryItem({
         ...editingItem,
         name: editItemName,
         category: editItemCategory,
         unit: editItemUnit,
-        currentStock: editItemCurrentStock,
+        initialStock: safeStock,
+        stockIn: safeStockIn - txIn,
+        stockOut: safeStockOut - txOut,
+        currentStock: calculatedBalance,
         lastUpdated: new Date().toISOString().split('T')[0]
       });
     }
@@ -129,18 +171,22 @@ export default function InventoryManager({
     e.preventDefault();
     if (!newItemName.trim()) return;
 
+    const safeInitialStock = Math.max(0, newItemInitialStock);
     const safeStockIn = Math.max(0, newItemStockIn);
-    const safeStockOut = Math.min(safeStockIn, Math.max(0, newItemStockOut));
-    const calculatedBalance = Math.max(0, safeStockIn - safeStockOut);
+    const totalAvailable = safeInitialStock + safeStockIn;
+    const safeStockOut = Math.min(totalAvailable, Math.max(0, newItemStockOut));
+    const calculatedBalance = Math.max(0, totalAvailable - safeStockOut);
 
     onAddInventoryItem({
       name: newItemName,
       category: newItemCategory,
       unit: newItemUnit,
+      initialStock: safeInitialStock,
       currentStock: calculatedBalance,
       minStockThreshold: 5,
       unitCost: 0
     }, {
+      initialStock: safeInitialStock,
       stockIn: safeStockIn,
       stockOut: safeStockOut,
       purpose: newItemPurpose || 'Initial Stock Movement / Opening Balance'
@@ -148,7 +194,8 @@ export default function InventoryManager({
 
     // Reset Form
     setNewItemName('');
-    setNewItemStockIn(50);
+    setNewItemInitialStock(50);
+    setNewItemStockIn(0);
     setNewItemStockOut(0);
     setNewItemPurpose('Opening Stock Receipt / Supplier Inward');
     setShowNewItemModal(false);
@@ -177,29 +224,11 @@ export default function InventoryManager({
     setShowLogModal(false);
   };
 
-  // Helper to compute Stock-In, Stock-Out, and Balance for tracking stock movement
-  const getItemStockMovement = (item: InventoryItem) => {
-    const itemTx = transactions.filter(t => t.itemId === item.id);
-    const recordedIn = itemTx
-      .filter(t => t.type === 'STOCK_IN' || t.type === 'INWARDS')
-      .reduce((sum, t) => sum + t.quantity, 0);
-    const recordedOut = itemTx
-      .filter(t => t.type === 'STOCK_OUT' || t.type === 'OUTWARDS')
-      .reduce((sum, t) => sum + t.quantity, 0);
-
-    // If recordedIn is 0 but item.currentStock > 0, initial stock was recorded on creation
-    const stockIn = recordedIn > 0 ? recordedIn : (item.currentStock + recordedOut);
-    const stockOut = recordedOut;
-    const balance = item.currentStock;
-
-    return { stockIn, stockOut, balance };
-  };
-
   // Summary KPI values across all inventory
+  const totalStockUnits = inventory.reduce((sum, item) => sum + getItemStockMovement(item).stock, 0);
   const totalStockInUnits = inventory.reduce((sum, item) => sum + getItemStockMovement(item).stockIn, 0);
   const totalStockOutUnits = inventory.reduce((sum, item) => sum + getItemStockMovement(item).stockOut, 0);
   const totalBalanceUnits = inventory.reduce((sum, item) => sum + item.currentStock, 0);
-  const totalInventoryValuation = inventory.reduce((sum, item) => sum + (item.currentStock * item.unitCost), 0);
 
   // Sorting states
   type StockSortField = 'name' | 'category' | 'currentStock' | 'stockIn' | 'stockOut' | 'balance' | 'unitCost' | 'minStockThreshold' | 'status' | 'date';
@@ -240,13 +269,16 @@ export default function InventoryManager({
     let valA: any = a[stockSortField as keyof InventoryItem];
     let valB: any = b[stockSortField as keyof InventoryItem];
 
-    if (stockSortField === 'stockIn') {
+    if (stockSortField === 'currentStock') {
+      valA = getItemStockMovement(a).stock;
+      valB = getItemStockMovement(b).stock;
+    } else if (stockSortField === 'stockIn') {
       valA = getItemStockMovement(a).stockIn;
       valB = getItemStockMovement(b).stockIn;
     } else if (stockSortField === 'stockOut') {
       valA = getItemStockMovement(a).stockOut;
       valB = getItemStockMovement(b).stockOut;
-    } else if (stockSortField === 'balance' || stockSortField === 'currentStock') {
+    } else if (stockSortField === 'balance') {
       valA = a.currentStock;
       valB = b.currentStock;
     } else if (stockSortField === 'status') {
@@ -334,6 +366,19 @@ export default function InventoryManager({
 
       {/* Stock Movement KPI Highlights */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Stock</span>
+            <p className="text-lg font-bold font-mono text-slate-900 mt-0.5">
+              {totalStockUnits.toLocaleString()} <span className="text-xs font-sans text-gray-400 font-normal">units</span>
+            </p>
+            <p className="text-[10px] text-gray-400">Opening / base stock</p>
+          </div>
+          <div className="p-2.5 bg-slate-50 rounded-xl text-slate-700 border border-slate-200">
+            <ArrowUpDown className="w-5 h-5" />
+          </div>
+        </div>
+
         <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-xs flex items-center justify-between">
           <div>
             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Stock-In</span>
@@ -370,19 +415,6 @@ export default function InventoryManager({
           </div>
           <div className="p-2.5 bg-wood-50 rounded-xl text-wood-700 border border-wood-100">
             <Flame className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Stock Valuation</span>
-            <p className="text-lg font-bold font-mono text-gray-900 mt-0.5">
-              {formatCurrency(totalInventoryValuation)}
-            </p>
-            <p className="text-[10px] text-gray-400">Current reserve value</p>
-          </div>
-          <div className="p-2.5 bg-gray-50 rounded-xl text-gray-600 border border-gray-100">
-            <ArrowUpDown className="w-5 h-5" />
           </div>
         </div>
       </div>
@@ -505,13 +537,49 @@ export default function InventoryManager({
                         </div>
                       </th>
                       <th 
+                        onClick={() => handleStockSort('currentStock')} 
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition bg-slate-50/60"
+                        title="Click to sort by Stock"
+                      >
+                        <div className="flex items-center justify-end gap-1.5 text-slate-900 font-black">
+                          <span>Stock</span>
+                          {stockSortField === 'currentStock' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-slate-700" /> : <ArrowDown className="w-3 h-3 text-slate-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-slate-300" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('stockIn')} 
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition bg-emerald-50/40"
+                        title="Click to sort by Stock-In"
+                      >
+                        <div className="flex items-center justify-end gap-1.5 text-emerald-800 font-black">
+                          <span>Stock-In</span>
+                          {stockSortField === 'stockIn' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-700" /> : <ArrowDown className="w-3 h-3 text-emerald-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-emerald-300" />}
+                        </div>
+                      </th>
+                      <th 
+                        onClick={() => handleStockSort('stockOut')} 
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition bg-amber-50/40"
+                        title="Click to sort by Stock-Out"
+                      >
+                        <div className="flex items-center justify-end gap-1.5 text-amber-800 font-black">
+                          <span>Stock-Out</span>
+                          {stockSortField === 'stockOut' ? (
+                            stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-amber-700" /> : <ArrowDown className="w-3 h-3 text-amber-700" />
+                          ) : <ArrowUpDown className="w-3 h-3 text-amber-300" />}
+                        </div>
+                      </th>
+                      <th 
                         onClick={() => handleStockSort('balance')} 
                         className="py-3 px-4 text-right cursor-pointer hover:bg-gray-100/80 transition bg-wood-50/50"
-                        title="Click to sort by active In-Stock Balance"
+                        title="Click to sort by Balance"
                       >
                         <div className="flex items-center justify-end gap-1.5 text-wood-950 font-black">
-                          <span>In Stock / Balance</span>
-                          {stockSortField === 'balance' || stockSortField === 'currentStock' ? (
+                          <span>Balance</span>
+                          {stockSortField === 'balance' ? (
                             stockSortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-wood-700" /> : <ArrowDown className="w-3 h-3 text-wood-700" />
                           ) : <ArrowUpDown className="w-3 h-3 text-wood-300" />}
                         </div>
@@ -534,7 +602,7 @@ export default function InventoryManager({
                   <tbody className="divide-y divide-gray-100 font-medium">
                     {sortedInventory.length === 0 ? (
                       <tr>
-                        <td colSpan={isAuditor ? 4 : 5} className="text-center py-16 text-gray-400">
+                        <td colSpan={isAuditor ? 7 : 8} className="text-center py-16 text-gray-400">
                           {inventory.length === 0 ? (
                             <div className="space-y-2">
                               <p className="font-semibold text-gray-600">No inventory items in stock.</p>
@@ -566,7 +634,25 @@ export default function InventoryManager({
                             <td className="py-3.5 px-4 uppercase text-[10px] font-bold text-gray-500">
                               {item.category}
                             </td>
-                            {/* In Stock / Balance Column */}
+                            {/* Stock Column */}
+                            <td className="py-3.5 px-4 text-right font-mono font-bold text-sm bg-slate-50/30 whitespace-nowrap">
+                              <span className="text-slate-900 font-bold">
+                                {movement.stock}
+                              </span> <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
+                            </td>
+                            {/* Stock-In Column */}
+                            <td className="py-3.5 px-4 text-right font-mono font-bold text-sm bg-emerald-50/20 whitespace-nowrap">
+                              <span className="text-emerald-700 font-bold">
+                                +{movement.stockIn}
+                              </span> <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
+                            </td>
+                            {/* Stock-Out Column */}
+                            <td className="py-3.5 px-4 text-right font-mono font-bold text-sm bg-amber-50/20 whitespace-nowrap">
+                              <span className="text-amber-700 font-bold">
+                                -{movement.stockOut}
+                              </span> <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
+                            </td>
+                            {/* Balance Column */}
                             <td className="py-3.5 px-4 text-right font-mono font-black text-sm bg-wood-50/20 whitespace-nowrap">
                               <span className={movement.balance <= 5 ? 'text-red-700 font-black' : 'text-wood-950 font-black'}>
                                 {movement.balance}
@@ -710,8 +796,12 @@ export default function InventoryManager({
                         <p className="text-[10px] text-gray-400 font-semibold">ID: {item.id} &bull; Unit: {item.unit}</p>
                       </div>
 
-                      {/* Stock Movement 3-Pillar Micro Metric */}
-                      <div className="grid grid-cols-3 gap-2 py-2 px-3 my-2 bg-gray-50 rounded-xl border border-gray-100 text-center font-mono">
+                      {/* Stock Movement 4-Pillar Micro Metric */}
+                      <div className="grid grid-cols-4 gap-2 py-2 px-3 my-2 bg-gray-50 rounded-xl border border-gray-100 text-center font-mono">
+                        <div>
+                          <p className="text-[9px] uppercase font-bold text-slate-700">Stock</p>
+                          <p className="text-xs font-bold text-slate-900">{movement.stock}</p>
+                        </div>
                         <div>
                           <p className="text-[9px] uppercase font-bold text-emerald-700">Stock-In</p>
                           <p className="text-xs font-bold text-emerald-700">+{movement.stockIn}</p>
@@ -1011,16 +1101,49 @@ export default function InventoryManager({
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Current Stock ({editItemUnit})</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={editItemCurrentStock}
-                    onChange={(e) => setEditItemCurrentStock(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-semibold text-gray-700 font-mono"
-                  />
+                {/* Edit Stock, Stock-In, Stock-Out & Balance */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-800 block">Stock</label>
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        value={editItemInitialStock}
+                        onChange={(e) => setEditItemInitialStock(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg focus:border-wood-500 outline-hidden text-sm font-bold text-slate-900 font-mono bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-emerald-800 block">Stock-In (+)</label>
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        value={editItemStockIn}
+                        onChange={(e) => setEditItemStockIn(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-emerald-300 rounded-lg focus:border-emerald-600 outline-hidden text-sm font-bold text-emerald-900 font-mono bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-amber-800 block">Stock-Out (-)</label>
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        value={editItemStockOut}
+                        onChange={(e) => setEditItemStockOut(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg focus:border-amber-600 outline-hidden text-sm font-bold text-amber-900 font-mono bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="p-2.5 bg-white rounded-lg border border-slate-200 flex items-center justify-between text-xs">
+                    <span className="font-bold text-gray-500 uppercase text-[10px]">Calculated Balance ({editItemUnit}):</span>
+                    <span className="font-mono font-black text-sm text-wood-950">
+                      {Math.max(0, editItemInitialStock + editItemStockIn - editItemStockOut)} {editItemUnit}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-4">
@@ -1117,25 +1240,41 @@ export default function InventoryManager({
                   </div>
                 </div>
 
-                {/* Stock Movement Tracking Section (Stock-In, Stock-Out, and Balance) */}
+                {/* Stock Movement Tracking Section (Stock, Stock-In, Stock-Out, and Balance) */}
                 <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-200/80 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950 uppercase tracking-wide">
                       <TrendingUp className="w-4 h-4 text-emerald-700" />
-                      <span>Stock Movement & Balance Tracking</span>
+                      <span>Stock, Stock-In, Stock-Out & Balance</span>
                     </div>
                     <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
-                      newItemStockIn - newItemStockOut > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      newItemInitialStock + newItemStockIn - newItemStockOut > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                     }`}>
-                      Balance: {Math.max(0, newItemStockIn - newItemStockOut)} {newItemUnit}
+                      Balance: {Math.max(0, newItemInitialStock + newItemStockIn - newItemStockOut)} {newItemUnit}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-slate-900 flex items-center gap-1">
+                        <span>Stock</span>
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min={0}
+                        value={newItemInitialStock}
+                        onChange={(e) => setNewItemInitialStock(Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg focus:border-slate-600 outline-hidden text-sm font-bold text-slate-950 font-mono bg-white"
+                        placeholder="0"
+                      />
+                      <span className="text-[9px] text-slate-600">Opening stock</span>
+                    </div>
+
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-emerald-900 flex items-center gap-1">
-                        <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>Stock-In (Received)</span>
+                        <ArrowDownLeft className="w-3 h-3 text-emerald-700" />
+                        <span>Stock-In</span>
                       </label>
                       <input
                         type="number"
@@ -1143,27 +1282,27 @@ export default function InventoryManager({
                         min={0}
                         value={newItemStockIn}
                         onChange={(e) => setNewItemStockIn(Number(e.target.value))}
-                        className="w-full px-3 py-1.5 border border-emerald-300 rounded-lg focus:border-emerald-600 outline-hidden text-sm font-bold text-emerald-950 font-mono bg-white"
+                        className="w-full px-2.5 py-1.5 border border-emerald-300 rounded-lg focus:border-emerald-600 outline-hidden text-sm font-bold text-emerald-950 font-mono bg-white"
                         placeholder="0"
                       />
-                      <span className="text-[9px] text-emerald-700">Initial stock received</span>
+                      <span className="text-[9px] text-emerald-700">Stock received</span>
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-amber-900 flex items-center gap-1">
-                        <ArrowUpRight className="w-3.5 h-3.5 text-amber-700" />
-                        <span>Stock-Out (Dispatched)</span>
+                        <ArrowUpRight className="w-3 h-3 text-amber-700" />
+                        <span>Stock-Out</span>
                       </label>
                       <input
                         type="number"
                         min={0}
-                        max={newItemStockIn}
+                        max={newItemInitialStock + newItemStockIn}
                         value={newItemStockOut}
-                        onChange={(e) => setNewItemStockOut(Math.min(newItemStockIn, Math.max(0, Number(e.target.value))))}
-                        className="w-full px-3 py-1.5 border border-amber-300 rounded-lg focus:border-amber-600 outline-hidden text-sm font-bold text-amber-950 font-mono bg-white"
+                        onChange={(e) => setNewItemStockOut(Math.min(newItemInitialStock + newItemStockIn, Math.max(0, Number(e.target.value))))}
+                        className="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg focus:border-amber-600 outline-hidden text-sm font-bold text-amber-950 font-mono bg-white"
                         placeholder="0"
                       />
-                      <span className="text-[9px] text-amber-700">Initial dispatched/used</span>
+                      <span className="text-[9px] text-amber-700">Dispatched</span>
                     </div>
                   </div>
 
@@ -1172,13 +1311,13 @@ export default function InventoryManager({
                     <div>
                       <span className="text-[9px] uppercase font-bold text-gray-400 block">Net Initial Balance</span>
                       <span className="font-mono font-black text-sm text-wood-950">
-                        {Math.max(0, newItemStockIn - newItemStockOut)} <span className="text-xs font-normal text-gray-500">{newItemUnit}</span>
+                        {Math.max(0, newItemInitialStock + newItemStockIn - newItemStockOut)} <span className="text-xs font-normal text-gray-500">{newItemUnit}</span>
                       </span>
                     </div>
                     <div className="text-right">
                       <span className="text-[9px] uppercase font-bold text-gray-400 block">Initial Stock Status</span>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
-                        {Math.max(0, newItemStockIn - newItemStockOut) <= 2 ? 'Critical (≤2)' : Math.max(0, newItemStockIn - newItemStockOut) <= 5 ? 'Low Stock (≤5)' : 'Healthy In-Stock'}
+                        {Math.max(0, newItemInitialStock + newItemStockIn - newItemStockOut) <= 2 ? 'Critical (≤2)' : Math.max(0, newItemInitialStock + newItemStockIn - newItemStockOut) <= 5 ? 'Low Stock (≤5)' : 'Healthy In-Stock'}
                       </span>
                     </div>
                   </div>

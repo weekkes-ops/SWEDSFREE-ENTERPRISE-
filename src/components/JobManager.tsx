@@ -1355,7 +1355,6 @@ export default function JobManager({
                     <option value="Bank Transfer">Bank Transfer / wire</option>
                     <option value="Cash">Cash</option>
                     <option value="Check">Check Clearance</option>
-                    <option value="Mobile Money">Mobile Money (Momo)</option>
                   </select>
                 </div>
 
@@ -1448,7 +1447,6 @@ export default function JobManager({
                     <option value="Cash">Cash</option>
                     <option value="Bank Transfer">Bank Transfer / wire</option>
                     <option value="Cheque">Check Clearance</option>
-                    <option value="Mobile Money">Mobile Money (Momo)</option>
                   </select>
                 </div>
 

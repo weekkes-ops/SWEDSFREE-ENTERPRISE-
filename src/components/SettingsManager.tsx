@@ -32,7 +32,7 @@ interface SettingsManagerProps {
   currentUser: Employee | null;
   isOnline: boolean;
   lastSyncTime: string;
-  syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
+  syncStatus: 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
   onPerformSync: () => void;
   onExportBackup: () => void;
   onImportBackup: (e: React.ChangeEvent<HTMLInputElement>) => void;

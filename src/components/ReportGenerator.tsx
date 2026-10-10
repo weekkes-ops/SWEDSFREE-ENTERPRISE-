@@ -890,25 +890,40 @@ export default function ReportGenerator({
                 <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400 font-bold">
                   <th className="py-2.5 px-3">Material Name</th>
                   <th className="py-2.5 px-3">Category</th>
-                  <th className="py-2.5 px-3 text-right">In Stock Reserves</th>
-                  <th className="py-2.5 px-3 text-right">Typical Unit Rate</th>
-                  <th className="py-2.5 px-3 text-right">Total Asset Worth</th>
+                  <th className="py-2.5 px-3 text-right">Stock</th>
+                  <th className="py-2.5 px-3 text-right text-emerald-700">Stock-In</th>
+                  <th className="py-2.5 px-3 text-right text-amber-700">Stock-Out</th>
+                  <th className="py-2.5 px-3 text-right text-wood-950">Balance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 text-gray-700">
-                {inventory.map(item => (
-                  <tr key={item.id} className="hover:bg-gray-50/30 transition">
-                    <td className="py-2.5 px-3 font-bold text-gray-800">{item.name}</td>
-                    <td className="py-2.5 px-3 text-gray-400 font-bold uppercase text-[10px]">{item.category}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-800">
-                      {item.currentStock} {item.unit}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-gray-500">{formatCurrency(item.unitCost)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-wood-950">
-                      {formatCurrency(item.currentStock * item.unitCost, 0)}
-                    </td>
-                  </tr>
-                ))}
+                {inventory.map(item => {
+                  const itemTx = inventoryTransactions.filter(t => t.itemId === item.id);
+                  const txIn = itemTx.filter(t => t.type === 'STOCK_IN' || t.type === 'INWARDS').reduce((s, t) => s + t.quantity, 0);
+                  const txOut = itemTx.filter(t => t.type === 'STOCK_OUT' || t.type === 'OUTWARDS').reduce((s, t) => s + t.quantity, 0);
+                  const stockIn = Math.max(0, (item.stockIn || 0) + txIn);
+                  const stockOut = Math.max(0, (item.stockOut || 0) + txOut);
+                  const stock = item.initialStock !== undefined ? item.initialStock : (stockIn > 0 ? stockIn : (item.currentStock + stockOut));
+                  const balance = item.currentStock;
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50/30 transition">
+                      <td className="py-2.5 px-3 font-bold text-gray-800">{item.name}</td>
+                      <td className="py-2.5 px-3 text-gray-400 font-bold uppercase text-[10px]">{item.category}</td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800">
+                        {stock} {item.unit}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700">
+                        +{stockIn} {item.unit}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-700">
+                        -{stockOut} {item.unit}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-wood-950">
+                        {balance} {item.unit}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

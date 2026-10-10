@@ -15,7 +15,7 @@ export default defineConfig(() => {
       },
     },
     define: {
-      'process.env.FIREBASE_API_KEY': JSON.stringify(process.env.FIREBASE_API_KEY || 'AIzaSyD8GuExFnpkNLqvBFDsVGMrQXDAyHec6oY'),
+      'process.env.FIREBASE_API_KEY': JSON.stringify(process.env.FIREBASE_API_KEY || ''),
     },
     server: {
       host: '0.0.0.0',

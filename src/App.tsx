@@ -200,7 +200,7 @@ export default function App() {
 
   // Offline network  for production infastrature status & file backup ref
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>(navigator.onLine ? 'synced' : 'offline');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'synced' | 'syncing' | 'offline' | 'error'>(navigator.onLine ? 'synced' : 'offline');
   const [syncBannerMessage, setSyncBannerMessage] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
     return localStorage.getItem('swedsfree_last_online_sync') || new Date().toLocaleTimeString();
@@ -871,12 +871,13 @@ export default function App() {
   // A. Inventory mutators
   const handleAddInventoryItem = (
     item: Omit<InventoryItem, 'id' | 'lastUpdated'>,
-    stockMovements?: { stockIn: number; stockOut: number; purpose?: string }
+    stockMovements?: { initialStock?: number; stockIn: number; stockOut: number; purpose?: string }
   ) => {
     const itemId = `inv-${Date.now()}`;
     const dateStr = new Date().toISOString().split('T')[0];
     const newItem: InventoryItem = {
       ...item,
+      initialStock: stockMovements?.initialStock ?? item.initialStock,
       id: itemId,
       lastUpdated: dateStr
     };

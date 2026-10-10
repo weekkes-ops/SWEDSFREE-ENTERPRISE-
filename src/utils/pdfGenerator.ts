@@ -457,11 +457,11 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(0, 0, 0);
-    doc.text("BANK WIRE & PAYMENT SETTLEMENT:", 18, bankY + 4.5);
+    doc.text("OFFICIAL SETTLEMENT BANK ACCOUNT:", 18, bankY + 4.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.8);
-    doc.text("Bank: Sierra Leone Commercial Bank (SLCB) Freetown", 18, bankY + 8.5);
-    doc.text(`Swift: SLCBSLFRXXX • Account No: 003-09415-2831 • Ref: ${invNoStr}`, 18, bankY + 12.5);
+    doc.text("Bank: UBA Bank", 18, bankY + 8.5);
+    doc.text(`B-BAN: 540810160001602 • Ref: ${invNoStr}`, 18, bankY + 12.5);
 
     // Authorized Signatory & Official Stamp on Right
     doc.setFont('helvetica', 'bold');
@@ -685,7 +685,7 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(75, 85, 99);
-    const bankInstructionsText = `Standard bank wires are accepted at Sierra Leone Commercial Bank (SLCB) Freetown.\nSwift Address: SLCBSLFRXXX • Account: 003-09415-2831\nPlease specify invoice reference: INV-${invNoStr}`;
+    const bankInstructionsText = `Standard bank wires are accepted at UBA Bank.\nB-BAN: 540810160001602\nPlease specify invoice reference: INV-${invNoStr}`;
     doc.text(bankInstructionsText, 15, botY + 4.5);
 
     // Modern Totals Block
@@ -1444,14 +1444,14 @@ export function buildProformaInvoicePdfContent(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
   doc.setTextColor(15, 23, 42);
-  doc.text("BANK WIRE & MOBILE CLEARANCE:", 18, footY + 24);
+  doc.text("OFFICIAL SETTLEMENT BANK ACCOUNT:", 18, footY + 24);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(51, 65, 85);
-  doc.text("Bank: Sierra Leone Commercial Bank (SLCB) • Freetown", 18, footY + 28.5);
-  doc.text(`Account Name: Sweds Wood Enterprise • Account: 003-09415-2831`, 18, footY + 32.5);
-  doc.text(`Orange Money Merchant / Africell: 076-000-000 • Ref: ${proformaNo}`, 18, footY + 36.5);
+  doc.text("Bank: UBA Bank", 18, footY + 28.5);
+  doc.text(`Account Name: Sweds Wood Enterprise • B-BAN: 540810160001602`, 18, footY + 32.5);
+  doc.text(`Reference: ${proformaNo}`, 18, footY + 36.5);
 
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(6);

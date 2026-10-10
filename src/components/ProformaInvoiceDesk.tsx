@@ -590,7 +590,7 @@ export default function ProformaInvoiceDesk({
         taxPercent: inv.taxPercent || 0,
         depositPercent: inv.depositPercent !== undefined ? inv.depositPercent : 50,
         bankDetails:
-          'Sierra Leone Commercial Bank (SLCB) • A/C: 003001099234 • SWIFT: SLCBSLFR\nRokel Commercial Bank • A/C: 0140293849\nOrange Money Merchant: #882910 (SWEDS WOOD)\nAfricell Money: #449201',
+          'UBA Bank • B-BAN: 540810160001602',
         notes: inv.notes || '',
         preparedBy: inv.preparedBy || (currentUser ? `${currentUser.name} (${currentUser.role})` : 'Mr Paul Bindi (Admin)'),
         logoDataUrl
@@ -758,7 +758,7 @@ export default function ProformaInvoiceDesk({
         taxPercent,
         depositPercent,
         bankDetails:
-          'Sierra Leone Commercial Bank (SLCB) • A/C: 003001099234 • SWIFT: SLCBSLFR\nRokel Commercial Bank • A/C: 0140293849\nOrange Money Merchant: #882910 (SWEDS WOOD)\nAfricell Money: #449201',
+          'UBA Bank • B-BAN: 540810160001602',
         notes,
         preparedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'Master Joiner / Commercial Director',
         logoDataUrl
@@ -869,9 +869,8 @@ ${items.map((it, idx) => `• ${idx + 1}. ${it.description} (${it.woodSpecies ||
 📜 *Payment Terms:* ${paymentTerms}
 
 *Workshop Bank Clearance:*
-Sierra Leone Commercial Bank (SLCB)
-A/C: 003001099234 | SWEDS WOOD LTD
-Orange Money Merchant: #882910
+UBA Bank
+B-BAN: 540810160001602 | SWEDS WOOD ENTERPRISE
 
 _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232 76 442590)._`;
 
@@ -2008,15 +2007,11 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
               {/* Payment & Banking Instructions */}
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 block border-b border-gray-200 pb-1">
-                  Workshop Settlement Accounts
+                  Official Settlement Bank Accounts
                 </span>
                 <div className="space-y-1 text-[11px] text-gray-700 font-medium">
-                  <p className="font-bold text-slate-900">Sierra Leone Commercial Bank (SLCB)</p>
-                  <p className="font-mono text-gray-600">A/C: 003001099234 • SWIFT: SLCBSLFR</p>
-                  <p className="font-bold text-slate-900 pt-1">Rokel Commercial Bank</p>
-                  <p className="font-mono text-gray-600">A/C: 0140293849</p>
-                  <p className="font-bold text-slate-900 pt-1">Mobile Money Merchant Numbers</p>
-                  <p className="font-mono text-gray-600">Orange Money: #882910 • Africell Money: #449201</p>
+                  <p className="font-bold text-slate-900">UBA Bank</p>
+                  <p className="font-mono text-gray-600">B-BAN: 540810160001602</p>
                 </div>
               </div>
 

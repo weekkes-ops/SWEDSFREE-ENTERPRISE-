@@ -1134,7 +1134,6 @@ export default function CustomerManager({
                   >
                     <option value="Bank Transfer">Bank Transfer</option>
                     <option value="Cash">Cash</option>
-                    <option value="Mobile Money">Orange Money / Mobile Money</option>
                     <option value="Check">Check / Cheque</option>
                   </select>
                 </div>
@@ -1463,7 +1462,6 @@ export default function CustomerManager({
                     <option value="Cash">Cash</option>
                     <option value="Bank Transfer">Bank Transfer / wire</option>
                     <option value="Cheque">Check Clearance</option>
-                    <option value="Mobile Money">Mobile Money (Momo)</option>
                   </select>
                 </div>
 

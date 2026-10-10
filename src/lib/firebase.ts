@@ -6,7 +6,7 @@ export const FIREBASE_API_KEY =
   ((import.meta as any).env?.VITE_FIREBASE_API_KEY as string) || 
   (typeof process !== 'undefined' && process.env?.FIREBASE_API_KEY) || 
   firebaseConfig.apiKey || 
-  "AIzaSyD8GuExFnpkNLqvBFDsVGMrQXDAyHec6oY";
+  "";
 
 const config = {
   ...firebaseConfig,

@@ -631,7 +631,7 @@ export function generateUserManualPDFDoc(): jsPDF {
     'Clients rarely settle large custom woodwork commissions in a single upfront payment. The system provides ' +
     'comprehensive installment tracking:'
   );
-  addBullet('Recording an Installment', 'Select the commission, click "+ Record Payment", enter the exact amount in Le, select payment method (Cash, Bank Transfer, Cheque, Mobile Money), and add notes.');
+  addBullet('Recording an Installment', 'Select the commission, click "+ Record Payment", enter the exact amount in Le, select payment method (Cash, Bank Transfer, Cheque), and add notes.');
   addBullet('Official Payment Receipt', 'Each captured payment generates a branded receipt displaying the Payment ID, date, method, notes, and the Captured Payment Records table.');
   addBullet('Financial Settlement Breakdown', 'Every receipt automatically calculates the Total Contract Value, Cumulative Payments to Date, and the Remaining Balance Due (or displays "Le 0.00 - Fully Settled").');
 
