@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Customer, Job, Employee, SavedInvoice, SavedInvoiceItem, formatCurrency } from '../types';
 import { saveDocument, deleteDocument, subscribeToCollection } from '../lib/firestoreService';
 import { buildProformaInvoicePdfContent, ProformaPdfItem, getLogoDataUrl } from '../utils/pdfGenerator';
+import { printDocument } from '../utils/printHelper';
 import { jsPDF } from 'jspdf';
 import { 
   FileSpreadsheet, 
@@ -777,10 +778,10 @@ export default function ProformaInvoiceDesk({
     if (viewMode !== 'PREVIEW') {
       setViewMode('PREVIEW');
       setTimeout(() => {
-        window.print();
+        printDocument('proforma');
       }, 150);
     } else {
-      window.print();
+      printDocument('proforma');
     }
   };
 
@@ -1841,7 +1842,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
       )}
 
       {/* A4 Executive Preview Mode (Interactive Document Display & Always Printable) */}
-      <div className={viewMode === 'PREVIEW' ? 'flex flex-col items-center' : 'hidden print:flex print:flex-col print:items-center'}>
+      <div className={viewMode === 'PREVIEW' ? 'flex flex-col items-center' : 'hidden'}>
         {/* A4 Document Container */}
         <div
           id="proforma-print-area"

@@ -51,6 +51,7 @@ import { buildInvoicePdfContent, buildReceiptPdfContent, buildProformaInvoicePdf
 export { getLogoDataUrl };
 import ProformaInvoiceDesk from './ProformaInvoiceDesk';
 import EmailDispatchModal, { SYSTEM_EMAIL } from './EmailDispatchModal';
+import { printDocument } from '../utils/printHelper';
 
 export interface CustomInvoiceItem {
   id: string;
@@ -323,6 +324,8 @@ export default function InvoiceReceiptManager({
     } else if (targetSubTab === 'RECEIPT' && receipt) {
       setSubTab('RECEIPT');
       if (receipt.job.id) setSelectedJobId(receipt.job.id);
+      setIsInvoiceModalOpen(false);
+      setActiveInvoice(null);
       setActiveReceipt(receipt);
       setSaveToast(`Loaded Receipt REC-${receipt.payment.id.toUpperCase()}`);
       setTimeout(() => setSaveToast(null), 3000);
@@ -331,7 +334,9 @@ export default function InvoiceReceiptManager({
       setSelectedJobId(jobId);
       const job = jobs.find(j => j.id === jobId);
       if (job) {
+        setActiveReceipt(null);
         setActiveInvoice(job);
+        setIsInvoiceModalOpen(true);
         setSaveToast(`Loaded Order ${job.id}`);
         setTimeout(() => setSaveToast(null), 3000);
       }
@@ -391,6 +396,7 @@ export default function InvoiceReceiptManager({
   
   // Active documents being viewed in "PDF Form"
   const [activeInvoice, setActiveInvoice] = useState<Job | null>(null);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [activeReceipt, setActiveReceipt] = useState<{ job: Job; payment: JobPayment } | null>(null);
 
   // Bulk Print & Export States
@@ -697,6 +703,8 @@ export default function InvoiceReceiptManager({
       }
       saveDocument('jobs', updatedJob);
       
+      setIsInvoiceModalOpen(false);
+      setActiveInvoice(null);
       setActiveReceipt({
         job: updatedJob,
         payment: fullPaymentRecord
@@ -710,6 +718,8 @@ export default function InvoiceReceiptManager({
         note: 'OFFICIAL 100% FULL PAYMENT CONTRACT CLEARANCE RECEIPT'
       };
       
+      setIsInvoiceModalOpen(false);
+      setActiveInvoice(null);
       setActiveReceipt({
         job: job,
         payment: fullPaymentRecord
@@ -768,6 +778,8 @@ export default function InvoiceReceiptManager({
     }
     saveDocument('jobs', updatedJob);
 
+    setIsInvoiceModalOpen(false);
+    setActiveInvoice(null);
     setActiveReceipt({
       job: updatedJob,
       payment: newPayment
@@ -872,6 +884,8 @@ export default function InvoiceReceiptManager({
       if (job) {
         if (initialSubTab === 'RECEIPT') {
           setSubTab('RECEIPT');
+          setIsInvoiceModalOpen(false);
+          setActiveInvoice(null);
           if (job.payments.length > 0) {
             setActiveReceipt({ job, payment: job.payments[job.payments.length - 1] });
             setReceiptPdfMode('VIEW');
@@ -880,7 +894,9 @@ export default function InvoiceReceiptManager({
           }
         } else {
           setSubTab('INVOICE');
+          setActiveReceipt(null);
           setActiveInvoice(job);
+          setIsInvoiceModalOpen(true);
           setInvoicePdfMode('VIEW');
         }
       } else if (initialSubTab) {
@@ -976,12 +992,12 @@ export default function InvoiceReceiptManager({
   const selectedJob = jobs.find(j => j.id === selectedJobId) || jobs[0] || null;
   const selectedCustomer = selectedJob ? customers.find(c => c.id === selectedJob.customerId) : null;
 
-  // Automatically keep activeInvoice in sync with selectedJob and jobs state updates
+  // Automatically keep activeInvoice in sync with selectedJob and jobs state updates when modal is actively open
   useEffect(() => {
-    if (selectedJob) {
+    if (selectedJob && isInvoiceModalOpen) {
       setActiveInvoice(selectedJob);
     }
-  }, [selectedJobId, selectedJob]);
+  }, [selectedJobId, selectedJob, isInvoiceModalOpen]);
 
   // Automatically keep saved invoices in sync with jobs & customer updates
   useEffect(() => {
@@ -1142,8 +1158,20 @@ export default function InvoiceReceiptManager({
 
   const totals = getCalculatedTotals();
 
+  const handlePrintInvoice = () => {
+    printDocument('invoice');
+  };
+
+  const handlePrintReceipt = () => {
+    printDocument('receipt');
+  };
+
   const handlePrint = () => {
-    window.print();
+    if (activeReceipt) {
+      printDocument('receipt');
+    } else {
+      printDocument('invoice');
+    }
   };
 
   // ==========================================

@@ -46,41 +46,48 @@ export const printDocument = (type: PrintDocumentType) => {
   }, 120);
 };
 
+const isElementVisible = (el: HTMLElement | null): boolean => {
+  if (!el || !document.body.contains(el)) return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  return el.getClientRects().length > 0;
+};
+
 // Global listener for native print shortcuts (Ctrl+P / Cmd+P / Browser Menu Print)
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeprint', () => {
     if (!document.documentElement.getAttribute('data-print-mode')) {
       // 1. Detect open Receipt modal
       const receiptEl = document.getElementById('receipt-print-area');
-      if (receiptEl && receiptEl.offsetParent !== null) {
+      if (isElementVisible(receiptEl)) {
         setPrintMode('receipt');
         return;
       }
 
       // 2. Detect open Invoice modal
       const invoiceEl = document.getElementById('invoice-print-area');
-      if (invoiceEl && invoiceEl.offsetParent !== null) {
+      if (isElementVisible(invoiceEl)) {
         setPrintMode('invoice');
         return;
       }
 
-      // 3. Detect Proforma Desk
-      const proformaEl = document.getElementById('proforma-print-area');
-      if (proformaEl && proformaEl.offsetParent !== null) {
-        setPrintMode('proforma');
+      // 3. Detect Bulk Print container
+      const bulkEl = document.getElementById('bulk-print-area');
+      if (isElementVisible(bulkEl)) {
+        setPrintMode('bulk-invoices');
         return;
       }
 
-      // 4. Detect Bulk Print container
-      const bulkEl = document.getElementById('bulk-print-area');
-      if (bulkEl && bulkEl.offsetParent !== null) {
-        setPrintMode('bulk-invoices');
+      // 4. Detect Proforma Desk
+      const proformaEl = document.getElementById('proforma-print-area');
+      if (isElementVisible(proformaEl)) {
+        setPrintMode('proforma');
         return;
       }
 
       // 5. Detect Report Ledger
       const reportEl = document.getElementById('report-print-area');
-      if (reportEl && reportEl.offsetParent !== null) {
+      if (isElementVisible(reportEl)) {
         setPrintMode('report');
         return;
       }
