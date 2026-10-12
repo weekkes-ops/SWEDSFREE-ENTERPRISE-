@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { FinancialTransaction, FinancialCategory, formatCurrency, Employee } from '../types';
+import { printDocument } from '../utils/printHelper';
 import { 
   Plus, 
   TrendingUp, 
@@ -13,7 +14,11 @@ import {
   ShieldAlert,
   Edit2,
   Trash2,
-  Receipt
+  Receipt,
+  Printer,
+  Download,
+  Search,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -51,6 +56,11 @@ export default function FinancialLedger({
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInlineForm, setShowInlineForm] = useState(true);
   const [activeTab, setActiveTab] = useState<'LEDGER' | 'ANALYTICS'>('LEDGER');
+
+  // Filter & Print states
+  const [ledgerFilterType, setLedgerFilterType] = useState<'ALL' | 'INCOME' | 'EXPENDITURE'>('ALL');
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [voucherTransaction, setVoucherTransaction] = useState<FinancialTransaction | null>(null);
 
   // Form states - Add Transaction
   const [type, setType] = useState<'INCOME' | 'EXPENDITURE'>('INCOME');
@@ -150,6 +160,22 @@ export default function FinancialLedger({
     }
   };
 
+  // Filtered transactions for ledger table & print
+  const filteredTransactions = [...transactions]
+    .reverse()
+    .filter(t => {
+      if (ledgerFilterType !== 'ALL' && t.type !== ledgerFilterType) return false;
+      if (ledgerSearch.trim()) {
+        const q = ledgerSearch.toLowerCase();
+        const matchDesc = (t.description || '').toLowerCase().includes(q);
+        const matchCat = (t.category || '').toLowerCase().includes(q);
+        const matchDate = (t.date || '').toLowerCase().includes(q);
+        const matchRef = (t.referenceId || '').toLowerCase().includes(q);
+        if (!matchDesc && !matchCat && !matchDate && !matchRef) return false;
+      }
+      return true;
+    });
+
   // Calculations
   const totalIncome = transactions
     .filter(t => t.type === 'INCOME')
@@ -161,6 +187,60 @@ export default function FinancialLedger({
 
   const netProfit = totalIncome - totalExpenditure;
   const margin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
+
+  const filteredIncome = filteredTransactions
+    .filter(t => t.type === 'INCOME')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const filteredExpenditure = filteredTransactions
+    .filter(t => t.type === 'EXPENDITURE')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const filteredNet = filteredIncome - filteredExpenditure;
+
+  const handlePrintLedger = () => {
+    if (activeTab !== 'LEDGER') {
+      setActiveTab('LEDGER');
+      setTimeout(() => {
+        printDocument('financial-ledger');
+      }, 150);
+    } else {
+      printDocument('financial-ledger');
+    }
+  };
+
+  const handlePrintVoucher = (tx: FinancialTransaction) => {
+    setVoucherTransaction(tx);
+    setTimeout(() => {
+      printDocument('financial-voucher');
+    }, 180);
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Clearance Date', 'Transaction ID', 'Reference ID', 'Flow Type', 'Category', 'Description', 'Quantity', 'Unit Cost (Le)', 'Cleared Amount (Le)'];
+    const rows = filteredTransactions.map(t => [
+      t.date,
+      t.id,
+      t.referenceId || '-',
+      t.type,
+      t.category,
+      (t.description || '').replace(/"/g, '""'),
+      t.quantity ?? '-',
+      t.unitCost ?? '-',
+      `${t.type === 'INCOME' ? '+' : '-'}${t.amount}`
+    ]);
+    const csvContent = '\uFEFF' + [headers, ...rows]
+      .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `SWEDS_FINANCIAL_LEDGER_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Chart 1: Group Income & Expenditures by Month
   // Let's extract Month/Year (e.g. "Jun 2026", "Jul 2026")
@@ -200,10 +280,40 @@ export default function FinancialLedger({
   }));
 
   return (
-    <div className="space-y-6">
+    <div id="financial-ledger-print-area" className="space-y-6 print:space-y-4 print:p-0">
       
+      {/* Official Print-Only Statement Header */}
+      <div className="hidden print:block border-b-2 border-gray-900 pb-4 mb-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-tight text-gray-900">
+              SWEDSFREE ENTERPRISE — OFFICIAL FINANCIAL LEDGER STATEMENT
+            </h1>
+            <p className="text-xs font-semibold text-gray-700 mt-0.5">
+              17F New England Ville, Freetown, Sierra Leone • Tel: +232 78 466480 / +232 76 442590
+            </p>
+            <p className="text-[11px] font-mono font-bold text-gray-800 mt-0.5">
+              Official Bank Account: UBA Bank • BBAN: 540810160001602
+            </p>
+          </div>
+          <div className="text-right text-xs font-mono">
+            <p className="font-bold text-gray-900">
+              Printed: {new Date().toLocaleDateString('en-GB')} {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <p className="text-gray-600">
+              Filter: {ledgerFilterType === 'ALL' ? 'All Transactions' : ledgerFilterType} ({filteredTransactions.length} records)
+            </p>
+            {currentUser && (
+              <p className="text-gray-600">
+                Operator: {currentUser.name} ({currentUser.role})
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Title Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-wood-100 shadow-xs print:hidden">
         <div>
           <h1 className="text-2xl font-display font-bold text-wood-900 tracking-tight">
             Income & Expenditure Analytics
@@ -213,29 +323,50 @@ export default function FinancialLedger({
           </p>
         </div>
         
-        {!isAuditor ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <button 
-              onClick={() => setShowInlineForm(prev => !prev)}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-50 text-wood-900 border border-wood-200 hover:bg-wood-100 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
-            >
-              <Plus className="w-4 h-4 text-wood-700" />
-              <span>{showInlineForm ? 'Hide Cash Form' : 'Record Cash Transaction'}</span>
-            </button>
-            <button 
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Cash Transaction</span>
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold font-mono">
-            <ShieldAlert className="w-4 h-4 text-slate-500" />
-            <span>Auditor (Read-Only)</span>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handlePrintLedger}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            title="Print Official Financial Ledger Statement"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Print Ledger</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+            title="Export Financial Ledger to CSV"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
+
+          {!isAuditor ? (
+            <>
+              <button 
+                onClick={() => setShowInlineForm(prev => !prev)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-50 text-wood-900 border border-wood-200 hover:bg-wood-100 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
+              >
+                <Plus className="w-4 h-4 text-wood-700" />
+                <span>{showInlineForm ? 'Hide Cash Form' : 'Record Cash Transaction'}</span>
+              </button>
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Cash Transaction</span>
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold font-mono">
+              <ShieldAlert className="w-4 h-4 text-slate-500" />
+              <span>Auditor (Read-Only)</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Analytics KPI cards */}
@@ -294,7 +425,7 @@ export default function FinancialLedger({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-100">
+      <div className="flex border-b border-gray-100 print:hidden">
         <button
           onClick={() => setActiveTab('LEDGER')}
           className={`px-5 py-3 text-sm font-semibold border-b-2 transition ${activeTab === 'LEDGER' ? 'border-wood-600 text-wood-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
@@ -313,7 +444,7 @@ export default function FinancialLedger({
         <div className="space-y-6">
           {/* Cash Transaction Entry Form Panel */}
           {!isAuditor && (
-            <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
+            <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden print:hidden">
               <div className="p-4 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-wood-100 text-wood-700 rounded-xl">
@@ -516,103 +647,203 @@ export default function FinancialLedger({
           )}
 
           {/* Ledger List */}
-          <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden">
-            <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-display font-bold text-gray-800 flex items-center gap-1.5">
-                <DollarSign className="w-4 h-4 text-wood-600" />
-                General Cash Ledger
-              </h3>
-              <span className="text-xs text-gray-400 font-semibold">
-                Showing {transactions.length} record(s)
-              </span>
+          <div className="bg-white rounded-2xl border border-wood-100 shadow-xs overflow-hidden print:border-gray-300 print:rounded-none print:shadow-none">
+            <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3 print:bg-white print:border-b-2 print:border-gray-800 print:px-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-display font-bold text-gray-800 flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-wood-600 print:hidden" />
+                  General Cash Ledger
+                </h3>
+                <span className="text-xs text-gray-500 font-semibold bg-gray-100 px-2.5 py-0.5 rounded-md border border-gray-200">
+                  {filteredTransactions.length} record(s)
+                </span>
+              </div>
+
+              {/* Filter, Search & Print Toolbar */}
+              <div className="flex flex-wrap items-center gap-2 print:hidden">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search description, category, date..."
+                    value={ledgerSearch}
+                    onChange={(e) => setLedgerSearch(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-xl bg-white focus:border-wood-400 outline-hidden w-52 sm:w-60"
+                  />
+                </div>
+
+                <div className="flex items-center bg-gray-100 p-0.5 rounded-xl border border-gray-200 text-[11px] font-bold">
+                  {(['ALL', 'INCOME', 'EXPENDITURE'] as const).map(ft => (
+                    <button
+                      key={ft}
+                      type="button"
+                      onClick={() => setLedgerFilterType(ft)}
+                      className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                        ledgerFilterType === ft
+                          ? 'bg-wood-900 text-white shadow-2xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      {ft === 'ALL' ? 'All' : ft === 'INCOME' ? 'Inflow' : 'Outflow'}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePrintLedger}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-wood-800 hover:bg-wood-950 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
+                  title="Print General Cash Ledger Table"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Ledger</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400 font-bold">
+                  <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-400 font-bold print:bg-gray-100 print:text-gray-900 print:border-gray-300">
                     <th className="py-3 px-4">Clearance Date</th>
                     <th className="py-3 px-4">Transaction Details</th>
                     <th className="py-3 px-4">Cost Category</th>
                     <th className="py-3 px-4 text-center">Inflow / Outflow</th>
                     <th className="py-3 px-4 text-center">Quantity & Unit Cost</th>
                     <th className="py-3 px-4 text-right">Cleared Amount</th>
-                    {!isAuditor && <th className="py-3 px-4 text-center">Actions</th>}
+                    <th className="py-3 px-4 text-center print:hidden">Actions</th>
                   </tr>
                 </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
-                {[...transactions].reverse().map(t => {
-                  const isInc = t.type === 'INCOME';
-                  return (
-                    <tr key={t.id} className="hover:bg-gray-50/50 transition">
-                      <td className="py-3.5 px-4 font-mono text-xs text-gray-500 whitespace-nowrap">{t.date}</td>
-                      <td className="py-3.5 px-4 font-semibold text-gray-800">
-                        {t.description}
-                        {t.referenceId && (
-                          <span className="block text-[10px] font-semibold text-wood-600 uppercase">Ref: {t.referenceId}</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 text-xs font-semibold text-gray-500">{t.category}</td>
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-0.5 px-2.5 py-0.5 text-[10px] font-bold rounded-md border uppercase ${isInc ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                          {isInc ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                          {t.type}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-center font-mono text-xs whitespace-nowrap">
-                        {t.quantity ? (
-                          <div className="space-y-0.5">
-                            <span className="font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
-                              {t.quantity} <span className="text-[10px] font-sans text-gray-500 font-normal">units</span>
-                            </span>
-                            {t.unitCost ? (
-                              <span className="block text-[10px] text-gray-500 font-medium">
-                                @ {formatCurrency(t.unitCost)}
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                      </td>
-                      <td className={`py-3.5 px-4 text-right font-mono font-bold whitespace-nowrap ${isInc ? 'text-emerald-700' : 'text-red-700'}`}>
-                        {isInc ? '+' : '-'}{formatCurrency(t.amount)}
-                      </td>
-                      {!isAuditor && (
+              <tbody className="divide-y divide-gray-100 text-sm print:divide-gray-200">
+                {filteredTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-xs text-gray-400 font-medium">
+                      No financial transactions match the selected filter.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTransactions.map(t => {
+                    const isInc = t.type === 'INCOME';
+                    return (
+                      <tr key={t.id} className="hover:bg-gray-50/50 transition">
+                        <td className="py-3.5 px-4 font-mono text-xs text-gray-500 whitespace-nowrap print:text-gray-900">{t.date}</td>
+                        <td className="py-3.5 px-4 font-semibold text-gray-800 print:text-gray-900">
+                          {t.description}
+                          {t.referenceId && (
+                            <span className="block text-[10px] font-semibold text-wood-600 uppercase print:text-gray-600">Ref: {t.referenceId}</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-xs font-semibold text-gray-500 print:text-gray-800">{t.category}</td>
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-0.5 px-2.5 py-0.5 text-[10px] font-bold rounded-md border uppercase ${isInc ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                            {isInc ? <ArrowDownRight className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
+                            {t.type}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono text-xs whitespace-nowrap">
+                          {t.quantity ? (
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+                                {t.quantity} <span className="text-[10px] font-sans text-gray-500 font-normal">units</span>
+                              </span>
+                              {t.unitCost ? (
+                                <span className="block text-[10px] text-gray-500 font-medium">
+                                  @ {formatCurrency(t.unitCost)}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className={`py-3.5 px-4 text-right font-mono font-bold whitespace-nowrap ${isInc ? 'text-emerald-700' : 'text-red-700'}`}>
+                          {isInc ? '+' : '-'}{formatCurrency(t.amount)}
+                        </td>
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap print:hidden">
                           <div className="inline-flex items-center justify-center gap-1.5">
-                            {(isInc || t.referenceId) && onTriggerReceipt && (
-                              <button
-                                onClick={() => onTriggerReceipt(t.referenceId)}
-                                className="px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition flex items-center gap-1 cursor-pointer"
-                                title="Open Receipt Desk"
-                              >
-                                <Receipt className="w-3 h-3 text-emerald-600" />
-                                <span>Receipt</span>
-                              </button>
+                            <button
+                              type="button"
+                              onClick={() => handlePrintVoucher(t)}
+                              className="px-2 py-1 text-[10px] font-extrabold uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition flex items-center gap-1 cursor-pointer"
+                              title="Print Single Cash Transaction Voucher"
+                            >
+                              <Printer className="w-3 h-3 text-wood-700" />
+                              <span>Print</span>
+                            </button>
+                            {!isAuditor && (
+                              <>
+                                {(isInc || t.referenceId) && onTriggerReceipt && (
+                                  <button
+                                    onClick={() => onTriggerReceipt(t.referenceId)}
+                                    className="px-2 py-1 text-[10px] font-extrabold uppercase text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition flex items-center gap-1 cursor-pointer"
+                                    title="Open Receipt Desk"
+                                  >
+                                    <Receipt className="w-3 h-3 text-emerald-600" />
+                                    <span>Receipt</span>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleStartEdit(t)}
+                                  className="p-1 text-slate-400 hover:text-wood-700 rounded-lg hover:bg-slate-100 transition"
+                                  title="Edit Transaction"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(t.id)}
+                                  className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50/50 transition"
+                                  title="Delete Transaction"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
                             )}
-                            <button
-                              onClick={() => handleStartEdit(t)}
-                              className="p-1 text-slate-400 hover:text-wood-700 rounded-lg hover:bg-slate-100 transition"
-                              title="Edit Transaction"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(t.id)}
-                              className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50/50 transition"
-                              title="Delete Transaction"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
                           </div>
                         </td>
-                      )}
-                    </tr>
-                  );
-                })}
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
+              {filteredTransactions.length > 0 && (
+                <tfoot>
+                  <tr className="bg-gray-50 border-t-2 border-gray-200 font-mono text-xs font-bold print:bg-gray-100 print:border-gray-800">
+                    <td colSpan={3} className="py-3 px-4 text-gray-800 uppercase font-sans">
+                      Ledger Summary Totals ({filteredTransactions.length} Entries)
+                    </td>
+                    <td className="py-3 px-4 text-center text-emerald-700">
+                      In: +{formatCurrency(filteredIncome)}
+                    </td>
+                    <td className="py-3 px-4 text-center text-red-700">
+                      Out: -{formatCurrency(filteredExpenditure)}
+                    </td>
+                    <td className={`py-3 px-4 text-right text-sm font-black ${filteredNet >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>
+                      Net: {filteredNet >= 0 ? '+' : '-'}{formatCurrency(Math.abs(filteredNet))}
+                    </td>
+                    <td className="print:hidden"></td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
+          </div>
+
+          {/* Official Print-Only Verification Signature Footer */}
+          <div className="hidden print:grid grid-cols-3 gap-8 pt-10 px-4 pb-4 border-t border-gray-300 mt-6 text-xs">
+            <div>
+              <p className="font-bold text-gray-700 uppercase">Prepared By (Finance / Admin):</p>
+              <div className="border-b border-gray-800 h-8 mt-4"></div>
+              <p className="text-[10px] text-gray-500 mt-1">Name, Signature & Date</p>
+            </div>
+            <div>
+              <p className="font-bold text-gray-700 uppercase">Verified By (Internal Auditor):</p>
+              <div className="border-b border-gray-800 h-8 mt-4"></div>
+              <p className="text-[10px] text-gray-500 mt-1">Audit Stamp, Signature & Date</p>
+            </div>
+            <div>
+              <p className="font-bold text-gray-700 uppercase">Approved By (Managing Director):</p>
+              <div className="border-b border-gray-800 h-8 mt-4"></div>
+              <p className="text-[10px] text-gray-500 mt-1">SWEDSFREE ENTERPRISE Authorization</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1066,6 +1297,124 @@ export default function FinancialLedger({
                 </div>
               </form>
             </motion.div>
+          </div>
+        )}
+
+        {/* Single Cash Transaction Printable Voucher Modal */}
+        {voucherTransaction && (
+          <div className="print-modal-container fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div
+              id="financial-voucher-print-area"
+              className="bg-white rounded-2xl border border-wood-200 shadow-2xl w-full max-w-xl overflow-hidden print:border-0 print:shadow-none print:rounded-none"
+            >
+              {/* Top Action Bar (Hidden in Print) */}
+              <div className="bg-wood-950 px-5 py-3.5 text-white flex items-center justify-between print:hidden">
+                <div className="flex items-center gap-2">
+                  <Printer className="w-4 h-4 text-amber-400" />
+                  <span className="font-display font-bold text-sm">Cash Transaction Voucher Preview</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => printDocument('financial-voucher')}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Voucher</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVoucherTransaction(null)}
+                    className="p-1 text-wood-300 hover:text-white rounded-lg transition cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Printable Voucher Body */}
+              <div className="p-6 sm:p-8 space-y-6 text-gray-900">
+                <div className="border-b-2 border-gray-900 pb-4 flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-black uppercase tracking-tight text-gray-900">
+                      SWEDSFREE ENTERPRISE
+                    </h2>
+                    <p className="text-xs font-semibold text-gray-600">
+                      17F New England Ville, Freetown, Sierra Leone
+                    </p>
+                    <p className="text-[11px] font-mono text-gray-600">
+                      Tel: +232 78 466480 / +232 76 442590 • UBA Bank BBAN: 540810160001602
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`inline-block px-3 py-1 rounded-md text-xs font-black uppercase border ${
+                      voucherTransaction.type === 'INCOME'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-red-50 text-red-800 border-red-300'
+                    }`}>
+                      {voucherTransaction.type === 'INCOME' ? 'CASH INFLOW VOUCHER' : 'CASH EXPENDITURE VOUCHER'}
+                    </span>
+                    <p className="text-xs font-mono font-bold text-gray-700 mt-1">
+                      Voucher ID: {voucherTransaction.id.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-gray-400 block">Clearance Date</span>
+                    <span className="font-mono font-bold text-gray-900 text-sm">{voucherTransaction.date}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-gray-400 block">Cost Category</span>
+                    <span className="font-bold text-gray-900 text-sm uppercase">{voucherTransaction.category}</span>
+                  </div>
+                  {voucherTransaction.referenceId && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-gray-400 block">System Reference ID</span>
+                      <span className="font-mono font-bold text-wood-800">{voucherTransaction.referenceId}</span>
+                    </div>
+                  )}
+                  {voucherTransaction.quantity && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-gray-400 block">Quantity & Unit Cost</span>
+                      <span className="font-mono font-bold text-gray-900">
+                        {voucherTransaction.quantity} units {voucherTransaction.unitCost ? `@ ${formatCurrency(voucherTransaction.unitCost)}` : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase text-gray-400 block">Transaction Description / Purpose</span>
+                  <div className="p-4 rounded-xl border border-gray-200 bg-white font-semibold text-sm text-gray-900">
+                    {voucherTransaction.description}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-xl bg-gray-900 text-white">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-300">
+                    Total Cleared Amount
+                  </span>
+                  <span className="text-xl font-mono font-black">
+                    {voucherTransaction.type === 'INCOME' ? '+' : '-'}{formatCurrency(voucherTransaction.amount)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8 pt-8 border-t border-gray-200 text-xs">
+                  <div>
+                    <p className="font-bold text-gray-600 uppercase">Prepared / Dispatched By:</p>
+                    <div className="border-b border-gray-800 h-8 mt-4"></div>
+                    <p className="text-[10px] text-gray-500 mt-1">Signature & Date</p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-600 uppercase">Authorized / Received By:</p>
+                    <div className="border-b border-gray-800 h-8 mt-4"></div>
+                    <p className="text-[10px] text-gray-500 mt-1">Signature & Official Stamp</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </AnimatePresence>

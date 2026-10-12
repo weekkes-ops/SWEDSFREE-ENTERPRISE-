@@ -500,6 +500,52 @@ button.bg-wood-700:hover {
     overflow: hidden !important;
   }
 
+  /* 5B. FINANCIAL LEDGER ONLY MODE */
+  html[data-print-mode="financial-ledger"] #financial-ledger-print-area,
+  html[data-print-mode="financial-ledger"] #financial-ledger-print-area *,
+  body[data-print-mode="financial-ledger"] #financial-ledger-print-area,
+  body[data-print-mode="financial-ledger"] #financial-ledger-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="financial-ledger"] #financial-ledger-print-area,
+  body[data-print-mode="financial-ledger"] #financial-ledger-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  html[data-print-mode="financial-ledger"] #financial-voucher-print-area,
+  body[data-print-mode="financial-ledger"] #financial-voucher-print-area {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* 5C. FINANCIAL TRANSACTION VOUCHER ONLY MODE */
+  html[data-print-mode="financial-voucher"] #financial-voucher-print-area,
+  html[data-print-mode="financial-voucher"] #financial-voucher-print-area *,
+  body[data-print-mode="financial-voucher"] #financial-voucher-print-area,
+  body[data-print-mode="financial-voucher"] #financial-voucher-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="financial-voucher"] #financial-voucher-print-area,
+  body[data-print-mode="financial-voucher"] #financial-voucher-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  html[data-print-mode="financial-voucher"] #financial-ledger-print-area,
+  body[data-print-mode="financial-voucher"] #financial-ledger-print-area {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+  }
+
   /* 6. FALLBACK FOR DIRECT/NATIVE PRINT (when no data-print-mode attribute is set) */
   html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area,
   html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area * {
@@ -546,6 +592,7 @@ button.bg-wood-700:hover {
   .print-modal-container,
   div:has(> #invoice-print-area),
   div:has(> #receipt-print-area),
+  div:has(> #financial-voucher-print-area),
   div:has(> #print-area),
   div:has(> #bulk-print-area) {
     position: static !important;
@@ -592,6 +639,8 @@ button.bg-wood-700:hover {
   #proforma-print-area,
   #bulk-print-area,
   #report-print-area,
+  #financial-ledger-print-area,
+  #financial-voucher-print-area,
   #print-area {
     position: static !important;
     left: auto !important;

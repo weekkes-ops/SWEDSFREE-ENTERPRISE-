@@ -12,7 +12,11 @@
         "currentStock": { "type": "number" },
         "minStockThreshold": { "type": "number" },
         "unitCost": { "type": "number" },
-        "lastUpdated": { "type": "string" }
+        "lastUpdated": { "type": "string" },
+        "lastUpdatedTime": { "type": "string" },
+        "lastUpdatedTimestamp": { "type": "string" },
+        "lastMovementPurpose": { "type": "string" },
+        "lastModifiedBy": { "type": "string" }
       },
       "required": ["id", "name", "category", "unit", "currentStock"]
     },
@@ -80,8 +84,14 @@
         "quantity": { "type": "number" },
         "unitCost": { "type": "number" },
         "totalValue": { "type": "number" },
+        "previousBalance": { "type": "number" },
+        "newBalance": { "type": "number" },
         "date": { "type": "string" },
-        "purpose": { "type": "string" }
+        "time": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "purpose": { "type": "string" },
+        "recordedBy": { "type": "string" },
+        "referenceId": { "type": "string" }
       },
       "required": ["id", "itemId", "type", "quantity"]
     },

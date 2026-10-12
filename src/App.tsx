@@ -871,88 +871,173 @@ export default function App() {
   // A. Inventory mutators
   const handleAddInventoryItem = (
     item: Omit<InventoryItem, 'id' | 'lastUpdated'>,
-    stockMovements?: { initialStock?: number; stockIn: number; stockOut: number; purpose?: string }
+    stockMovements?: { initialStock?: number; stockIn: number; stockOut: number; purpose?: string; date?: string; time?: string }
   ) => {
+    const now = new Date();
     const itemId = `inv-${Date.now()}`;
-    const dateStr = new Date().toISOString().split('T')[0];
+    const dateStr = stockMovements?.date || now.toISOString().split('T')[0];
+    const timeStr = stockMovements?.time || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    const isoStr = now.toISOString();
+    const operator = currentUser ? `${currentUser.name} (${currentUser.role})` : 'System Admin';
+    const movementPurpose = (stockMovements?.purpose || item.lastMovementPurpose || 'Opening Stock Registration & Initial Entry').trim();
+
     const newItem: InventoryItem = {
       ...item,
       initialStock: stockMovements?.initialStock ?? item.initialStock,
       id: itemId,
-      lastUpdated: dateStr
+      lastUpdated: dateStr,
+      lastUpdatedTime: timeStr,
+      lastUpdatedTimestamp: isoStr,
+      lastMovementPurpose: movementPurpose,
+      lastModifiedBy: operator
     };
     setInventory(prev => [newItem, ...prev]);
     saveDocument('inventory', newItem);
 
-    // If stock movements were explicitly provided from New Raw Material form:
+    // Log audit trail entries for initial stock & opening stock movements
     if (stockMovements) {
+      let runningBalance = 0;
+      const baseStock = stockMovements.initialStock ?? item.initialStock ?? 0;
+      if (baseStock > 0) {
+        const initTx: InventoryTransaction = {
+          id: `tx-inv-${Date.now()}-init`,
+          itemId,
+          itemName: newItem.name,
+          category: newItem.category,
+          unit: newItem.unit,
+          type: 'INITIAL',
+          quantity: baseStock,
+          previousBalance: 0,
+          newBalance: baseStock,
+          unitCost: newItem.unitCost,
+          totalValue: baseStock * newItem.unitCost,
+          date: dateStr,
+          time: timeStr,
+          timestamp: isoStr,
+          purpose: movementPurpose || 'Opening Stock Balance Registration',
+          recordedBy: operator
+        };
+        runningBalance = baseStock;
+        setInventoryTransactions(prev => [initTx, ...prev]);
+        saveDocument('inventoryTransactions', initTx);
+      }
       if (stockMovements.stockIn > 0) {
+        const prevBal = runningBalance;
+        const nextBal = prevBal + stockMovements.stockIn;
         const inTx: InventoryTransaction = {
           id: `tx-inv-${Date.now()}-in`,
           itemId,
           itemName: newItem.name,
+          category: newItem.category,
+          unit: newItem.unit,
           type: 'STOCK_IN',
           quantity: stockMovements.stockIn,
+          previousBalance: prevBal,
+          newBalance: nextBal,
           unitCost: newItem.unitCost,
           totalValue: stockMovements.stockIn * newItem.unitCost,
           date: dateStr,
-          purpose: stockMovements.purpose || 'Initial Stock-In / Opening Balance'
+          time: timeStr,
+          timestamp: isoStr,
+          purpose: movementPurpose || 'Initial Stock-In / Supplier Delivery',
+          recordedBy: operator
         };
+        runningBalance = nextBal;
         setInventoryTransactions(prev => [inTx, ...prev]);
         saveDocument('inventoryTransactions', inTx);
       }
       if (stockMovements.stockOut > 0) {
+        const prevBal = runningBalance;
+        const nextBal = Math.max(0, prevBal - stockMovements.stockOut);
         const outTx: InventoryTransaction = {
           id: `tx-inv-${Date.now()}-out`,
           itemId,
           itemName: newItem.name,
+          category: newItem.category,
+          unit: newItem.unit,
           type: 'STOCK_OUT',
           quantity: stockMovements.stockOut,
+          previousBalance: prevBal,
+          newBalance: nextBal,
           unitCost: newItem.unitCost,
           totalValue: stockMovements.stockOut * newItem.unitCost,
           date: dateStr,
-          purpose: 'Initial Stock-Out / Opening Issue'
+          time: timeStr,
+          timestamp: isoStr,
+          purpose: movementPurpose ? `${movementPurpose} (Opening Stock-Out)` : 'Initial Stock-Out / Production Issue',
+          recordedBy: operator
         };
         setInventoryTransactions(prev => [outTx, ...prev]);
         saveDocument('inventoryTransactions', outTx);
       }
     } else if (newItem.currentStock > 0) {
-      // Fallback if stockMovements was not specified
       const initialTx: InventoryTransaction = {
         id: `tx-inv-${Date.now()}`,
         itemId,
         itemName: newItem.name,
-        type: 'STOCK_IN',
+        category: newItem.category,
+        unit: newItem.unit,
+        type: 'INITIAL',
         quantity: newItem.currentStock,
+        previousBalance: 0,
+        newBalance: newItem.currentStock,
         unitCost: newItem.unitCost,
         totalValue: newItem.currentStock * newItem.unitCost,
         date: dateStr,
-        purpose: 'Initial Stock / Opening Balance'
+        time: timeStr,
+        timestamp: isoStr,
+        purpose: movementPurpose,
+        recordedBy: operator
       };
       setInventoryTransactions(prev => [initialTx, ...prev]);
       saveDocument('inventoryTransactions', initialTx);
     }
   };
 
-  const handleLogTransaction = (tx: Omit<InventoryTransaction, 'id' | 'date'>) => {
+  const handleLogTransaction = (tx: Omit<InventoryTransaction, 'id' | 'date'> & { date?: string }) => {
+    const now = new Date();
     const transactionId = `tx-inv-${Date.now()}`;
-    const dateStr = new Date().toISOString().split('T')[0];
+    const dateStr = tx.date || now.toISOString().split('T')[0];
+    const timeStr = tx.time || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    const isoStr = tx.timestamp || now.toISOString();
+    const operator = tx.recordedBy || (currentUser ? `${currentUser.name} (${currentUser.role})` : 'System Admin');
+    const purposeStr = (tx.purpose || 'Workshop Stock Movement').trim();
+
+    const targetItem = inventory.find(i => i.id === tx.itemId);
+    const isStockIn = tx.type === 'INWARDS' || tx.type === 'STOCK_IN' || tx.type === 'INITIAL';
+    const isAdjustment = tx.type === 'ADJUSTMENT';
+    const prevBal = tx.previousBalance !== undefined ? tx.previousBalance : (targetItem ? targetItem.currentStock : 0);
+    const computedNewBal = tx.newBalance !== undefined
+      ? tx.newBalance
+      : isAdjustment
+        ? tx.quantity
+        : Math.max(0, prevBal + (isStockIn ? tx.quantity : -tx.quantity));
 
     const newTx: InventoryTransaction = {
       ...tx,
       id: transactionId,
-      date: dateStr
+      category: tx.category || targetItem?.category,
+      unit: tx.unit || targetItem?.unit,
+      previousBalance: prevBal,
+      newBalance: computedNewBal,
+      date: dateStr,
+      time: timeStr,
+      timestamp: isoStr,
+      purpose: purposeStr,
+      recordedBy: operator
     };
 
-    // 1. Update stock reserves
+    // 1. Update stock reserves with real-time metadata
     setInventory(prev => prev.map(item => {
       if (item.id === tx.itemId) {
-        const isStockIn = tx.type === 'INWARDS' || (tx.type as string) === 'STOCK_IN';
-        const stockDiff = isStockIn ? tx.quantity : -tx.quantity;
-        const updatedItem = {
+        const updatedItem: InventoryItem = {
           ...item,
-          currentStock: Math.max(0, item.currentStock + stockDiff),
-          lastUpdated: dateStr
+          currentStock: computedNewBal,
+          lastUpdated: dateStr,
+          lastUpdatedTime: timeStr,
+          lastUpdatedTimestamp: isoStr,
+          lastMovementPurpose: purposeStr,
+          lastModifiedBy: operator
         };
         saveDocument('inventory', updatedItem);
         return updatedItem;
@@ -960,8 +1045,8 @@ export default function App() {
       return item;
     }));
 
-    // 2. Append transaction log
-    setInventoryTransactions(prev => [...prev, newTx]);
+    // 2. Append transaction log (newest first for real-time audit trail visibility)
+    setInventoryTransactions(prev => [newTx, ...prev]);
     saveDocument('inventoryTransactions', newTx);
   };
 
@@ -1033,16 +1118,29 @@ export default function App() {
 
   // Log Material usage specifically for a woodwork commission
   const handleLogJobMaterial = (jobId: string, jobMaterial: JobMaterial) => {
-    const dateStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const dateStr = jobMaterial.date || now.toISOString().split('T')[0];
+    const timeStr = jobMaterial.time || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    const isoStr = jobMaterial.timestamp || now.toISOString();
+    const operator = jobMaterial.recordedBy || (currentUser ? `${currentUser.name} (${currentUser.role})` : 'System Admin');
+    const targetJob = jobs.find(j => j.id === jobId);
+    const targetItem = inventory.find(i => i.id === jobMaterial.itemId);
+    const prevBal = targetItem ? targetItem.currentStock : 0;
+    const nextBal = Math.max(0, prevBal - jobMaterial.quantity);
+    const purposeStr = (jobMaterial.purpose || `Issued to Workshop Job: ${targetJob?.title || jobId} (Client: ${targetJob?.customerName || 'Workshop'})`).trim();
     const txId = `tx-inv-job-${Date.now()}`;
 
-    // 1. Subtract from core inventory reserves
+    // 1. Subtract from core inventory reserves & stamp real-time audit fields
     setInventory(prev => prev.map(item => {
       if (item.id === jobMaterial.itemId) {
-        const updatedItem = {
+        const updatedItem: InventoryItem = {
           ...item,
-          currentStock: Math.max(0, item.currentStock - jobMaterial.quantity),
-          lastUpdated: dateStr
+          currentStock: nextBal,
+          lastUpdated: dateStr,
+          lastUpdatedTime: timeStr,
+          lastUpdatedTimestamp: isoStr,
+          lastMovementPurpose: purposeStr,
+          lastModifiedBy: operator
         };
         saveDocument('inventory', updatedItem);
         return updatedItem;
@@ -1050,28 +1148,43 @@ export default function App() {
       return item;
     }));
 
-    // 2. Append a Stock-Out inventory transaction log
+    // 2. Append a Stock-Out inventory transaction log with full real-time audit trail
     const invTx: InventoryTransaction = {
       id: txId,
       itemId: jobMaterial.itemId,
       itemName: jobMaterial.name,
+      category: targetItem?.category,
+      unit: targetItem?.unit,
       type: 'STOCK_OUT',
       quantity: jobMaterial.quantity,
+      previousBalance: prevBal,
+      newBalance: nextBal,
       unitCost: jobMaterial.unitCost,
       totalValue: jobMaterial.totalCost,
       date: dateStr,
-      purpose: `Woodwork consumed in Job ID: ${jobId}`,
+      time: timeStr,
+      timestamp: isoStr,
+      purpose: purposeStr,
+      recordedBy: operator,
       referenceId: jobId
     };
-    setInventoryTransactions(prev => [...prev, invTx]);
+    setInventoryTransactions(prev => [invTx, ...prev]);
     saveDocument('inventoryTransactions', invTx);
 
-    // 3. Append to Job material consumption list
+    // 3. Append to Job material consumption list with timestamp and purpose
+    const enrichedMaterial: JobMaterial = {
+      ...jobMaterial,
+      date: dateStr,
+      time: timeStr,
+      timestamp: isoStr,
+      purpose: purposeStr,
+      recordedBy: operator
+    };
     setJobs(prev => prev.map(job => {
       if (job.id === jobId) {
         const updatedJob = {
           ...job,
-          materialsUsed: [...job.materialsUsed, jobMaterial]
+          materialsUsed: [...job.materialsUsed, enrichedMaterial]
         };
         saveDocument('jobs', updatedJob);
         return updatedJob;
@@ -1969,6 +2082,7 @@ export default function App() {
               <InventoryManager
                 inventory={inventory}
                 transactions={inventoryTransactions}
+                jobs={jobs}
                 onAddInventoryItem={handleAddInventoryItem}
                 onLogTransaction={handleLogTransaction}
                 onUpdateInventoryItem={handleUpdateInventoryItem}
@@ -2036,9 +2150,6 @@ export default function App() {
                 showCreateModalOnLoad={quickActionTrigger === 'create-job'}
                 onCloseCreateModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
-                onTriggerInvoice={handleTriggerInvoice}
-                onTriggerProforma={(jobId) => handleTriggerProforma(undefined, jobId)}
-                onTriggerReceipt={handleTriggerReceipt}
               />
             )}
 

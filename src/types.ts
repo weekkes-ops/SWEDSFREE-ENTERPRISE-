@@ -13,18 +13,29 @@ export interface InventoryItem {
   minStockThreshold: number;
   unitCost: number; // typical purchase price per unit
   lastUpdated: string;
+  lastUpdatedTime?: string; // HH:MM:SS real-time of entry
+  lastUpdatedTimestamp?: string; // ISO 8601 real-time timestamp
+  lastMovementPurpose?: string; // Description or purpose of latest stock movement
+  lastModifiedBy?: string; // Operator who recorded the movement
 }
 
 export interface InventoryTransaction {
   id: string;
   itemId: string;
   itemName: string;
-  type: 'INWARDS' | 'OUTWARDS' | 'STOCK_IN' | 'STOCK_OUT';
+  category?: WoodCategory;
+  unit?: WoodUnit;
+  type: 'INWARDS' | 'OUTWARDS' | 'STOCK_IN' | 'STOCK_OUT' | 'INITIAL' | 'ADJUSTMENT';
   quantity: number;
+  previousBalance?: number;
+  newBalance?: number;
   unitCost: number;
   totalValue: number;
   date: string; // YYYY-MM-DD
-  purpose: string;
+  time?: string; // HH:MM:SS AM/PM (Real-time of entry)
+  timestamp?: string; // Full ISO timestamp of entry
+  purpose: string; // Description or purpose of the stock movement
+  recordedBy?: string; // Audit trail user (Name & Role)
   referenceId?: string; // Job ID or Purchase Order
 }
 
@@ -77,6 +88,11 @@ export interface JobMaterial {
   quantity: number;
   unitCost: number;
   totalCost: number;
+  date?: string;
+  time?: string;
+  timestamp?: string;
+  purpose?: string;
+  recordedBy?: string;
 }
 
 export interface JobItem {

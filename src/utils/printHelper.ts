@@ -4,7 +4,9 @@ export type PrintDocumentType =
   | 'proforma' 
   | 'bulk-invoices' 
   | 'bulk-receipts' 
-  | 'report';
+  | 'report'
+  | 'financial-ledger'
+  | 'financial-voucher';
 
 export const setPrintMode = (type: PrintDocumentType) => {
   const mode = type.toLowerCase();
@@ -89,6 +91,20 @@ if (typeof window !== 'undefined') {
       const reportEl = document.getElementById('report-print-area');
       if (isElementVisible(reportEl)) {
         setPrintMode('report');
+        return;
+      }
+
+      // 6. Detect open Financial Transaction Voucher modal
+      const finVoucherEl = document.getElementById('financial-voucher-print-area');
+      if (isElementVisible(finVoucherEl)) {
+        setPrintMode('financial-voucher');
+        return;
+      }
+
+      // 7. Detect Financial Ledger
+      const finLedgerEl = document.getElementById('financial-ledger-print-area');
+      if (isElementVisible(finLedgerEl)) {
+        setPrintMode('financial-ledger');
         return;
       }
     }

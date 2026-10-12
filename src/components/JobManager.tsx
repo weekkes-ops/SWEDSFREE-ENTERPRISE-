@@ -104,9 +104,20 @@ export default function JobManager({
   const [editJobQuoteAmount, setEditJobQuoteAmount] = useState(5000);
   const [editJobItems, setEditJobItems] = useState<JobItem[]>([]);
 
-  // Form states - Log Material
+  // Form states - Log Material (with Date, Real-Time of Entry & Movement Purpose)
   const [materialItemId, setMaterialItemId] = useState(inventory[0]?.id || '');
   const [materialQty, setMaterialQty] = useState(10);
+  const [materialDate, setMaterialDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [materialPurpose, setMaterialPurpose] = useState('');
+  const [liveClock, setLiveClock] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setLiveClock(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const liveTimeStr = liveClock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  const operatorLabel = currentUser ? `${currentUser.name} (${currentUser.role})` : 'System Admin';
 
   // Form states - Record Payment
   const [paymentAmount, setPaymentAmount] = useState(2500);
@@ -304,7 +315,7 @@ export default function JobManager({
 
   const handleLogMaterialSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedJob || !materialItemId) return;
+    if (!selectedJob || !materialItemId || !materialPurpose.trim()) return;
 
     const item = inventory.find(i => i.id === materialItemId);
     if (!item) return;
@@ -314,12 +325,20 @@ export default function JobManager({
       return;
     }
 
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
     onLogJobMaterial(selectedJob.id, {
       itemId: materialItemId,
       name: item.name,
       quantity: materialQty,
       unitCost: item.unitCost,
-      totalCost: materialQty * item.unitCost
+      totalCost: materialQty * item.unitCost,
+      date: materialDate || now.toISOString().split('T')[0],
+      time: timeStr,
+      timestamp: now.toISOString(),
+      purpose: materialPurpose.trim(),
+      recordedBy: operatorLabel
     });
 
     setShowMaterialModal(false);
@@ -549,41 +568,6 @@ export default function JobManager({
                       <span>Val: {formatCurrency(job.quoteAmount, 0)}</span>
                       <span>Paid: {completePercent}%</span>
                     </div>
-
-                    {/* Proforma Invoice & Quick Doc Actions */}
-                    <div className="flex items-center justify-between pt-2 mt-1 border-t border-gray-100 w-full" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-[9px] font-extrabold uppercase text-gray-400">Documents</span>
-                      <div className="flex items-center gap-1.5">
-                        {onTriggerProforma && (
-                          <button
-                            type="button"
-                            onClick={(evt) => {
-                              evt.stopPropagation();
-                              onTriggerProforma(job.id);
-                            }}
-                            className="px-2.5 py-1 text-[10px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer"
-                            title={`Create or view Proforma Invoice for ${job.title}`}
-                          >
-                            <FileSpreadsheet className="w-3 h-3 text-amber-900" />
-                            <span>PROFORMA INVOICE</span>
-                          </button>
-                        )}
-                        {onTriggerInvoice && (
-                          <button
-                            type="button"
-                            onClick={(evt) => {
-                              evt.stopPropagation();
-                              onTriggerInvoice(job.id);
-                            }}
-                            className="px-2 py-1 text-[10px] font-bold uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-lg transition flex items-center gap-1 cursor-pointer"
-                            title={`Generate Invoice for ${job.title}`}
-                          >
-                            <FileText className="w-3 h-3 text-wood-700" />
-                            <span>Invoice</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 );
               })
@@ -608,34 +592,6 @@ export default function JobManager({
                           className="px-2 py-0.5 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition"
                         >
                           Edit
-                        </button>
-                      )}
-                      {onTriggerInvoice && (
-                        <button
-                          onClick={() => onTriggerInvoice(activeSelectedJob.id)}
-                          className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
-                        >
-                          <FileText className="w-3 h-3 text-amber-700" />
-                          <span>Create Invoice</span>
-                        </button>
-                      )}
-                      {onTriggerProforma && (
-                        <button
-                          onClick={() => onTriggerProforma(activeSelectedJob.id)}
-                          className="px-3 py-1 text-xs font-black uppercase text-amber-950 bg-amber-300 hover:bg-amber-400 border border-amber-500 rounded-lg transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                          title="Generate a modern stunning Proforma Invoice for this client"
-                        >
-                          <FileSpreadsheet className="w-3.5 h-3.5 text-amber-950" />
-                          <span>PROFORMA INVOICE</span>
-                        </button>
-                      )}
-                      {onTriggerReceipt && (
-                        <button
-                          onClick={() => onTriggerReceipt(activeSelectedJob.id)}
-                          className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
-                        >
-                          <Receipt className="w-3 h-3 text-emerald-700" />
-                          <span>Issue / View Receipt</span>
                         </button>
                       )}
                       {!isAuditor && onDeleteJob && (
@@ -739,15 +695,6 @@ export default function JobManager({
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] text-gray-400 font-bold uppercase">Payments Clearing</span>
                     <div className="flex items-center gap-2">
-                      {onTriggerReceipt && (
-                        <button 
-                          onClick={() => onTriggerReceipt(activeSelectedJob.id)}
-                          className="text-[10px] text-emerald-700 font-extrabold hover:underline flex items-center gap-0.5 cursor-pointer"
-                        >
-                          <Receipt className="w-3 h-3 text-emerald-600" />
-                          <span>Receipt Desk</span>
-                        </button>
-                      )}
                       {!isAuditor && (
                         <button 
                           onClick={() => setShowPaymentModal(true)}
@@ -778,10 +725,10 @@ export default function JobManager({
                   <div>
                     <h3 className="font-display font-bold text-gray-900 flex items-center gap-1.5 text-sm">
                       <ListOrdered className="w-4 h-4 text-wood-600" />
-                      Recorded Job Line Items ({activeSelectedJob.items?.length || 1}) — Appears on Invoice Printout
+                      Recorded Job Line Items ({activeSelectedJob.items?.length || 1})
                     </h3>
                     <p className="text-[11px] text-gray-500 mt-0.5">
-                      Items recorded here will automatically print as separate itemized lines on the official invoice and receipt printout.
+                      Itemized carpentry units and specifications recorded under this job commission.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -792,25 +739,6 @@ export default function JobManager({
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
                         <span>Edit / Add Items</span>
-                      </button>
-                    )}
-                    {onTriggerInvoice && (
-                      <button
-                        onClick={() => onTriggerInvoice(activeSelectedJob.id)}
-                        className="flex items-center gap-1 text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
-                      >
-                        <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Print Invoice</span>
-                      </button>
-                    )}
-                    {onTriggerProforma && (
-                      <button
-                        onClick={() => onTriggerProforma(activeSelectedJob.id)}
-                        className="flex items-center gap-1.5 text-xs font-black uppercase text-amber-950 bg-amber-300 px-3 py-1.5 rounded-lg border border-amber-500 hover:bg-amber-400 transition cursor-pointer shadow-xs"
-                        title="Generate a modern stunning Proforma Invoice for this client"
-                      >
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-amber-950" />
-                        <span>PROFORMA INVOICE</span>
                       </button>
                     )}
                   </div>
@@ -873,17 +801,26 @@ export default function JobManager({
                 </div>
               </div>
 
-              {/* Consumer Materials Card - Live subtraction & tracking */}
+              {/* Consumer Materials Card - Live subtraction & real-time audit tracking */}
               <div className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display font-bold text-gray-900 flex items-center gap-1.5">
-                    <Package className="w-4 h-4 text-wood-600" />
-                    Consumed Wood, Hardware & Finishes
-                  </h3>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="font-display font-bold text-gray-900 flex items-center gap-1.5">
+                      <Package className="w-4 h-4 text-wood-600" />
+                      Consumed Wood, Hardware &amp; Finishes (Real-Time Stock-Out Audit)
+                    </h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Every stock movement logged here records date, real-time of entry, operator, and movement purpose in the Inventory Audit Trail.
+                    </p>
+                  </div>
                   {!isAuditor && (
                     <button
-                      onClick={() => setShowMaterialModal(true)}
-                      className="flex items-center gap-1 text-[10px] font-bold text-wood-700 bg-wood-50 px-2.5 py-1.5 rounded-lg border border-wood-200 hover:bg-wood-100 transition"
+                      onClick={() => {
+                        setMaterialDate(new Date().toISOString().split('T')[0]);
+                        setMaterialPurpose(`Issued to Workshop Job: ${activeSelectedJob.title} (${activeSelectedJob.customerName})`);
+                        setShowMaterialModal(true);
+                      }}
+                      className="flex items-center gap-1 text-[10px] font-bold text-wood-700 bg-wood-50 px-2.5 py-1.5 rounded-lg border border-wood-200 hover:bg-wood-100 transition cursor-pointer"
                     >
                       <PlusCircle className="w-3.5 h-3.5" />
                       <span>Log material used</span>
@@ -895,24 +832,38 @@ export default function JobManager({
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px] border-b border-gray-100">
+                        <th className="py-2.5 px-3">Date &amp; Real-Time</th>
                         <th className="py-2.5 px-3">Raw Material</th>
-                        <th className="py-2.5 px-3 text-right">Quantity Consumed</th>
-                        <th className="py-2.5 px-3 text-right">Unit cost</th>
-                        <th className="py-2.5 px-3 text-right">Total Material Cost</th>
+                        <th className="py-2.5 px-3">Description / Purpose of Stock Movement</th>
+                        <th className="py-2.5 px-3 text-right">Qty Consumed</th>
+                        <th className="py-2.5 px-3 text-right">Unit Cost</th>
+                        <th className="py-2.5 px-3 text-right">Total Cost</th>
                         {!isAuditor && onDeleteJobMaterial && <th className="py-2.5 px-3 text-center">Action</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50 text-gray-600">
                       {activeSelectedJob.materialsUsed.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="text-center py-6 text-gray-400 font-medium">
+                          <td colSpan={7} className="text-center py-6 text-gray-400 font-medium">
                             No wood, hardware, or polish sheets logged to this commission yet.
                           </td>
                         </tr>
                       ) : (
                         activeSelectedJob.materialsUsed.map((mat, i) => (
                           <tr key={`${mat.itemId}-${i}`}>
-                            <td className="py-2 px-3 font-bold text-gray-800">{mat.name}</td>
+                            <td className="py-2 px-3 font-mono text-[11px] whitespace-nowrap">
+                              <div className="font-bold text-gray-800">{mat.date || activeSelectedJob.startDate}</div>
+                              <div className="text-[10px] text-emerald-700 font-semibold">{mat.time || 'Real-Time Logged'}</div>
+                            </td>
+                            <td className="py-2 px-3">
+                              <div className="font-bold text-gray-800">{mat.name}</div>
+                              {mat.recordedBy && (
+                                <div className="text-[10px] text-gray-400">By: {mat.recordedBy}</div>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-xs text-gray-700 max-w-[220px]">
+                              {mat.purpose || `Allocated to Job: ${activeSelectedJob.title}`}
+                            </td>
                             <td className="py-2 px-3 text-right font-mono font-semibold">{mat.quantity}</td>
                             <td className="py-2 px-3 text-right font-mono">{formatCurrency(mat.unitCost)}</td>
                             <td className="py-2 px-3 text-right font-mono font-bold text-gray-800">
@@ -926,7 +877,7 @@ export default function JobManager({
                                       onDeleteJobMaterial(activeSelectedJob.id, mat.itemId);
                                     }
                                   }}
-                                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
                                   title="Delete Material Log"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -940,7 +891,7 @@ export default function JobManager({
                     {activeSelectedJob.materialsUsed.length > 0 && (
                       <tfoot>
                         <tr className="bg-wood-50/50 font-bold border-t border-gray-100 text-gray-800">
-                          <td colSpan={3} className="py-2.5 px-3 uppercase text-[10px]">Accumulated Materials Expense:</td>
+                          <td colSpan={5} className="py-2.5 px-3 uppercase text-[10px]">Accumulated Materials Expense:</td>
                           <td className="py-2.5 px-3 text-right font-mono text-sm">
                             {formatCurrency(activeSelectedJob.materialsUsed.reduce((sum, m) => sum + m.totalCost, 0))}
                           </td>
@@ -975,15 +926,6 @@ export default function JobManager({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-bold text-emerald-800">+{formatCurrency(p.amount)}</span>
-                          {onTriggerReceipt && (
-                            <button
-                              onClick={() => onTriggerReceipt(activeSelectedJob.id)}
-                              className="px-2.5 py-1 text-[10px] font-extrabold uppercase text-emerald-900 bg-emerald-100 hover:bg-emerald-200 border border-emerald-200 rounded-lg transition shadow-2xs flex items-center gap-1 cursor-pointer"
-                            >
-                              <Receipt className="w-3 h-3 text-emerald-700" />
-                              <span>Receipt</span>
-                            </button>
-                          )}
                           {!isAuditor && (
                             <button
                               onClick={() => handleOpenEditPaymentModal(p)}
@@ -1249,18 +1191,40 @@ export default function JobManager({
             >
               <div className="bg-wood-950 p-5 text-white flex items-center justify-between">
                 <div>
-                  <h3 className="font-display font-bold text-lg">Log Consumed Materials</h3>
-                  <p className="text-xs text-wood-200">Log wood or hardware taken from reserves to this commission.</p>
+                  <h3 className="font-display font-bold text-lg">Log Consumed Materials (Stock-Out)</h3>
+                  <p className="text-xs text-wood-200 font-mono">
+                    Real-Time Entry: {materialDate} &bull; {liveTimeStr} &bull; By {operatorLabel}
+                  </p>
                 </div>
                 <button 
                   onClick={() => setShowMaterialModal(false)}
-                  className="text-wood-300 hover:text-white font-bold"
+                  className="text-wood-300 hover:text-white font-bold cursor-pointer"
                 >
                   &times;
                 </button>
               </div>
 
               <form onSubmit={handleLogMaterialSubmit} className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase block">Movement Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={materialDate}
+                      onChange={(e) => setMaterialDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 outline-hidden"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase block">Real-Time of Entry</label>
+                    <div className="px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-800 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>{liveTimeStr}</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Select Material *</label>
                   <select
@@ -1288,19 +1252,33 @@ export default function JobManager({
                   />
                 </div>
 
-                <div className="flex gap-2 pt-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 uppercase">
+                    Description / Purpose of Stock Movement *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Describe purpose of stock movement (e.g., Framing & tabletop joinery)"
+                    value={materialPurpose}
+                    onChange={(e) => setMaterialPurpose(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:border-wood-400 outline-hidden text-xs font-medium text-gray-800"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
                   <button 
                     type="button" 
                     onClick={() => setShowMaterialModal(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition"
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button 
                     type="submit" 
-                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs"
+                    className="flex-1 py-2.5 rounded-xl bg-wood-600 hover:bg-wood-700 text-white text-sm font-bold transition shadow-xs cursor-pointer"
                   >
-                    Deduct & log material
+                    Deduct &amp; Log Audit
                   </button>
                 </div>
               </form>
@@ -1372,16 +1350,6 @@ export default function JobManager({
                   >
                     Clear Payment
                   </button>
-                  {onTriggerReceipt && (
-                    <button 
-                      type="button"
-                      onClick={(e) => handleRecordPaymentSubmit(e as any, true)}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-100 text-xs font-black uppercase transition shadow-xs flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <Receipt className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Clear & Open Receipt</span>
-                    </button>
-                  )}
                 </div>
               </form>
             </motion.div>
