@@ -923,7 +923,7 @@ export default function InvoiceReceiptManager({
         setInvoiceCompany("SWEDS WOOD ENTERPRISE");
         setInvoiceCompanyContact("Corporate Carpentry, Woodwork, Timber Logistics & Design.\nFreetown Workshop & Site Installations.\nSierra Leone Office: 2 Swed Free Avenue, Sussex.\nContact: swedswoodinfo@gmail.com | +232 76 442590");
         setInvoiceTerms("Payment Clear / Standard Log");
-        setInvoiceBankInstructions(`Standard bank wires are accepted at UBA Bank.\nB-BAN: 540810160001602\nPlease specify invoice reference: INV-${activeInvoice.id.slice(4).toUpperCase()}`);
+        setInvoiceBankInstructions(`Standard bank wires are accepted at UBA Bank.\nB-BAN: 540810160001602\nSWIFT CODE: UNAFSLFRXXX\nPlease specify invoice reference: INV-${activeInvoice.id.slice(4).toUpperCase()}`);
         setInvoiceCustomerMessage("");
       }
       setInvoiceNo(`INV-${activeInvoice.id.slice(4).toUpperCase()}`);
@@ -1440,7 +1440,7 @@ export default function InvoiceReceiptManager({
         discountPercent: inv.discountPercent || 0,
         taxPercent: inv.taxPercent || 0,
         depositPercent: inv.depositPercent || 50,
-        bankDetails: 'UBA Bank • B-BAN: 540810160001602',
+        bankDetails: 'UBA Bank • B-BAN: 540810160001602 • SWIFT CODE: UNAFSLFRXXX',
         preparedBy: inv.preparedBy || 'Master Joiner / Commercial Director',
         logoDataUrl
       });
@@ -1553,7 +1553,7 @@ export default function InvoiceReceiptManager({
         items,
         subtotal: subtotalVal,
         depositPercent: 50,
-        bankDetails: 'UBA Bank • B-BAN: 540810160001602',
+        bankDetails: 'UBA Bank • B-BAN: 540810160001602 • SWIFT CODE: UNAFSLFRXXX',
         notes: invoiceCustomerMessage || 'All timber is kiln-dried to <12% moisture content. 5-year structural joinery warranty.',
         preparedBy: currentUser?.name || 'Master Joiner',
         logoDataUrl
@@ -4521,6 +4521,7 @@ export default function InvoiceReceiptManager({
                         <div className="space-y-1 text-[11px] text-gray-700">
                           <p className="font-bold text-slate-900">UBA Bank</p>
                           <p className="font-mono text-gray-600">B-BAN: 540810160001602</p>
+                          <p className="font-mono text-gray-600">SWIFT CODE: UNAFSLFRXXX</p>
                         </div>
                       </div>
 
@@ -6103,7 +6104,7 @@ export default function InvoiceReceiptManager({
                               Thank you for your business. All commissions are constructed with seasoned hardwood timber. Delivery is authorized upon settlement.
                             </p>
                             <p className="text-[10px] text-gray-500 mt-2 font-mono">
-                              Bank: UBA Bank • B-BAN: 540810160001602 • Account Name: Sweds Wood Enterprise
+                              Bank: UBA Bank • B-BAN: 540810160001602 • SWIFT CODE: UNAFSLFRXXX • Account Name: Sweds Wood Enterprise
                             </p>
                           </div>
                         </div>

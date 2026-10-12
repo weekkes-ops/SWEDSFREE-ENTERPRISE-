@@ -293,7 +293,7 @@ export default function FinancialLedger({
               17F New England Ville, Freetown, Sierra Leone • Tel: +232 78 466480 / +232 76 442590
             </p>
             <p className="text-[11px] font-mono font-bold text-gray-800 mt-0.5">
-              Official Bank Account: UBA Bank • BBAN: 540810160001602
+              Official Bank Account: UBA Bank • BBAN: 540810160001602 • SWIFT CODE: UNAFSLFRXXX
             </p>
           </div>
           <div className="text-right text-xs font-mono">
@@ -1343,7 +1343,7 @@ export default function FinancialLedger({
                       17F New England Ville, Freetown, Sierra Leone
                     </p>
                     <p className="text-[11px] font-mono text-gray-600">
-                      Tel: +232 78 466480 / +232 76 442590 • UBA Bank BBAN: 540810160001602
+                      Tel: +232 78 466480 / +232 76 442590 • UBA Bank BBAN: 540810160001602 • SWIFT CODE: UNAFSLFRXXX
                     </p>
                   </div>
                   <div className="text-right">

@@ -162,6 +162,7 @@ export default function EmailDispatchModal({
     body += `\nBANK / PAYMENT INFORMATION:\n`;
     body += `Bank: UBA Bank\n`;
     body += `B-BAN: 540810160001602\n`;
+    body += `SWIFT CODE: UNAFSLFRXXX\n`;
     body += `Account Name: Swedswood Enterprise\n\n`;
 
     body += `If you have any questions or require modifications, please contact our workshop team:\n`;

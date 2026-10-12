@@ -590,7 +590,7 @@ export default function ProformaInvoiceDesk({
         taxPercent: inv.taxPercent || 0,
         depositPercent: inv.depositPercent !== undefined ? inv.depositPercent : 50,
         bankDetails:
-          'UBA Bank • B-BAN: 540810160001602',
+          'UBA Bank • B-BAN: 540810160001602 • SWIFT CODE: UNAFSLFRXXX',
         notes: inv.notes || '',
         preparedBy: inv.preparedBy || (currentUser ? `${currentUser.name} (${currentUser.role})` : 'Mr Paul Bindi (Admin)'),
         logoDataUrl
@@ -758,7 +758,7 @@ export default function ProformaInvoiceDesk({
         taxPercent,
         depositPercent,
         bankDetails:
-          'UBA Bank • B-BAN: 540810160001602',
+          'UBA Bank • B-BAN: 540810160001602 • SWIFT CODE: UNAFSLFRXXX',
         notes,
         preparedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'Master Joiner / Commercial Director',
         logoDataUrl
@@ -870,7 +870,7 @@ ${items.map((it, idx) => `• ${idx + 1}. ${it.description} (${it.woodSpecies ||
 
 *Workshop Bank Clearance:*
 UBA Bank
-B-BAN: 540810160001602 | SWEDS WOOD ENTERPRISE
+B-BAN: 540810160001602 | SWIFT CODE: UNAFSLFRXXX | SWEDS WOOD ENTERPRISE
 
 _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232 76 442590)._`;
 
@@ -2012,6 +2012,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
                 <div className="space-y-1 text-[11px] text-gray-700 font-medium">
                   <p className="font-bold text-slate-900">UBA Bank</p>
                   <p className="font-mono text-gray-600">B-BAN: 540810160001602</p>
+                  <p className="font-mono text-gray-600">SWIFT CODE: UNAFSLFRXXX</p>
                 </div>
               </div>
 

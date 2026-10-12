@@ -460,7 +460,7 @@ export function buildInvoicePdfContent(
     doc.text("OFFICIAL SETTLEMENT BANK ACCOUNT:", 18, bankY + 4.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.8);
-    doc.text("Bank: UBA Bank", 18, bankY + 8.5);
+    doc.text("Bank: UBA Bank • SWIFT: UNAFSLFRXXX", 18, bankY + 8.5);
     doc.text(`B-BAN: 540810160001602 • Ref: ${invNoStr}`, 18, bankY + 12.5);
 
     // Authorized Signatory & Official Stamp on Right
@@ -685,7 +685,7 @@ export function buildInvoicePdfContent(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(75, 85, 99);
-    const bankInstructionsText = `Standard bank wires are accepted at UBA Bank.\nB-BAN: 540810160001602\nPlease specify invoice reference: INV-${invNoStr}`;
+    const bankInstructionsText = `Standard bank wires are accepted at UBA Bank.\nB-BAN: 540810160001602 • SWIFT CODE: UNAFSLFRXXX\nPlease specify invoice reference: INV-${invNoStr}`;
     doc.text(bankInstructionsText, 15, botY + 4.5);
 
     // Modern Totals Block
@@ -1449,7 +1449,7 @@ export function buildProformaInvoicePdfContent(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(51, 65, 85);
-  doc.text("Bank: UBA Bank", 18, footY + 28.5);
+  doc.text("Bank: UBA Bank • SWIFT CODE: UNAFSLFRXXX", 18, footY + 28.5);
   doc.text(`Account Name: Sweds Wood Enterprise • B-BAN: 540810160001602`, 18, footY + 32.5);
   doc.text(`Reference: ${proformaNo}`, 18, footY + 36.5);
 
