@@ -165,8 +165,18 @@ export default function App() {
     : (activeTab !== 'dashboard' ? 'dashboard' : null);
   const previousTabLabel = previousTabId ? getTabDisplayName(previousTabId) : null;
 
-  const handleTriggerInvoice = (jobId: string) => {
-    setInvoiceJobId(jobId);
+  const handleTriggerInvoice = (jobId?: string, customerId?: string) => {
+    let targetJobId = jobId;
+    if (!targetJobId && customerId) {
+      const custJob = jobs.find(j => j.customerId === customerId);
+      if (custJob) {
+        targetJobId = custJob.id;
+      }
+    }
+    setInvoiceJobId(targetJobId || null);
+    if (customerId) {
+      setProformaCustomerId(customerId);
+    }
     setInvoiceInitialSubTab('INVOICE');
     setActiveTab('invoices');
   };
@@ -190,9 +200,17 @@ export default function App() {
     setActiveTab('proforma');
   };
 
-  const handleTriggerReceipt = (jobId?: string) => {
-    if (jobId) {
-      setInvoiceJobId(jobId);
+  const handleTriggerReceipt = (jobId?: string, customerId?: string) => {
+    let targetJobId = jobId;
+    if (!targetJobId && customerId) {
+      const custJob = jobs.find(j => j.customerId === customerId);
+      if (custJob) {
+        targetJobId = custJob.id;
+      }
+    }
+    setInvoiceJobId(targetJobId || null);
+    if (customerId) {
+      setProformaCustomerId(customerId);
     }
     setInvoiceInitialSubTab('RECEIPT');
     setActiveTab('invoices');
@@ -2108,6 +2126,8 @@ export default function App() {
                 onCloseRegisterModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
                 onTriggerProforma={handleTriggerProforma}
+                onTriggerInvoice={handleTriggerInvoice}
+                onTriggerReceipt={handleTriggerReceipt}
               />
             )}
 
@@ -2150,6 +2170,9 @@ export default function App() {
                 showCreateModalOnLoad={quickActionTrigger === 'create-job'}
                 onCloseCreateModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
+                onTriggerInvoice={handleTriggerInvoice}
+                onTriggerReceipt={handleTriggerReceipt}
+                onTriggerProforma={handleTriggerProforma}
               />
             )}
 

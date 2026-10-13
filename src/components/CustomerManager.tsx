@@ -1,6 +1,8 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Customer, Job, Employee, JobPayment, formatCurrency } from '../types';
 import { printDocument } from '../utils/printHelper';
+import { jsPDF } from 'jspdf';
+import { buildInvoicePdfContent, buildReceiptPdfContent, getLogoDataUrl } from '../utils/pdfGenerator';
 import { 
   Plus, 
   Search, 
@@ -12,25 +14,26 @@ import {
   FileText, 
   Calendar, 
   Wrench, 
-  DollarSign,
-  ShieldAlert,
-  Trash2,
-  CreditCard,
-  Receipt,
-  Printer,
-  CheckCircle2,
-  Clock,
-  ArrowUpRight,
-  Percent,
-  Download,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Edit2,
-  X,
-  Check,
-  AlertCircle,
-  FileSpreadsheet
+  DollarSign, 
+  ShieldAlert, 
+  Trash2, 
+  CreditCard, 
+  Receipt, 
+  Printer, 
+  CheckCircle2, 
+  Clock, 
+  ArrowUpRight, 
+  Percent, 
+  Download, 
+  ArrowUpDown, 
+  ArrowUp, 
+  ArrowDown, 
+  Edit2, 
+  X, 
+  Check, 
+  AlertCircle, 
+  FileSpreadsheet,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -49,6 +52,8 @@ interface CustomerManagerProps {
   onCloseRegisterModal?: () => void;
   currentUser?: Employee | null;
   onTriggerProforma?: (customerId: string, jobId?: string) => void;
+  onTriggerInvoice?: (jobId?: string, customerId?: string) => void;
+  onTriggerReceipt?: (jobId?: string, customerId?: string) => void;
 }
 
 export default function CustomerManager({
@@ -65,7 +70,9 @@ export default function CustomerManager({
   showRegisterModalOnLoad = false,
   onCloseRegisterModal,
   currentUser,
-  onTriggerProforma
+  onTriggerProforma,
+  onTriggerInvoice,
+  onTriggerReceipt
 }: CustomerManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [searchTerm, setSearchTerm] = useState('');
@@ -87,8 +94,123 @@ export default function CustomerManager({
   const [quickJobTitle, setQuickJobTitle] = useState('');
   const [quickJobQuote, setQuickJobQuote] = useState<number | ''>('');
 
-  // Receipt Modal state
+  // Receipt & Invoice Modal states
   const [viewReceiptPayment, setViewReceiptPayment] = useState<{ payment: JobPayment; job: Job } | null>(null);
+  const [viewInvoiceJob, setViewInvoiceJob] = useState<{ job: Job; customer: Customer } | null>(null);
+
+  // Quick Commission Modal to issue invoice when customer has no orders yet
+  const [showQuickCommissionModal, setShowQuickCommissionModal] = useState(false);
+  const [quickCommTitle, setQuickCommTitle] = useState('');
+  const [quickCommQuote, setQuickCommQuote] = useState<number | ''>(5000);
+  const [quickCommDueDate, setQuickCommDueDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().split('T')[0];
+  });
+  const [quickCommDesc, setQuickCommDesc] = useState('');
+
+  // PDF Download Handler for Invoices
+  const handleDownloadInvoicePdf = async (job: Job, customer: Customer) => {
+    try {
+      const logoDataUrl = await getLogoDataUrl('/logo.svg');
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      buildInvoicePdfContent(
+        doc,
+        job,
+        customer,
+        'SWEDS_WOOD',
+        currentUser || null,
+        undefined,
+        `INV-${job.id.slice(4).toUpperCase()}`,
+        new Date().toISOString().split('T')[0],
+        customer.name,
+        customer.address,
+        customer.phone,
+        customer.email,
+        'Please examine all dimensions on delivery. Thank you for choosing Sweds Wood Enterprise!',
+        job.title,
+        job.description,
+        job.quoteAmount,
+        job.quantity || 1,
+        logoDataUrl
+      );
+      const cleanName = (customer.name || 'Client').replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`Invoice_${job.id}_${cleanName}.pdf`);
+    } catch (err) {
+      console.error('Failed to generate invoice PDF:', err);
+    }
+  };
+
+  // PDF Download Handler for Receipts
+  const handleDownloadReceiptPdf = async (payment: JobPayment, job: Job, customer?: Customer) => {
+    try {
+      const logoDataUrl = await getLogoDataUrl('/logo.svg');
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      buildReceiptPdfContent(
+        doc,
+        job,
+        payment,
+        customer || selectedCustomer || undefined,
+        undefined,
+        `REC-${payment.id.toUpperCase()}`,
+        payment.date,
+        customer?.name || selectedCustomer?.name || job.customerName,
+        payment.method,
+        job.title,
+        payment.amount,
+        undefined,
+        undefined,
+        undefined,
+        logoDataUrl
+      );
+      const cleanName = (customer?.name || selectedCustomer?.name || 'Client').replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`Receipt_${payment.id}_${cleanName}.pdf`);
+    } catch (err) {
+      console.error('Failed to generate receipt PDF:', err);
+    }
+  };
+
+  const handleCreateQuickCommissionSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer || !quickCommTitle.trim() || !quickCommQuote || quickCommQuote <= 0) return;
+
+    const newJob: Omit<Job, 'id' | 'materialsUsed' | 'payments'> = {
+      title: quickCommTitle.trim(),
+      customerId: selectedCustomer.id,
+      customerName: selectedCustomer.name,
+      description: quickCommDesc.trim() || 'Custom hand-crafted fine carpentry order',
+      quantity: 1,
+      assignedEmployees: [],
+      status: 'Quote',
+      startDate: new Date().toISOString().split('T')[0],
+      dueDate: quickCommDueDate,
+      quoteAmount: Number(quickCommQuote),
+      laborCost: 0,
+      otherCosts: 0
+    };
+
+    if (onAddJob) {
+      onAddJob(newJob);
+    }
+
+    const createdJobMock: Job = {
+      ...newJob,
+      id: `job-${Date.now().toString().slice(-4)}`,
+      materialsUsed: [],
+      payments: []
+    };
+
+    setShowQuickCommissionModal(false);
+    setQuickCommTitle('');
+    setQuickCommQuote(5000);
+    setQuickCommDesc('');
+
+    // Immediately open the invoice for this newly created job
+    setViewInvoiceJob({
+      job: createdJobMock,
+      customer: selectedCustomer
+    });
+  };
 
   // Form states - Register Customer
   const [name, setName] = useState('');
@@ -538,20 +660,60 @@ export default function CustomerManager({
                             <span>&bull;</span>
                             <span className="font-mono">Reg: {c.registrationDate}</span>
                           </div>
-                          {onTriggerProforma && (
+                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onTriggerProforma(c.id);
+                                setSelectedCustomer(c);
+                                if (cJobs.length > 0) {
+                                  setViewInvoiceJob({ job: cJobs[0], customer: c });
+                                } else {
+                                  setShowQuickCommissionModal(true);
+                                }
                               }}
-                              className="px-2 py-0.5 text-[9px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer shrink-0"
-                              title={`Create Proforma Invoice for ${c.name}`}
+                              className="px-1.5 py-0.5 text-[9px] font-black uppercase text-blue-900 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded-md transition flex items-center gap-0.5 shadow-2xs cursor-pointer"
+                              title={`View / Print Invoice for ${c.name}`}
                             >
-                              <FileSpreadsheet className="w-2.5 h-2.5 text-amber-900" />
-                              <span>PROFORMA</span>
+                              <FileText className="w-2.5 h-2.5 text-blue-700" />
+                              <span>INV</span>
                             </button>
-                          )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCustomer(c);
+                                const cPayments = cJobs.flatMap(j => (j.payments || []).map(p => ({ payment: p, job: j })));
+                                if (cPayments.length > 0) {
+                                  setViewReceiptPayment({ payment: cPayments[0].payment, job: cPayments[0].job });
+                                } else if (cJobs.length > 0) {
+                                  handleOpenInstallmentModal();
+                                } else {
+                                  setShowQuickCommissionModal(true);
+                                }
+                              }}
+                              className="px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-md transition flex items-center gap-0.5 shadow-2xs cursor-pointer"
+                              title={`View / Print Receipt for ${c.name}`}
+                            >
+                              <Receipt className="w-2.5 h-2.5 text-emerald-700" />
+                              <span>REC</span>
+                            </button>
+                            {onTriggerProforma && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCustomer(c);
+                                  onTriggerProforma(c.id);
+                                }}
+                                className="px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-md transition flex items-center gap-0.5 shadow-2xs cursor-pointer"
+                                title={`Create Proforma Invoice for ${c.name}`}
+                              >
+                                <FileSpreadsheet className="w-2.5 h-2.5 text-amber-900" />
+                                <span>PRO</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -603,6 +765,36 @@ export default function CustomerManager({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (customerJobs.length > 0) {
+                          setViewInvoiceJob({ job: customerJobs[0], customer: selectedCustomer });
+                        } else {
+                          setShowQuickCommissionModal(true);
+                        }
+                      }}
+                      className="px-3 py-1.5 text-xs font-black uppercase text-blue-950 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                      title="View / Print official Commercial Invoice for this customer"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-blue-700" />
+                      <span>Customer Invoice</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (allCustomerInstallments.length > 0) {
+                          setViewReceiptPayment({ payment: allCustomerInstallments[0].payment, job: allCustomerInstallments[0].job });
+                        } else if (customerJobs.length > 0) {
+                          handleOpenInstallmentModal();
+                        } else {
+                          setShowQuickCommissionModal(true);
+                        }
+                      }}
+                      className="px-3 py-1.5 text-xs font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                      title="View / Print official Payment Receipt for this customer"
+                    >
+                      <Receipt className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Customer Receipts</span>
+                    </button>
                     {onTriggerProforma && (
                       <button
                         onClick={() => onTriggerProforma(selectedCustomer.id)}
@@ -755,6 +947,136 @@ export default function CustomerManager({
                 </div>
               </div>
 
+              {/* DEDICATED CUSTOMER COMMERCIAL INVOICES SECTION */}
+              <div className="bg-white p-6 rounded-2xl border border-wood-100 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                  <div>
+                    <h3 className="font-display font-bold text-gray-900 text-base flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                      Customer Commercial Invoices
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-black rounded-full font-mono">
+                        {customerJobs.length} {customerJobs.length === 1 ? 'Invoice' : 'Invoices'}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Commercial tax invoices, billing valuation, print-ready documents and PDF exports for {selectedCustomer.name}.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {!isAuditor && (
+                      <button
+                        onClick={() => setShowQuickCommissionModal(true)}
+                        className="px-3.5 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer shrink-0"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>+ Issue New Invoice</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {customerJobs.length === 0 ? (
+                  <div className="text-center py-8 bg-blue-50/30 rounded-xl border border-dashed border-blue-200 space-y-3">
+                    <FileText className="w-8 h-8 text-blue-300 mx-auto" />
+                    <p className="text-xs font-semibold text-gray-600">
+                      No commercial invoices issued for {selectedCustomer.name} yet.
+                    </p>
+                    <p className="text-[11px] text-gray-400 max-w-md mx-auto">
+                      Create an official woodwork commission order to generate and issue their commercial invoice.
+                    </p>
+                    {!isAuditor && (
+                      <button
+                        onClick={() => setShowQuickCommissionModal(true)}
+                        className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Create Job & Issue Invoice</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-gray-50 text-gray-500 font-bold uppercase text-[10px] border-y border-gray-100 select-none">
+                          <th className="py-2.5 px-3">Invoice #</th>
+                          <th className="py-2.5 px-3">Commission / Scope</th>
+                          <th className="py-2.5 px-3">Due Date</th>
+                          <th className="py-2.5 px-3 text-right">Invoice Valuation</th>
+                          <th className="py-2.5 px-3 text-center">Status</th>
+                          <th className="py-2.5 px-3 text-center">Document Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {customerJobs.map(job => {
+                          const paid = (job.payments || []).reduce((sum, p) => sum + p.amount, 0);
+                          const isCleared = paid >= job.quoteAmount;
+                          const invNo = `INV-${job.id.slice(4).toUpperCase()}`;
+
+                          return (
+                            <tr key={job.id} className="hover:bg-blue-50/20 transition">
+                              <td className="py-3 px-3 font-mono font-bold text-blue-900 whitespace-nowrap">
+                                {invNo}
+                              </td>
+                              <td className="py-3 px-3">
+                                <p className="font-bold text-gray-900">{job.title}</p>
+                                <p className="text-[10px] text-gray-500 truncate max-w-[220px]">{job.description || 'Bespoke fine woodwork'}</p>
+                              </td>
+                              <td className="py-3 px-3 font-mono text-gray-600 whitespace-nowrap">
+                                {job.dueDate}
+                              </td>
+                              <td className="py-3 px-3 font-mono font-bold text-gray-900 text-right whitespace-nowrap">
+                                {formatCurrency(job.quoteAmount)}
+                              </td>
+                              <td className="py-3 px-3 text-center whitespace-nowrap">
+                                <span className={`px-2 py-0.5 rounded-full font-extrabold text-[10px] border ${
+                                  isCleared 
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                    : paid > 0 
+                                      ? 'bg-blue-50 text-blue-800 border-blue-200' 
+                                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                                }`}>
+                                  {isCleared ? 'CLEARED' : paid > 0 ? 'PART-PAID' : 'DUE / UNPAID'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-center whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => setViewInvoiceJob({ job, customer: selectedCustomer })}
+                                    className="px-2.5 py-1 text-[11px] font-bold text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                                    title="View / Print Commercial Invoice"
+                                  >
+                                    <FileText className="w-3 h-3 text-blue-700" />
+                                    <span>View / Print</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDownloadInvoicePdf(job, selectedCustomer)}
+                                    className="p-1 text-blue-700 hover:text-blue-900 hover:bg-blue-100/70 border border-blue-200 rounded-lg transition cursor-pointer"
+                                    title="Download Official Invoice PDF"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </button>
+                                  {onTriggerInvoice && (
+                                    <button
+                                      onClick={() => onTriggerInvoice(job.id, selectedCustomer.id)}
+                                      className="p-1 text-gray-500 hover:text-gray-800 hover:bg-gray-100 border border-gray-200 rounded-lg transition cursor-pointer"
+                                      title="Open in Full Invoices & Receipts Desk"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               {/* DEDICATED CLIENT PAYMENT INSTALLMENTS SECTION */}
               <div className="bg-white p-6 rounded-2xl border border-wood-100 shadow-xs space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
@@ -886,11 +1208,18 @@ export default function CustomerManager({
                               <div className="flex items-center justify-center gap-1">
                                 <button
                                   onClick={() => setViewReceiptPayment({ payment, job })}
-                                  className="px-2.5 py-1 text-[11px] font-bold text-wood-700 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                                  className="px-2.5 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center gap-1 transition cursor-pointer"
                                   title="View Receipt"
                                 >
-                                  <Receipt className="w-3 h-3 text-wood-600" />
+                                  <Receipt className="w-3 h-3 text-emerald-600" />
                                   <span>Receipt</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDownloadReceiptPdf(payment, job, selectedCustomer || undefined)}
+                                  className="p-1 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100/70 border border-emerald-200 rounded-lg transition cursor-pointer"
+                                  title="Download Receipt PDF"
+                                >
+                                  <Download className="w-3 h-3" />
                                 </button>
                                 <button
                                   onClick={() => handleOpenEditPaymentModal({ payment, job })}
@@ -968,16 +1297,56 @@ export default function CustomerManager({
                             <span className={`px-2.5 py-1 text-[10px] font-extrabold rounded-md border ${isFullyPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
                               {isFullyPaid ? 'CLEARED' : 'PART PAID'}
                             </span>
-                            {onTriggerProforma && (
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
                               <button
-                                onClick={() => onTriggerProforma(selectedCustomer.id, job.id)}
-                                className="px-3 py-1.5 text-xs font-black uppercase text-amber-950 bg-amber-300 hover:bg-amber-400 border border-amber-500 rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
-                                title={`Create / View Proforma Invoice for ${job.title}`}
+                                onClick={() => setViewInvoiceJob({ job, customer: selectedCustomer })}
+                                className="px-2.5 py-1 text-[11px] font-black uppercase text-blue-950 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer shrink-0"
+                                title={`View / Print Commercial Invoice for ${job.title}`}
                               >
-                                <FileSpreadsheet className="w-3.5 h-3.5 text-amber-950" />
-                                <span>PROFORMA INVOICE</span>
+                                <FileText className="w-3 h-3 text-blue-700" />
+                                <span>Invoice</span>
                               </button>
-                            )}
+                              <button
+                                onClick={() => handleDownloadInvoicePdf(job, selectedCustomer)}
+                                className="p-1 text-blue-700 hover:text-blue-900 hover:bg-blue-50 border border-blue-200 rounded-lg transition shadow-2xs cursor-pointer shrink-0"
+                                title={`Download Invoice PDF for ${job.title}`}
+                              >
+                                <Download className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (job.payments && job.payments.length > 0) {
+                                    setViewReceiptPayment({ payment: job.payments[job.payments.length - 1], job });
+                                  } else {
+                                    handleOpenInstallmentModal();
+                                  }
+                                }}
+                                className="px-2.5 py-1 text-[11px] font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer shrink-0"
+                                title={`View / Print Payment Receipt for ${job.title}`}
+                              >
+                                <Receipt className="w-3 h-3 text-emerald-700" />
+                                <span>Receipt</span>
+                              </button>
+                              {onTriggerProforma && (
+                                <button
+                                  onClick={() => onTriggerProforma(selectedCustomer.id, job.id)}
+                                  className="px-2.5 py-1 text-[11px] font-black uppercase text-amber-950 bg-amber-300 hover:bg-amber-400 border border-amber-500 rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer shrink-0"
+                                  title={`Create / View Proforma Invoice for ${job.title}`}
+                                >
+                                  <FileSpreadsheet className="w-3 h-3 text-amber-950" />
+                                  <span>Proforma</span>
+                                </button>
+                              )}
+                              {onTriggerInvoice && (
+                                <button
+                                  onClick={() => onTriggerInvoice(job.id, selectedCustomer.id)}
+                                  className="p-1 text-gray-500 hover:text-gray-800 hover:bg-gray-100 border border-gray-200 rounded-lg transition shadow-2xs cursor-pointer shrink-0"
+                                  title="Open in Invoices & Receipts Desk"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -1694,6 +2063,512 @@ export default function CustomerManager({
                     className="px-5 py-2 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
                   >
                     Save & Register
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: Official Payment Clearance Receipt */}
+      <AnimatePresence>
+        {viewReceiptPayment && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-xl overflow-hidden my-6"
+            >
+              {/* Modal Toolbar (hidden during print) */}
+              <div className="bg-emerald-950 p-4 text-white flex flex-wrap items-center justify-between gap-3 no-print">
+                <div className="flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-emerald-400" />
+                  <div>
+                    <h3 className="font-display font-bold text-sm">Official Payment Clearance Receipt</h3>
+                    <p className="text-[10px] text-emerald-300">Swedswood Enterprise Commission Payment Voucher</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => printDocument('receipt')}
+                    className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                    title="Print Official Receipt (A4 Format)"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Receipt</span>
+                  </button>
+                  <button
+                    onClick={() => handleDownloadReceiptPdf(viewReceiptPayment.payment, viewReceiptPayment.job, selectedCustomer || undefined)}
+                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                    title="Download Official Receipt PDF"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download PDF</span>
+                  </button>
+                  {onTriggerReceipt && (
+                    <button
+                      onClick={() => {
+                        const jId = viewReceiptPayment.job.id;
+                        const cId = selectedCustomer?.id;
+                        setViewReceiptPayment(null);
+                        onTriggerReceipt(jId, cId);
+                      }}
+                      className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1"
+                      title="Open in full Invoices & Receipts desk"
+                    >
+                      <Receipt className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>Receipt Desk</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setViewReceiptPayment(null)}
+                    className="p-1.5 text-emerald-300 hover:text-white rounded-lg transition cursor-pointer"
+                    title="Close Receipt Modal"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* The Printed Paper Receipt Container */}
+              <div id="receipt-print-area" className="p-8 bg-white text-slate-900 space-y-6">
+                {/* Header Letterhead */}
+                <div className="flex flex-col items-center text-center pb-5 border-b-2 border-emerald-900 space-y-1.5">
+                  <div className="flex items-center justify-center gap-2.5">
+                    <img src="/logo.svg" alt="Swedswood Logo" className="w-12 h-12 object-contain" />
+                    <div>
+                      <h2 className="text-xl font-display font-black tracking-wide text-slate-900">SWEDS WOOD ENTERPRISE</h2>
+                      <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest">FINE WOODWORK & TIMBER ARCHITECTURE</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    2 Swed Free Avenue, Sussex • Freetown, Sierra Leone • Tel: +232 76 442590 • Email: swedswoodinfo@gmail.com
+                  </p>
+                  <div className="pt-1">
+                    <span className="px-3 py-0.5 bg-emerald-950 text-white rounded-full font-black text-[10px] uppercase tracking-wider">
+                      OFFICIAL COMMISSION PAYMENT CLEARANCE RECEIPT
+                    </span>
+                  </div>
+                </div>
+
+                {/* Receipt Metadata Grid */}
+                <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100 grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase font-black block">Receipt Number</span>
+                    <span className="font-mono text-xs font-bold text-slate-900">
+                      REC-{viewReceiptPayment.payment.id.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 uppercase font-black block">Date Cleared</span>
+                    <span className="font-mono text-xs font-bold text-slate-900">
+                      {viewReceiptPayment.payment.date}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase font-black block">Client / Customer</span>
+                    <span className="text-xs font-bold text-slate-900 block">
+                      {selectedCustomer?.name || viewReceiptPayment.job.customerName}
+                    </span>
+                    {selectedCustomer?.company && (
+                      <span className="text-[10px] text-emerald-700 font-semibold block">
+                        {selectedCustomer.company}
+                      </span>
+                    )}
+                    {selectedCustomer?.phone && (
+                      <span className="text-[10px] text-slate-500 font-mono block">
+                        {selectedCustomer.phone}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 uppercase font-black block">Payment Mode</span>
+                    <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-900 rounded font-black text-[10px] uppercase mt-0.5">
+                      {viewReceiptPayment.payment.method}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Job & Amount Details */}
+                <div className="space-y-3">
+                  <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <span className="text-[9px] text-slate-400 uppercase font-black block">Commission / Project</span>
+                        <h4 className="text-sm font-bold text-slate-900">{viewReceiptPayment.job.title}</h4>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-500 font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
+                        Job: #{viewReceiptPayment.job.id}
+                      </span>
+                    </div>
+                    {viewReceiptPayment.payment.note && (
+                      <div className="pt-1 text-xs text-slate-600 italic">
+                        <span className="font-semibold text-slate-700 not-italic">Milestone Note: </span>
+                        &quot;{viewReceiptPayment.payment.note}&quot;
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cleared Amount Box */}
+                  <div className="p-4 bg-emerald-900 text-white rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-emerald-300 tracking-wider block">
+                        Amount Received & Cleared
+                      </span>
+                      <span className="text-2xl font-black font-mono">
+                        {formatCurrency(viewReceiptPayment.payment.amount)}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-black uppercase px-2 py-1 bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 rounded-lg">
+                        FUNDS CLEARED
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contract Accounting Breakdown */}
+                {(() => {
+                  const targetJob = jobs.find(j => j.id === viewReceiptPayment.job.id) || viewReceiptPayment.job;
+                  const totalPaidJob = targetJob.payments.reduce((s, p) => s + p.amount, 0);
+                  const bal = Math.max(0, targetJob.quoteAmount - totalPaidJob);
+                  return (
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5 font-medium text-slate-700">
+                      <div className="flex justify-between">
+                        <span>Total Commission Agreed Valuation:</span>
+                        <span className="font-mono font-bold text-slate-900">{formatCurrency(targetJob.quoteAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-emerald-800">
+                        <span>Cumulative Installments Cleared to Date:</span>
+                        <span className="font-mono font-bold">{formatCurrency(totalPaidJob)}</span>
+                      </div>
+                      <div className="border-t border-slate-200 pt-1.5 flex justify-between font-bold">
+                        <span className="text-slate-900">Remaining Balance Due:</span>
+                        <span className={`font-mono ${bal <= 0 ? 'text-emerald-700' : 'text-amber-800'}`}>
+                          {bal <= 0 ? 'Le 0.00 (Fully Settled)' : formatCurrency(bal)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Seal & Authorization Footer */}
+                <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-full border-2 border-emerald-800 flex items-center justify-center text-center p-1 font-mono text-[8px] font-black uppercase text-emerald-800 leading-tight">
+                      SWEDS WOOD<br />OFFICIAL<br />SEAL
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase font-black">Authorized Officer</p>
+                      <p className="font-bold text-slate-800">{currentUser?.name || 'Mr Paul Bindi'}</p>
+                      <p className="text-[9px] text-slate-500">Managing Director / Cashier</p>
+                    </div>
+                  </div>
+                  <div className="text-right text-[9px] text-slate-400">
+                    <p>Computer-generated receipt</p>
+                    <p className="font-mono font-bold text-slate-600">Swedswood Enterprise</p>
+                    <p>Sierra Leone (SLL)</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: Official Commercial Invoice */}
+      <AnimatePresence>
+        {viewInvoiceJob && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-2xl overflow-hidden my-6"
+            >
+              {/* Modal Toolbar (hidden during print) */}
+              <div className="bg-slate-900 p-4 text-white flex flex-wrap items-center justify-between gap-3 no-print">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-amber-400" />
+                  <div>
+                    <h3 className="font-display font-bold text-sm">Official Commercial Invoice</h3>
+                    <p className="text-[10px] text-slate-300">Swedswood Enterprise Woodwork Invoice</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => printDocument('invoice')}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                    title="Print Commercial Invoice (A4 Format)"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Invoice</span>
+                  </button>
+                  <button
+                    onClick={() => handleDownloadInvoicePdf(viewInvoiceJob.job, viewInvoiceJob.customer)}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                    title="Download Commercial Invoice PDF"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download PDF</span>
+                  </button>
+                  {onTriggerInvoice && (
+                    <button
+                      onClick={() => {
+                        const jId = viewInvoiceJob.job.id;
+                        const cId = viewInvoiceJob.customer.id;
+                        setViewInvoiceJob(null);
+                        onTriggerInvoice(jId, cId);
+                      }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1"
+                      title="Open in full Invoices & Receipts desk"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Invoice Desk</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setViewInvoiceJob(null)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
+                    title="Close Invoice Modal"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* The Printed Paper Invoice Container */}
+              <div id="invoice-print-area" className="p-8 bg-white text-slate-900 space-y-6">
+                {/* Header Letterhead */}
+                <div className="flex flex-col items-center text-center pb-5 border-b-2 border-slate-900 space-y-1.5">
+                  <div className="flex items-center justify-center gap-2.5">
+                    <img src="/logo.svg" alt="Swedswood Logo" className="w-12 h-12 object-contain" />
+                    <div>
+                      <h2 className="text-xl font-display font-black tracking-wide text-slate-900">SWEDS WOOD ENTERPRISE</h2>
+                      <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">FINE WOODWORK & TIMBER ARCHITECTURE</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    2 Swed Free Avenue, Sussex • Freetown, Sierra Leone • Tel: +232 76 442590 • Email: swedswoodinfo@gmail.com
+                  </p>
+                  <div className="pt-1">
+                    <span className="px-3 py-0.5 bg-slate-900 text-white rounded-full font-black text-[10px] uppercase tracking-wider">
+                      OFFICIAL COMMERCIAL INVOICE
+                    </span>
+                  </div>
+                </div>
+
+                {/* Metadata Grid */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase font-black block">Invoice Number</span>
+                    <span className="font-mono text-xs font-bold text-slate-900">
+                      INV-{viewInvoiceJob.job.id.slice(4).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 uppercase font-black block">Date Issued</span>
+                    <span className="font-mono text-xs font-bold text-slate-900">
+                      {new Date().toISOString().split('T')[0]}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 uppercase font-black block">Billed To (Client)</span>
+                    <span className="text-xs font-bold text-slate-900 block">{viewInvoiceJob.customer.name}</span>
+                    {viewInvoiceJob.customer.company && (
+                      <span className="text-[10px] text-slate-600 font-semibold block">{viewInvoiceJob.customer.company}</span>
+                    )}
+                    {viewInvoiceJob.customer.phone && (
+                      <span className="text-[10px] text-slate-500 font-mono block">{viewInvoiceJob.customer.phone}</span>
+                    )}
+                    {viewInvoiceJob.customer.address && (
+                      <span className="text-[10px] text-slate-500 block">{viewInvoiceJob.customer.address}</span>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 uppercase font-black block">Terms & Due Date</span>
+                    <span className="text-slate-700 text-xs font-semibold block">COD / Standard Log</span>
+                    <span className="text-[10px] font-mono text-slate-500 block">Due: {viewInvoiceJob.job.dueDate}</span>
+                  </div>
+                </div>
+
+                {/* Scope & Line Item */}
+                <div className="space-y-3">
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-900 text-white text-[10px] uppercase font-black">
+                        <tr>
+                          <th className="py-2.5 px-3">Item Description & Scope</th>
+                          <th className="py-2.5 px-3 text-center">Qty</th>
+                          <th className="py-2.5 px-3 text-right">Amount (Le)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr>
+                          <td className="py-3 px-3">
+                            <p className="font-bold text-slate-900">{viewInvoiceJob.job.title}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{viewInvoiceJob.job.description || 'Bespoke fine woodwork commission & custom craftsmanship'}</p>
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-700">1 Set</td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">{formatCurrency(viewInvoiceJob.job.quoteAmount)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Total Box */}
+                  <div className="p-4 bg-slate-900 text-white rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider block">
+                        Total Invoice Valuation
+                      </span>
+                      <span className="text-2xl font-black font-mono">
+                        {formatCurrency(viewInvoiceJob.job.quoteAmount)}
+                      </span>
+                    </div>
+                    <div className="text-right text-[10px] text-slate-400">
+                      <p>Currency: Sierra Leone Leone (Le)</p>
+                      <p className="text-amber-300 font-bold">Standard Enterprise Rate</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Banking & Instructions */}
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-950 space-y-1">
+                  <p className="font-bold">Banking Coordinates & Wire Instructions:</p>
+                  <p className="text-[11px] text-slate-700 font-mono">
+                    Bank: UBA Bank • B-BAN: 540810160001602 • SWIFT: UNAFSLFRXXX • Account: Sweds Wood Enterprise
+                  </p>
+                </div>
+
+                {/* Footer Authorization */}
+                <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-full border-2 border-slate-900 flex items-center justify-center text-center p-1 font-mono text-[8px] font-black uppercase text-slate-900 leading-tight">
+                      SWEDS WOOD<br />OFFICIAL<br />STAMP
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase font-black">Authorized Signatory</p>
+                      <p className="font-bold text-slate-800">{currentUser?.name || 'Mr Paul Bindi'}</p>
+                      <p className="text-[9px] text-slate-500">Managing Director</p>
+                    </div>
+                  </div>
+                  <div className="text-right text-[9px] text-slate-400">
+                    <p>Swedswood Enterprise</p>
+                    <p>2 Swed Free Avenue, Sussex</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: Quick Create Commission & Issue Invoice */}
+      <AnimatePresence>
+        {showQuickCommissionModal && selectedCustomer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl border border-blue-100 shadow-2xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="bg-slate-900 p-5 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-blue-600/30 text-blue-400 rounded-xl border border-blue-500/40">
+                    <FileText className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-base">Issue Commercial Invoice</h3>
+                    <p className="text-xs text-slate-300">Create commission order & generate invoice for {selectedCustomer.name}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowQuickCommissionModal(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateQuickCommissionSubmit} className="p-6 space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block">Client Name</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={`${selectedCustomer.name}${selectedCustomer.company ? ` (${selectedCustomer.company})` : ''}`}
+                    className="w-full px-3 py-2 text-xs bg-gray-100 border border-gray-200 rounded-xl font-bold text-gray-700 cursor-not-allowed"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 uppercase block">Commission Title / Scope *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Master Bedroom Teak Wardrobes / Bespoke Dining Set"
+                    value={quickCommTitle}
+                    onChange={(e) => setQuickCommTitle(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:border-blue-500 outline-none font-semibold text-gray-900"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 uppercase block">Invoice Valuation (Le) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      step="any"
+                      placeholder="e.g. 15000"
+                      value={quickCommQuote}
+                      onChange={(e) => setQuickCommQuote(Number(e.target.value))}
+                      className="w-full px-3.5 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:border-blue-500 outline-none font-mono font-bold text-blue-900"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 uppercase block">Due / Delivery Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={quickCommDueDate}
+                      onChange={(e) => setQuickCommDueDate(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:border-blue-500 outline-none font-medium text-gray-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 uppercase block">Project Scope Description</label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Fine hardwood joinery, sanded and polished complete with custom architectural fittings."
+                    value={quickCommDesc}
+                    onChange={(e) => setQuickCommDesc(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:border-blue-500 outline-none text-gray-700"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickCommissionModal(false)}
+                    className="px-4 py-2 text-xs font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Create & Open Commercial Invoice</span>
                   </button>
                 </div>
               </form>

@@ -134,6 +134,7 @@ export default function InvoiceReceiptManager({
 }: InvoiceReceiptManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCustomerIdFilter, setSelectedCustomerIdFilter] = useState<string>(proformaCustomerId || 'ALL');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(jobs[0]?.id || null);
   
   // Top level tabs: Invoice Workspace vs Proforma Desk vs Saved Invoices Directory vs Receipt Workspace vs Payment Audit Log
@@ -868,8 +869,12 @@ export default function InvoiceReceiptManager({
     setTimeout(() => setSaveToast(null), 3500);
   };
 
-  // Sync to outer invoice / receipt creation request (e.g. from Jobs tracker)
+  // Sync to outer invoice / receipt creation request (e.g. from Jobs tracker or CustomerManager)
   useEffect(() => {
+    if (proformaCustomerId) {
+      setSelectedCustomerIdFilter(proformaCustomerId);
+    }
+
     if (initialSubTab === 'PROFORMA') {
       setSubTab('PROFORMA');
       if (invoiceJobId) {
@@ -878,15 +883,17 @@ export default function InvoiceReceiptManager({
       return;
     }
 
-    if (invoiceJobId) {
-      setSelectedJobId(invoiceJobId);
-      const job = jobs.find(j => j.id === invoiceJobId);
+    const resolvedJobId = invoiceJobId || (proformaCustomerId ? jobs.find(j => j.customerId === proformaCustomerId)?.id : null);
+
+    if (resolvedJobId) {
+      setSelectedJobId(resolvedJobId);
+      const job = jobs.find(j => j.id === resolvedJobId);
       if (job) {
         if (initialSubTab === 'RECEIPT') {
           setSubTab('RECEIPT');
           setIsInvoiceModalOpen(false);
           setActiveInvoice(null);
-          if (job.payments.length > 0) {
+          if (job.payments && job.payments.length > 0) {
             setActiveReceipt({ job, payment: job.payments[job.payments.length - 1] });
             setReceiptPdfMode('VIEW');
           } else {
@@ -908,7 +915,7 @@ export default function InvoiceReceiptManager({
     } else if (initialSubTab) {
       setSubTab(initialSubTab);
     }
-  }, [invoiceJobId, jobs, initialSubTab, onClearInvoiceJobId]);
+  }, [invoiceJobId, proformaCustomerId, jobs, initialSubTab, onClearInvoiceJobId]);
 
   // Sync Invoice local editable states when an activeInvoice is selected/opened
   useEffect(() => {
@@ -982,14 +989,20 @@ export default function InvoiceReceiptManager({
     }
   }, [activeReceipt, currentUser]);
 
-  // Filter jobs based on search term
+  // Filter jobs based on search term and selected customer filter
   const filteredJobs = jobs.filter(j => {
+    if (selectedCustomerIdFilter !== 'ALL' && j.customerId !== selectedCustomerIdFilter) {
+      return false;
+    }
     const cust = customers.find(c => c.id === j.customerId);
     const searchString = `${j.title} ${j.customerName} ${cust?.company || ''} ${j.id}`.toLowerCase();
     return searchString.includes(searchTerm.toLowerCase());
   });
 
-  const selectedJob = jobs.find(j => j.id === selectedJobId) || jobs[0] || null;
+  const selectedJob = (selectedJobId ? jobs.find(j => j.id === selectedJobId) : null)
+    || (filteredJobs.length > 0 ? filteredJobs[0] : null)
+    || jobs[0]
+    || null;
   const selectedCustomer = selectedJob ? customers.find(c => c.id === selectedJob.customerId) : null;
 
   // Automatically keep activeInvoice in sync with selectedJob and jobs state updates when modal is actively open
@@ -3144,6 +3157,47 @@ export default function InvoiceReceiptManager({
                 <span>{subTab === 'RECEIPT' ? 'Bulk Print Receipts' : 'Bulk Print Invoices'}</span>
               </button>
             </div>
+            
+            {/* Customer Filter Dropdown */}
+            <div className="mb-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Client Filter:</span>
+                {selectedCustomerIdFilter !== 'ALL' && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCustomerIdFilter('ALL')}
+                    className="text-[9px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    All Clients
+                  </button>
+                )}
+              </div>
+              <select
+                value={selectedCustomerIdFilter}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedCustomerIdFilter(val);
+                  if (val !== 'ALL') {
+                    const custJobs = jobs.filter(j => j.customerId === val);
+                    if (custJobs.length > 0) {
+                      setSelectedJobId(custJobs[0].id);
+                    }
+                  }
+                }}
+                className="w-full px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-bold text-gray-800"
+              >
+                <option value="ALL">All Clients ({customers.length})</option>
+                {customers.map(c => {
+                  const cJobCount = jobs.filter(j => j.customerId === c.id).length;
+                  return (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.company ? `(${c.company})` : ''} • {cJobCount} order{cJobCount !== 1 ? 's' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
             <div className="relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
               <input
@@ -3158,8 +3212,42 @@ export default function InvoiceReceiptManager({
 
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
             {filteredJobs.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-xs font-medium">
-                No orders match your query.
+              <div className="text-center py-12 px-4 space-y-3">
+                <FileText className="w-8 h-8 text-gray-300 mx-auto" />
+                <p className="text-gray-500 text-xs font-bold">
+                  {selectedCustomerIdFilter !== 'ALL'
+                    ? `No orders or invoices found for ${customers.find(c => c.id === selectedCustomerIdFilter)?.name || 'selected client'}.`
+                    : 'No orders match your query.'}
+                </p>
+                {selectedCustomerIdFilter !== 'ALL' && onCreateJob && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const c = customers.find(cust => cust.id === selectedCustomerIdFilter);
+                      if (c) {
+                        const newJob: Omit<Job, 'id' | 'materialsUsed' | 'payments'> = {
+                          title: `New Woodwork Order - ${c.name}`,
+                          customerId: c.id,
+                          customerName: c.name,
+                          description: 'Custom fine woodwork and timber craftsmanship commission',
+                          quantity: 1,
+                          assignedEmployees: [],
+                          status: 'Quote',
+                          startDate: new Date().toISOString().split('T')[0],
+                          dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+                          quoteAmount: 5000,
+                          laborCost: 0,
+                          otherCosts: 0
+                        };
+                        onCreateJob(newJob);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create Order & Issue Invoice</span>
+                  </button>
+                )}
               </div>
             ) : (
               filteredJobs.map(job => {

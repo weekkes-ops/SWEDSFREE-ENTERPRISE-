@@ -566,7 +566,34 @@ export default function JobManager({
                     
                     <div className="flex items-center justify-between mt-1 text-[10px] text-gray-400 font-semibold w-full font-mono">
                       <span>Val: {formatCurrency(job.quoteAmount, 0)}</span>
-                      <span>Paid: {completePercent}%</span>
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        {onTriggerInvoice && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTriggerInvoice(job.id);
+                            }}
+                            className="px-1.5 py-0.5 text-[9px] font-black uppercase text-blue-900 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded transition cursor-pointer"
+                            title={`Open Invoice for ${job.title}`}
+                          >
+                            INV
+                          </button>
+                        )}
+                        {onTriggerReceipt && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTriggerReceipt(job.id);
+                            }}
+                            className="px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded transition cursor-pointer"
+                            title={`Open Receipt for ${job.title}`}
+                          >
+                            REC
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -607,6 +634,36 @@ export default function JobManager({
                         >
                           <Trash2 className="w-3 h-3 text-rose-600" />
                           <span>Delete Job</span>
+                        </button>
+                      )}
+                      {onTriggerInvoice && (
+                        <button
+                          onClick={() => onTriggerInvoice(activeSelectedJob.id)}
+                          className="px-2.5 py-1 text-[10px] font-black uppercase text-blue-950 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
+                          title={`Open Commercial Invoice for ${activeSelectedJob.title}`}
+                        >
+                          <FileText className="w-3 h-3 text-blue-700" />
+                          <span>Invoice</span>
+                        </button>
+                      )}
+                      {onTriggerReceipt && (
+                        <button
+                          onClick={() => onTriggerReceipt(activeSelectedJob.id)}
+                          className="px-2.5 py-1 text-[10px] font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
+                          title={`Open Payment Clearance Receipt for ${activeSelectedJob.title}`}
+                        >
+                          <Receipt className="w-3 h-3 text-emerald-700" />
+                          <span>Receipt</span>
+                        </button>
+                      )}
+                      {onTriggerProforma && (
+                        <button
+                          onClick={() => onTriggerProforma(activeSelectedJob.id)}
+                          className="px-2.5 py-1 text-[10px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
+                          title={`Draft Proforma Quotation for ${activeSelectedJob.title}`}
+                        >
+                          <FileSpreadsheet className="w-3 h-3 text-amber-900" />
+                          <span>Proforma</span>
                         </button>
                       )}
                     </div>
@@ -926,6 +983,16 @@ export default function JobManager({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-bold text-emerald-800">+{formatCurrency(p.amount)}</span>
+                          {onTriggerReceipt && (
+                            <button
+                              onClick={() => onTriggerReceipt(activeSelectedJob.id)}
+                              className="px-2 py-0.5 text-[10px] font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                              title="Open Payment Clearance Receipt"
+                            >
+                              <Receipt className="w-3 h-3 text-emerald-700" />
+                              <span>Receipt</span>
+                            </button>
+                          )}
                           {!isAuditor && (
                             <button
                               onClick={() => handleOpenEditPaymentModal(p)}
