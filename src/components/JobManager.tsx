@@ -33,7 +33,7 @@ interface JobManagerProps {
   customers: Customer[];
   employees: Employee[];
   inventory: InventoryItem[];
-  onCreateJob: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
+  onCreateJob: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string }) => void;
   onUpdateJob?: (updatedJob: Job) => void;
   onDeleteJob?: (jobId: string) => void;
   onDeleteJobMaterial?: (jobId: string, itemId: string) => void;
@@ -80,7 +80,9 @@ export default function JobManager({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showEditJobModal, setShowEditJobModal] = useState(false);
 
-  // Form states - Create Job
+  // Form states - Create Job (Manual Comm ID input supported)
+  const [commId, setCommId] = useState('');
+  const [commIdError, setCommIdError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [description, setDescription] = useState('');
@@ -274,6 +276,17 @@ export default function JobManager({
 
   const handleCreateJobSubmit = (e: FormEvent) => {
     e.preventDefault();
+    const trimmedCommId = commId.trim();
+    if (!trimmedCommId) {
+      setCommIdError('Please enter a custom Comm ID (manual input required).');
+      return;
+    }
+
+    if (jobs.some(j => j.id.trim().toLowerCase() === trimmedCommId.toLowerCase())) {
+      setCommIdError(`Comm ID "${trimmedCommId}" already exists. Please choose a unique Comm ID.`);
+      return;
+    }
+
     if (!title.trim() || !customerId) return;
 
     const customer = customers.find(c => c.id === customerId);
@@ -284,9 +297,10 @@ export default function JobManager({
     const totalQty = items.reduce((sum, i) => sum + (i.quantity || 1), 0) || quantity || 1;
 
     onCreateJob({
+      id: trimmedCommId,
       customerId,
       customerName: customer.name,
-      title,
+      title: title.trim(),
       description,
       quantity: totalQty,
       items: validItems.length > 0 ? validItems : [
@@ -302,6 +316,8 @@ export default function JobManager({
     });
 
     // Reset Form
+    setCommId('');
+    setCommIdError(null);
     setTitle('');
     setDescription('');
     setQuantity(1);
@@ -445,7 +461,10 @@ export default function JobManager({
 
   // Filters logic
   const filteredJobs = jobs.filter(j => {
-    const matchesSearch = j.title.toLowerCase().includes(searchTerm.toLowerCase()) || j.customerName.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = j.title.toLowerCase().includes(term) || 
+                          j.customerName.toLowerCase().includes(term) ||
+                          j.id.toLowerCase().includes(term);
     const matchesStatus = statusFilter === 'All' || j.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -532,7 +551,14 @@ export default function JobManager({
                     className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex flex-col gap-2 cursor-pointer ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-1 w-full">
-                      <h4 className="text-sm font-bold text-gray-800 line-clamp-2 pr-2">{job.title}</h4>
+                      <div className="flex-1 min-w-0 pr-1">
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                          <span className="font-mono text-[10px] font-extrabold text-wood-900 bg-wood-100/90 border border-wood-200/80 px-1.5 py-0.5 rounded tracking-tight">
+                            Comm ID: {job.id}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-bold text-gray-800 line-clamp-2">{job.title}</h4>
+                      </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded border whitespace-nowrap uppercase ${job.status === 'Completed' || job.status === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
                           {job.status}
@@ -1055,6 +1081,59 @@ export default function JobManager({
               </div>
 
               <form onSubmit={handleCreateJobSubmit} className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
+                {/* Manual Comm ID Input Section */}
+                <div className="p-3.5 bg-wood-50/80 border border-wood-200 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-wood-950 uppercase flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-wood-600 inline-block"></span>
+                      <span>Comm ID (Commission Job ID) *</span>
+                      <span className="text-[11px] font-normal text-wood-600 font-sans lowercase">(manual input)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const year = new Date().getFullYear();
+                        const nextNum = (jobs.length + 1).toString().padStart(3, '0');
+                        setCommId(`COMM-${year}-${nextNum}`);
+                        setCommIdError(null);
+                      }}
+                      className="text-[11px] font-bold text-wood-700 hover:text-wood-900 bg-white px-2 py-0.5 rounded border border-wood-300 shadow-2xs hover:bg-wood-100 transition cursor-pointer"
+                      title="Optional: Generate a suggested Comm ID"
+                    >
+                      Auto-Fill Comm ID
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter manual Comm ID e.g. COMM-2026-001 or JOB-104"
+                    value={commId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCommId(val);
+                      if (val.trim() && jobs.some(j => j.id.trim().toLowerCase() === val.trim().toLowerCase())) {
+                        setCommIdError(`Comm ID "${val.trim()}" is already assigned to an existing job. Please enter a unique ID.`);
+                      } else {
+                        setCommIdError(null);
+                      }
+                    }}
+                    className={`w-full px-4 py-2 bg-white border rounded-xl outline-hidden text-sm font-mono font-bold tracking-wide transition ${
+                      commIdError 
+                        ? 'border-red-400 bg-red-50/40 text-red-900 focus:border-red-500' 
+                        : 'border-wood-300 text-wood-950 focus:border-wood-600 focus:ring-1 focus:ring-wood-400'
+                    }`}
+                  />
+                  {commIdError ? (
+                    <p className="text-[11px] text-red-600 font-semibold flex items-center gap-1 pt-0.5">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      {commIdError}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-wood-700/80 font-medium">
+                      Enter your custom manual Comm ID for this woodwork job (not system auto-generated).
+                    </p>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-500 uppercase">Job / Commission Title *</label>
@@ -1629,6 +1708,15 @@ export default function JobManager({
               </div>
 
               <form onSubmit={handleEditJobSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                <div className="p-3 bg-wood-50 rounded-xl border border-wood-200 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Comm ID</span>
+                    <span className="text-sm font-mono font-bold text-wood-950">{selectedJob?.id}</span>
+                  </div>
+                  <span className="text-[11px] text-wood-700 bg-white px-2.5 py-1 rounded-lg border border-wood-200 font-bold shadow-2xs font-mono">
+                    Commission Reference
+                  </span>
+                </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Commission Title *</label>
                   <input

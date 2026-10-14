@@ -1102,10 +1102,11 @@ export default function App() {
   };
 
   // D. Job mutators
-  const handleCreateJob = (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => {
+  const handleCreateJob = (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string }) => {
+    const finalJobId = job.id && job.id.trim() ? job.id.trim() : `COMM-${Date.now().toString().slice(-6)}`;
     const newJob: Job = {
       ...job,
-      id: `job-${Date.now()}`,
+      id: finalJobId,
       materialsUsed: [],
       payments: []
     };

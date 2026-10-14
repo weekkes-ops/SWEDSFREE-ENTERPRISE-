@@ -110,7 +110,7 @@ interface InvoiceReceiptManagerProps {
   onUpdateJob?: (updatedJob: Job) => void;
   onUpdateJobPayment?: (jobId: string, payment: JobPayment) => void;
   onDeleteJobPayment?: (jobId: string, paymentId: string) => void;
-  onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
+  onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string }) => void;
   paymentAuditLogs?: PaymentAuditLogEntry[];
   onGoBack?: () => void;
 }

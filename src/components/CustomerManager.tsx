@@ -46,7 +46,7 @@ interface CustomerManagerProps {
   onRecordPayment?: (jobId: string, payment: Omit<JobPayment, 'id'>) => void;
   onUpdateJobPayment?: (jobId: string, payment: JobPayment) => void;
   onDeleteJobPayment?: (jobId: string, paymentId: string) => void;
-  onAddJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
+  onAddJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string }) => void;
   onUpdateJob?: (job: Job) => void;
   showRegisterModalOnLoad?: boolean;
   onCloseRegisterModal?: () => void;
@@ -100,6 +100,8 @@ export default function CustomerManager({
 
   // Quick Commission Modal to issue invoice when customer has no orders yet
   const [showQuickCommissionModal, setShowQuickCommissionModal] = useState(false);
+  const [quickCommId, setQuickCommId] = useState('');
+  const [quickCommIdError, setQuickCommIdError] = useState<string | null>(null);
   const [quickCommTitle, setQuickCommTitle] = useState('');
   const [quickCommQuote, setQuickCommQuote] = useState<number | ''>(5000);
   const [quickCommDueDate, setQuickCommDueDate] = useState<string>(() => {
@@ -174,7 +176,15 @@ export default function CustomerManager({
     e.preventDefault();
     if (!selectedCustomer || !quickCommTitle.trim() || !quickCommQuote || quickCommQuote <= 0) return;
 
-    const newJob: Omit<Job, 'id' | 'materialsUsed' | 'payments'> = {
+    const assignedCommId = quickCommId.trim() || `COMM-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+
+    if (jobs && jobs.some(j => j.id.trim().toLowerCase() === assignedCommId.toLowerCase())) {
+      setQuickCommIdError(`Comm ID "${assignedCommId}" already exists. Please choose a unique ID.`);
+      return;
+    }
+
+    const newJob: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string } = {
+      id: assignedCommId,
       title: quickCommTitle.trim(),
       customerId: selectedCustomer.id,
       customerName: selectedCustomer.name,
@@ -195,12 +205,14 @@ export default function CustomerManager({
 
     const createdJobMock: Job = {
       ...newJob,
-      id: `job-${Date.now().toString().slice(-4)}`,
+      id: assignedCommId,
       materialsUsed: [],
       payments: []
     };
 
     setShowQuickCommissionModal(false);
+    setQuickCommId('');
+    setQuickCommIdError(null);
     setQuickCommTitle('');
     setQuickCommQuote(5000);
     setQuickCommDesc('');
@@ -2503,6 +2515,53 @@ export default function CustomerManager({
                     value={`${selectedCustomer.name}${selectedCustomer.company ? ` (${selectedCustomer.company})` : ''}`}
                     className="w-full px-3 py-2 text-xs bg-gray-100 border border-gray-200 rounded-xl font-bold text-gray-700 cursor-not-allowed"
                   />
+                </div>
+
+                {/* MANUAL COMM ID INPUT */}
+                <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-blue-950 uppercase flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
+                      <span>Comm ID (Manual Input) *</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const year = new Date().getFullYear();
+                        const nextNum = ((jobs?.length || 0) + 1).toString().padStart(3, '0');
+                        setQuickCommId(`COMM-${year}-${nextNum}`);
+                        setQuickCommIdError(null);
+                      }}
+                      className="text-[10px] font-bold text-blue-700 hover:text-blue-900 bg-white px-2 py-0.5 rounded border border-blue-200 shadow-2xs hover:bg-blue-100 transition cursor-pointer"
+                    >
+                      Auto-Fill Comm ID
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. COMM-2026-001 or COMM-104"
+                    value={quickCommId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setQuickCommId(val);
+                      if (val.trim() && jobs && jobs.some(j => j.id.trim().toLowerCase() === val.trim().toLowerCase())) {
+                        setQuickCommIdError(`Comm ID "${val.trim()}" is already assigned to another job.`);
+                      } else {
+                        setQuickCommIdError(null);
+                      }
+                    }}
+                    className={`w-full px-3.5 py-2 text-xs bg-white border rounded-xl outline-none font-mono font-bold tracking-wide transition ${
+                      quickCommIdError 
+                        ? 'border-red-400 bg-red-50/40 text-red-900' 
+                        : 'border-blue-200 text-blue-950 focus:border-blue-500'
+                    }`}
+                  />
+                  {quickCommIdError ? (
+                    <p className="text-[10px] text-red-600 font-semibold">{quickCommIdError}</p>
+                  ) : (
+                    <p className="text-[10px] text-blue-700/80">Manual Commission Reference ID for invoicing and woodwork tracking.</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
