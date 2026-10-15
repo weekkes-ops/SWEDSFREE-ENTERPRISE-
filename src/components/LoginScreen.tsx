@@ -443,8 +443,7 @@ export default function LoginScreen({
                         id="login-password-input"
                       />
                     </div>
-                    <div className="flex items-center justify-between pt-1 text-[10px]">
-                      <span className="text-slate-400">Standard woodworker PIN: 1234</span>
+                    <div className="flex items-center justify-end pt-1 text-[10px]">
                       <button
                         type="button"
                         onClick={() => setShowForgotModal(true)}
