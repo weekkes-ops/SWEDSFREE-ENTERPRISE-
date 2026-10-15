@@ -1084,7 +1084,8 @@ export default function App() {
     const newEmployee: Employee = {
       ...employee,
       id: `emp-${Date.now()}`,
-      hireDate: new Date().toISOString().split('T')[0]
+      hireDate: new Date().toISOString().split('T')[0],
+      password: employee.password || '1234'
     };
     setEmployees(prev => [...prev, newEmployee]);
     saveDocument('employees', newEmployee);
@@ -1529,6 +1530,30 @@ export default function App() {
   const handleUpdateEmployee = (updatedEmployee: Employee) => {
     setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
     saveDocument('employees', updatedEmployee);
+    if (currentUser?.id === updatedEmployee.id) {
+      setCurrentUser(updatedEmployee);
+      localStorage.setItem('swedsfree_current_user', JSON.stringify(updatedEmployee));
+    }
+  };
+
+  const handleResetEmployeePassword = (employeeId: string, newPassword: string) => {
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    setEmployees(prev => prev.map(emp => {
+      if (emp.id === employeeId) {
+        const updated: Employee = {
+          ...emp,
+          password: newPassword,
+          lastPasswordReset: nowStr
+        };
+        saveDocument('employees', updated);
+        if (currentUser?.id === employeeId) {
+          setCurrentUser(updated);
+          localStorage.setItem('swedsfree_current_user', JSON.stringify(updated));
+        }
+        return updated;
+      }
+      return emp;
+    }));
   };
 
   const handleUpdateJob = (updatedJob: Job) => {
@@ -2140,8 +2165,10 @@ export default function App() {
                 onUpdateEmployee={handleUpdateEmployee}
                 onDeleteEmployee={handleDeleteEmployee}
                 onUpdateEmployeeStatus={handleUpdateEmployeeStatus}
+                onResetPassword={handleResetEmployeePassword}
                 showRegisterModalOnLoad={quickActionTrigger === 'register-employee'}
                 onCloseRegisterModal={() => setQuickActionTrigger(null)}
+                initialOpenPasswordsTab={quickActionTrigger === 'manage-passwords'}
                 currentUser={currentUser}
                 registrationRequests={registrationRequests}
                 onApproveRequest={handleApproveRequest}
@@ -2313,6 +2340,10 @@ export default function App() {
                 fileInputRef={fileInputRef}
                 onClearData={handleClearAllSystemDataForGoLive}
                 onOpenManual={() => setIsManualModalOpen(true)}
+                onOpenPasswordManagement={() => {
+                  setActiveTab('employees');
+                  setQuickActionTrigger('manage-passwords');
+                }}
                 recordCounts={{
                   inventory: inventory.length,
                   customers: customers.length,

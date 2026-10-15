@@ -23,7 +23,8 @@ import {
   Users,
   BookOpen,
   ExternalLink,
-  FileCheck
+  FileCheck,
+  KeyRound
 } from 'lucide-react';
 import { Employee } from '../types';
 import { downloadUserManualPdf } from '../utils/userManualPdf';
@@ -40,6 +41,7 @@ interface SettingsManagerProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onClearData: (silent?: boolean) => void;
   onOpenManual?: () => void;
+  onOpenPasswordManagement?: () => void;
   recordCounts: {
     inventory: number;
     customers: number;
@@ -64,6 +66,7 @@ export default function SettingsManager({
   fileInputRef,
   onClearData,
   onOpenManual,
+  onOpenPasswordManagement,
   recordCounts
 }: SettingsManagerProps) {
   const isActiveUser = currentUser?.status === 'Active';
@@ -467,6 +470,28 @@ export default function SettingsManager({
               )}
             </div>
           </div>
+
+          {/* Admin Password & Access Control */}
+          {currentUser?.role === 'Admin' && (
+            <div className="bg-amber-50/70 p-5 rounded-3xl border border-amber-200/90 space-y-3">
+              <div className="flex items-center gap-2 text-amber-950 font-black text-xs uppercase tracking-wider">
+                <KeyRound className="w-4 h-4 text-amber-600" />
+                <span>Admin Password &amp; Access Control</span>
+              </div>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Full administrator authority to manage user security, view and update staff passwords/PINs, and reset credentials for all registered workshop artisans.
+              </p>
+              {onOpenPasswordManagement && (
+                <button
+                  onClick={onOpenPasswordManagement}
+                  className="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-extrabold text-xs transition cursor-pointer shadow-xs flex items-center justify-center gap-2"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Manage Passwords &amp; Reset PINs ({recordCounts.employees})</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* System Purge Danger Zone */}
           {isAdminOrManager && (
