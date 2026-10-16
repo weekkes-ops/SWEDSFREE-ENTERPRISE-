@@ -16,9 +16,11 @@ import {
   Clock,
   X,
   RotateCcw,
-  RefreshCw
+  RefreshCw,
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { AndroidApkModal } from './AndroidApkModal';
 
 interface LoginScreenProps {
   employees: Employee[];
@@ -43,6 +45,7 @@ export default function LoginScreen({
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState(false);
   const [freshSessionBadge, setFreshSessionBadge] = useState(false);
+  const [showApkModal, setShowApkModal] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
   // Registration Form States
@@ -507,6 +510,16 @@ export default function LoginScreen({
 
         {/* Footer info banner */}
         <div className="mt-6 space-y-2 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowApkModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-full text-[11px] font-bold shadow-xs transition cursor-pointer"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-amber-200" />
+              <span>Install Android App / APK</span>
+            </button>
+          </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-800 rounded-full text-[10px] font-bold">
             <Sparkles className="w-3 h-3 text-amber-600 shrink-0" />
             <span>Active Account Required: Users must hold an active account to backup data & access workshop tools.</span>
@@ -575,6 +588,12 @@ export default function LoginScreen({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Android APK & Mobile App Center Modal */}
+      <AndroidApkModal
+        isOpen={showApkModal}
+        onClose={() => setShowApkModal(false)}
+      />
     </div>
   );
 }

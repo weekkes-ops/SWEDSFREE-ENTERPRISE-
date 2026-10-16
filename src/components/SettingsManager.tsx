@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Employee } from '../types';
 import { downloadUserManualPdf } from '../utils/userManualPdf';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface SettingsManagerProps {
   currentUser: Employee | null;
@@ -470,6 +471,9 @@ export default function SettingsManager({
               )}
             </div>
           </div>
+
+          {/* Android APK & Mobile App Installation */}
+          <PWAInstallButton variant="settings" />
 
           {/* Admin Password & Access Control */}
           {currentUser?.role === 'Admin' && (

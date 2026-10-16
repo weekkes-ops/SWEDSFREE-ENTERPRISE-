@@ -27,7 +27,8 @@ import {
   RotateCcw,
   ArrowLeft,
   FileCheck,
-  UploadCloud
+  UploadCloud,
+  Smartphone
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,6 +47,7 @@ import InvoiceReceiptManager from './components/InvoiceReceiptManager';
 import ProformaInvoiceDesk from './components/ProformaInvoiceDesk';
 import SettingsManager from './components/SettingsManager';
 import UserManualModal from './components/UserManualModal';
+import { AndroidApkModal } from './components/AndroidApkModal';
 import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
 import { downloadUserManualPdf } from './utils/userManualPdf';
@@ -105,6 +107,7 @@ export default function App() {
   const [proformaCustomerId, setProformaCustomerId] = useState<string | null>(null);
   const [proformaJobId, setProformaJobId] = useState<string | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
+  const [isApkModalOpen, setIsApkModalOpen] = useState<boolean>(false);
 
   // Track tab history for universal Go Back navigation across all users
   useEffect(() => {
@@ -1680,6 +1683,7 @@ export default function App() {
       { id: 'reports', label: 'Audit Reports', icon: FileBarChart },
     ] : []),
     { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'apk', label: 'Android APK / App', icon: Smartphone, badge: 'APK' },
     { id: 'manual', label: 'User Manual (PDF)', icon: BookOpen },
   ];
 
@@ -1850,6 +1854,11 @@ export default function App() {
                       setMobileMenuOpen(false);
                       return;
                     }
+                    if (tab.id === 'apk') {
+                      setIsApkModalOpen(true);
+                      setMobileMenuOpen(false);
+                      return;
+                    }
                     if (tab.id === 'proforma') {
                       setInvoiceInitialSubTab('PROFORMA');
                     }
@@ -1860,7 +1869,9 @@ export default function App() {
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     tab.id === 'manual'
                       ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-500/30'
-                      : isProforma
+                      : tab.id === 'apk'
+                        ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 border border-emerald-500/30'
+                        : isProforma
                         ? isActive
                           ? 'bg-amber-300 text-amber-950 border border-amber-500 shadow-xs font-black'
                           : 'bg-amber-50 hover:bg-amber-100/90 text-amber-950 border border-amber-300/90'
@@ -2057,6 +2068,14 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsApkModalOpen(true)}
+              className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-amber-400/40"
+              title="Install Android App (WebAPK) or download Android APK package"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-amber-200" />
+              <span>Android APK</span>
+            </button>
             <button
               onClick={() => handleTriggerProforma()}
               className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-amber-500/50"
@@ -2443,6 +2462,12 @@ export default function App() {
           onClose={() => setIsManualModalOpen(false)}
         />
       )}
+
+      {/* Android APK & Mobile App Center Modal */}
+      <AndroidApkModal
+        isOpen={isApkModalOpen}
+        onClose={() => setIsApkModalOpen(false)}
+      />
 
     </div>
   );
