@@ -24,11 +24,11 @@ import {
   BookOpen,
   ExternalLink,
   FileCheck,
-  KeyRound
+  Printer
 } from 'lucide-react';
 import { Employee } from '../types';
 import { downloadUserManualPdf } from '../utils/userManualPdf';
-import { PWAInstallButton } from './PWAInstallButton';
+import { printDocument } from '../utils/printHelper';
 
 interface SettingsManagerProps {
   currentUser: Employee | null;
@@ -42,7 +42,6 @@ interface SettingsManagerProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onClearData: (silent?: boolean) => void;
   onOpenManual?: () => void;
-  onOpenPasswordManagement?: () => void;
   recordCounts: {
     inventory: number;
     customers: number;
@@ -67,7 +66,6 @@ export default function SettingsManager({
   fileInputRef,
   onClearData,
   onOpenManual,
-  onOpenPasswordManagement,
   recordCounts
 }: SettingsManagerProps) {
   const isActiveUser = currentUser?.status === 'Active';
@@ -109,13 +107,24 @@ export default function SettingsManager({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md p-3 rounded-2xl border border-white/10 shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-lg">
-              {currentUser?.name.charAt(0) || 'U'}
-            </div>
-            <div>
-              <p className="text-xs font-black text-white">{currentUser?.name}</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{currentUser?.role} • Status: <span className={isActiveUser ? 'text-emerald-400' : 'text-amber-400'}>{currentUser?.status}</span></p>
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => printDocument('settings')}
+              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition cursor-pointer"
+            >
+              <Printer className="w-4 h-4 text-amber-400" />
+              <span>Print System Summary</span>
+            </button>
+
+            <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md p-3 rounded-2xl border border-white/10 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-lg">
+                {currentUser?.name.charAt(0) || 'U'}
+              </div>
+              <div>
+                <p className="text-xs font-black text-white">{currentUser?.name}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{currentUser?.role} • Status: <span className={isActiveUser ? 'text-emerald-400' : 'text-amber-400'}>{currentUser?.status}</span></p>
+              </div>
             </div>
           </div>
         </div>
@@ -472,31 +481,6 @@ export default function SettingsManager({
             </div>
           </div>
 
-          {/* Android APK & Mobile App Installation */}
-          <PWAInstallButton variant="settings" />
-
-          {/* Admin Password & Access Control */}
-          {currentUser?.role === 'Admin' && (
-            <div className="bg-amber-50/70 p-5 rounded-3xl border border-amber-200/90 space-y-3">
-              <div className="flex items-center gap-2 text-amber-950 font-black text-xs uppercase tracking-wider">
-                <KeyRound className="w-4 h-4 text-amber-600" />
-                <span>Admin Password &amp; Access Control</span>
-              </div>
-              <p className="text-[11px] text-amber-800 leading-relaxed">
-                Full administrator authority to manage user security, view and update staff passwords/PINs, and reset credentials for all registered workshop artisans.
-              </p>
-              {onOpenPasswordManagement && (
-                <button
-                  onClick={onOpenPasswordManagement}
-                  className="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-extrabold text-xs transition cursor-pointer shadow-xs flex items-center justify-center gap-2"
-                >
-                  <KeyRound className="w-3.5 h-3.5" />
-                  <span>Manage Passwords &amp; Reset PINs ({recordCounts.employees})</span>
-                </button>
-              )}
-            </div>
-          )}
-
           {/* System Purge Danger Zone */}
           {isAdminOrManager && (
             <div className="bg-red-50/50 p-5 rounded-3xl border border-red-200/80 space-y-3">
@@ -516,6 +500,57 @@ export default function SettingsManager({
             </div>
           )}
 
+        </div>
+      </div>
+      {/* ==========================================
+          PRINT AREA: SYSTEM CONFIGURATION & RECORDS
+         ========================================== */}
+      <div id="settings-print-area" className="hidden bg-white text-black p-6 space-y-6">
+        <div className="print-header">
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Swedswood Logo" className="w-12 h-12 object-contain" />
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
+              <p className="text-xs text-gray-600">2 Swed Free Avenue, Sussex &bull; System Settings, Sync &amp; Record Summary</p>
+            </div>
+          </div>
+          <div className="text-right text-xs font-mono">
+            <p className="font-bold">Printed: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+            <p>Operator: {currentUser?.name || 'System'} ({currentUser?.role || 'User'})</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 text-xs border border-slate-300 rounded-xl p-4">
+          <div className="space-y-1">
+            <p><strong>Active Session User:</strong> {currentUser?.name || 'N/A'}</p>
+            <p><strong>Role &amp; Status:</strong> {currentUser?.role || 'N/A'} ({currentUser?.status || 'Inactive'})</p>
+          </div>
+          <div className="space-y-1">
+            <p><strong>Database Connectivity:</strong> {isOnline ? 'Online (Cloud Firestore)' : 'Offline (Local Cache)'}</p>
+            <p><strong>Sync State / Last Sync:</strong> {syncStatus.toUpperCase()} &bull; {lastSyncTime || 'N/A'}</p>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-sm font-black uppercase mb-2">Stored Record Inventory</h2>
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-300 uppercase text-[10px]">
+                <th className="py-2 px-3">Collection / Module</th>
+                <th className="py-2 px-3 text-right">Stored Record Count</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              <tr><td className="py-2 px-3 font-bold">Inventory Materials</td><td className="py-2 px-3 text-right font-mono">{recordCounts.inventory}</td></tr>
+              <tr><td className="py-2 px-3 font-bold">Registered Clients / Customers</td><td className="py-2 px-3 text-right font-mono">{recordCounts.customers}</td></tr>
+              <tr><td className="py-2 px-3 font-bold">Workshop Commissions &amp; Jobs</td><td className="py-2 px-3 text-right font-mono">{recordCounts.jobs}</td></tr>
+              <tr><td className="py-2 px-3 font-bold">Saved Commercial &amp; Proforma Invoices</td><td className="py-2 px-3 text-right font-mono">{recordCounts.savedInvoices}</td></tr>
+              <tr><td className="py-2 px-3 font-bold">Financial Cash Ledger Transactions</td><td className="py-2 px-3 text-right font-mono">{recordCounts.financials}</td></tr>
+              <tr><td className="py-2 px-3 font-bold">Employees &amp; Staff Accounts</td><td className="py-2 px-3 text-right font-mono">{recordCounts.employees}</td></tr>
+              <tr><td className="py-2 px-3 font-bold">Daily Workshop &amp; Site Logs</td><td className="py-2 px-3 text-right font-mono">{recordCounts.dailyLogs}</td></tr>
+              <tr><td className="py-2 px-3 font-bold">Official Compliance Documents</td><td className="py-2 px-3 text-right font-mono">{recordCounts.officialDocuments ?? 0}</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

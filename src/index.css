@@ -333,6 +333,19 @@ button.bg-wood-700:hover {
   #proforma-print-area,
   #bulk-print-area,
   #report-print-area,
+  #financial-ledger-print-area,
+  #financial-voucher-print-area,
+  #dashboard-print-area,
+  #documents-print-area,
+  #document-single-print-area,
+  #inventory-print-area,
+  #customers-print-area,
+  #employees-print-area,
+  #invoices-ledger-print-area,
+  #jobs-print-area,
+  #daily-work-print-area,
+  #settings-print-area,
+  #manual-print-area,
   #print-area {
     display: none !important;
     visibility: hidden !important;
@@ -345,7 +358,7 @@ button.bg-wood-700:hover {
      STRICT PRINT MODE ISOLATION: ONLY THE TARGET DOCUMENT SHOWS
      ======================================================== */
 
-  /* 1. RECEIPT ONLY MODE: strictly display only receipt-print-area */
+  /* 1. RECEIPT ONLY MODE */
   html[data-print-mode="receipt"] #receipt-print-area,
   html[data-print-mode="receipt"] #receipt-print-area *,
   body[data-print-mode="receipt"] #receipt-print-area,
@@ -359,24 +372,8 @@ button.bg-wood-700:hover {
     max-height: none !important;
     overflow: visible !important;
   }
-  html[data-print-mode="receipt"] #invoice-print-area,
-  html[data-print-mode="receipt"] #proforma-print-area,
-  html[data-print-mode="receipt"] #bulk-print-area,
-  html[data-print-mode="receipt"] #report-print-area,
-  html[data-print-mode="receipt"] #print-area:not(#receipt-print-area),
-  body[data-print-mode="receipt"] #invoice-print-area,
-  body[data-print-mode="receipt"] #proforma-print-area,
-  body[data-print-mode="receipt"] #bulk-print-area,
-  body[data-print-mode="receipt"] #report-print-area,
-  body[data-print-mode="receipt"] #print-area:not(#receipt-print-area) {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-  }
 
-  /* 2. INVOICE ONLY MODE: strictly display only invoice-print-area */
+  /* 2. INVOICE ONLY MODE */
   html[data-print-mode="invoice"] #invoice-print-area,
   html[data-print-mode="invoice"] #invoice-print-area *,
   body[data-print-mode="invoice"] #invoice-print-area,
@@ -390,24 +387,8 @@ button.bg-wood-700:hover {
     max-height: none !important;
     overflow: visible !important;
   }
-  html[data-print-mode="invoice"] #receipt-print-area,
-  html[data-print-mode="invoice"] #proforma-print-area,
-  html[data-print-mode="invoice"] #bulk-print-area,
-  html[data-print-mode="invoice"] #report-print-area,
-  html[data-print-mode="invoice"] #print-area:not(#invoice-print-area),
-  body[data-print-mode="invoice"] #receipt-print-area,
-  body[data-print-mode="invoice"] #proforma-print-area,
-  body[data-print-mode="invoice"] #bulk-print-area,
-  body[data-print-mode="invoice"] #report-print-area,
-  body[data-print-mode="invoice"] #print-area:not(#invoice-print-area) {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-  }
 
-  /* 3. PROFORMA ONLY MODE: strictly display only proforma-print-area */
+  /* 3. PROFORMA ONLY MODE */
   html[data-print-mode="proforma"] #proforma-print-area,
   html[data-print-mode="proforma"] #proforma-print-area *,
   body[data-print-mode="proforma"] #proforma-print-area,
@@ -420,20 +401,6 @@ button.bg-wood-700:hover {
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
-  }
-  html[data-print-mode="proforma"] #invoice-print-area,
-  html[data-print-mode="proforma"] #receipt-print-area,
-  html[data-print-mode="proforma"] #bulk-print-area,
-  html[data-print-mode="proforma"] #report-print-area,
-  body[data-print-mode="proforma"] #invoice-print-area,
-  body[data-print-mode="proforma"] #receipt-print-area,
-  body[data-print-mode="proforma"] #bulk-print-area,
-  body[data-print-mode="proforma"] #report-print-area {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
   }
 
   /* 4. BULK INVOICES / RECEIPTS MODE */
@@ -456,20 +423,6 @@ button.bg-wood-700:hover {
     max-height: none !important;
     overflow: visible !important;
   }
-  html[data-print-mode*="bulk"] #invoice-print-area,
-  html[data-print-mode*="bulk"] #receipt-print-area,
-  html[data-print-mode*="bulk"] #proforma-print-area,
-  html[data-print-mode*="bulk"] #report-print-area,
-  body[data-print-mode*="bulk"] #invoice-print-area,
-  body[data-print-mode*="bulk"] #receipt-print-area,
-  body[data-print-mode*="bulk"] #proforma-print-area,
-  body[data-print-mode*="bulk"] #report-print-area {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-  }
 
   /* 5. REPORT ONLY MODE */
   html[data-print-mode="report"] #report-print-area,
@@ -485,22 +438,8 @@ button.bg-wood-700:hover {
     max-height: none !important;
     overflow: visible !important;
   }
-  html[data-print-mode="report"] #invoice-print-area,
-  html[data-print-mode="report"] #receipt-print-area,
-  html[data-print-mode="report"] #proforma-print-area,
-  html[data-print-mode="report"] #bulk-print-area,
-  body[data-print-mode="report"] #invoice-print-area,
-  body[data-print-mode="report"] #receipt-print-area,
-  body[data-print-mode="report"] #proforma-print-area,
-  body[data-print-mode="report"] #bulk-print-area {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-  }
 
-  /* 5B. FINANCIAL LEDGER ONLY MODE */
+  /* 6. FINANCIAL LEDGER & VOUCHER MODES */
   html[data-print-mode="financial-ledger"] #financial-ledger-print-area,
   html[data-print-mode="financial-ledger"] #financial-ledger-print-area *,
   body[data-print-mode="financial-ledger"] #financial-ledger-print-area,
@@ -514,16 +453,7 @@ button.bg-wood-700:hover {
     max-height: none !important;
     overflow: visible !important;
   }
-  html[data-print-mode="financial-ledger"] #financial-voucher-print-area,
-  body[data-print-mode="financial-ledger"] #financial-voucher-print-area {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
-  }
 
-  /* 5C. FINANCIAL TRANSACTION VOUCHER ONLY MODE */
   html[data-print-mode="financial-voucher"] #financial-voucher-print-area,
   html[data-print-mode="financial-voucher"] #financial-voucher-print-area *,
   body[data-print-mode="financial-voucher"] #financial-voucher-print-area,
@@ -537,50 +467,176 @@ button.bg-wood-700:hover {
     max-height: none !important;
     overflow: visible !important;
   }
-  html[data-print-mode="financial-voucher"] #financial-ledger-print-area,
-  body[data-print-mode="financial-voucher"] #financial-ledger-print-area {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    overflow: hidden !important;
+
+  /* 7. ALL MAIN MENU MODULE PRINT MODES */
+  html[data-print-mode="dashboard"] #dashboard-print-area,
+  html[data-print-mode="dashboard"] #dashboard-print-area *,
+  body[data-print-mode="dashboard"] #dashboard-print-area,
+  body[data-print-mode="dashboard"] #dashboard-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="dashboard"] #dashboard-print-area,
+  body[data-print-mode="dashboard"] #dashboard-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
-  /* 6. FALLBACK FOR DIRECT/NATIVE PRINT (when no data-print-mode attribute is set) */
+  html[data-print-mode="documents"] #documents-print-area,
+  html[data-print-mode="documents"] #documents-print-area *,
+  body[data-print-mode="documents"] #documents-print-area,
+  body[data-print-mode="documents"] #documents-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="documents"] #documents-print-area,
+  body[data-print-mode="documents"] #documents-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="document-single"] #document-single-print-area,
+  html[data-print-mode="document-single"] #document-single-print-area *,
+  body[data-print-mode="document-single"] #document-single-print-area,
+  body[data-print-mode="document-single"] #document-single-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="document-single"] #document-single-print-area,
+  body[data-print-mode="document-single"] #document-single-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="inventory"] #inventory-print-area,
+  html[data-print-mode="inventory"] #inventory-print-area *,
+  body[data-print-mode="inventory"] #inventory-print-area,
+  body[data-print-mode="inventory"] #inventory-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="inventory"] #inventory-print-area,
+  body[data-print-mode="inventory"] #inventory-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="customers"] #customers-print-area,
+  html[data-print-mode="customers"] #customers-print-area *,
+  body[data-print-mode="customers"] #customers-print-area,
+  body[data-print-mode="customers"] #customers-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="customers"] #customers-print-area,
+  body[data-print-mode="customers"] #customers-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="employees"] #employees-print-area,
+  html[data-print-mode="employees"] #employees-print-area *,
+  body[data-print-mode="employees"] #employees-print-area,
+  body[data-print-mode="employees"] #employees-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="employees"] #employees-print-area,
+  body[data-print-mode="employees"] #employees-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="invoices-ledger"] #invoices-ledger-print-area,
+  html[data-print-mode="invoices-ledger"] #invoices-ledger-print-area *,
+  body[data-print-mode="invoices-ledger"] #invoices-ledger-print-area,
+  body[data-print-mode="invoices-ledger"] #invoices-ledger-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="invoices-ledger"] #invoices-ledger-print-area,
+  body[data-print-mode="invoices-ledger"] #invoices-ledger-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="jobs"] #jobs-print-area,
+  html[data-print-mode="jobs"] #jobs-print-area *,
+  body[data-print-mode="jobs"] #jobs-print-area,
+  body[data-print-mode="jobs"] #jobs-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="jobs"] #jobs-print-area,
+  body[data-print-mode="jobs"] #jobs-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="daily-work"] #daily-work-print-area,
+  html[data-print-mode="daily-work"] #daily-work-print-area *,
+  body[data-print-mode="daily-work"] #daily-work-print-area,
+  body[data-print-mode="daily-work"] #daily-work-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="daily-work"] #daily-work-print-area,
+  body[data-print-mode="daily-work"] #daily-work-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="settings"] #settings-print-area,
+  html[data-print-mode="settings"] #settings-print-area *,
+  body[data-print-mode="settings"] #settings-print-area,
+  body[data-print-mode="settings"] #settings-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="settings"] #settings-print-area,
+  body[data-print-mode="settings"] #settings-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="manual"] #manual-print-area,
+  html[data-print-mode="manual"] #manual-print-area *,
+  body[data-print-mode="manual"] #manual-print-area,
+  body[data-print-mode="manual"] #manual-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="manual"] #manual-print-area,
+  body[data-print-mode="manual"] #manual-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* FALLBACK FOR DIRECT/NATIVE PRINT (when no data-print-mode attribute is set) */
   html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area,
-  html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area * {
-    visibility: visible !important;
-  }
-  html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area {
-    display: block !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
+  html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area *,
   html:not([data-print-mode]) body:not([data-print-mode]) #invoice-print-area,
-  html:not([data-print-mode]) body:not([data-print-mode]) #invoice-print-area * {
-    visibility: visible !important;
-  }
-  html:not([data-print-mode]) body:not([data-print-mode]) #invoice-print-area {
-    display: block !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
+  html:not([data-print-mode]) body:not([data-print-mode]) #invoice-print-area *,
   html:not([data-print-mode]) body:not([data-print-mode]) #proforma-print-area,
-  html:not([data-print-mode]) body:not([data-print-mode]) #proforma-print-area * {
-    visibility: visible !important;
-  }
-  html:not([data-print-mode]) body:not([data-print-mode]) #proforma-print-area {
-    display: block !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
+  html:not([data-print-mode]) body:not([data-print-mode]) #proforma-print-area *,
   html:not([data-print-mode]) body:not([data-print-mode]) #bulk-print-area,
   html:not([data-print-mode]) body:not([data-print-mode]) #bulk-print-area * {
     visibility: visible !important;
   }
+  html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area,
+  html:not([data-print-mode]) body:not([data-print-mode]) #invoice-print-area,
+  html:not([data-print-mode]) body:not([data-print-mode]) #proforma-print-area,
   html:not([data-print-mode]) body:not([data-print-mode]) #bulk-print-area {
     display: block !important;
     height: auto !important;
@@ -592,7 +648,9 @@ button.bg-wood-700:hover {
   .print-modal-container,
   div:has(> #invoice-print-area),
   div:has(> #receipt-print-area),
+  div:has(> #document-single-print-area),
   div:has(> #financial-voucher-print-area),
+  div:has(> #manual-print-area),
   div:has(> #print-area),
   div:has(> #bulk-print-area) {
     position: static !important;
@@ -611,22 +669,19 @@ button.bg-wood-700:hover {
     inset: auto !important;
   }
 
-  /* When printing receipt, completely hide invoice modal container */
+  /* Prevent cross-modal bleed when printing sibling modals */
   html[data-print-mode="receipt"] .print-modal-container:has(#invoice-print-area),
   body[data-print-mode="receipt"] .print-modal-container:has(#invoice-print-area),
   html[data-print-mode="receipt"] div:has(> #invoice-print-area),
-  body[data-print-mode="receipt"] div:has(> #invoice-print-area) {
-    display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    overflow: hidden !important;
-  }
-
-  /* When printing invoice, completely hide receipt modal container */
+  body[data-print-mode="receipt"] div:has(> #invoice-print-area),
   html[data-print-mode="invoice"] .print-modal-container:has(#receipt-print-area),
   body[data-print-mode="invoice"] .print-modal-container:has(#receipt-print-area),
   html[data-print-mode="invoice"] div:has(> #receipt-print-area),
-  body[data-print-mode="invoice"] div:has(> #receipt-print-area) {
+  body[data-print-mode="invoice"] div:has(> #receipt-print-area),
+  html[data-print-mode="customers"] div:has(> #receipt-print-area),
+  body[data-print-mode="customers"] div:has(> #receipt-print-area),
+  html[data-print-mode="documents"] div:has(> #document-single-print-area),
+  body[data-print-mode="documents"] div:has(> #document-single-print-area) {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
@@ -641,8 +696,19 @@ button.bg-wood-700:hover {
   #report-print-area,
   #financial-ledger-print-area,
   #financial-voucher-print-area,
+  #dashboard-print-area,
+  #documents-print-area,
+  #document-single-print-area,
+  #inventory-print-area,
+  #customers-print-area,
+  #employees-print-area,
+  #invoices-ledger-print-area,
+  #jobs-print-area,
+  #daily-work-print-area,
+  #settings-print-area,
+  #manual-print-area,
   #print-area {
-    position: static !important;
+    position: relative !important;
     left: auto !important;
     top: auto !important;
     width: 100% !important;
@@ -652,6 +718,7 @@ button.bg-wood-700:hover {
     padding: 0 !important;
     background-color: #ffffff !important;
     background: #ffffff !important;
+    color: #000000 !important;
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
@@ -659,7 +726,6 @@ button.bg-wood-700:hover {
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
-    display: block !important;
     page-break-inside: auto !important;
     break-inside: auto !important;
   }
@@ -696,7 +762,9 @@ button.bg-wood-700:hover {
   .no-print,
   [class*="no-print"],
   .print\:hidden,
+  *[class*="print:hidden"],
   button:not(.allow-print),
+  select,
   *[class*="watermark" i],
   .watermark,
   .watermark-logo,
@@ -717,6 +785,19 @@ button.bg-wood-700:hover {
   #proforma-print-area *,
   #bulk-print-area *,
   #report-print-area *,
+  #financial-ledger-print-area *,
+  #financial-voucher-print-area *,
+  #dashboard-print-area *,
+  #documents-print-area *,
+  #document-single-print-area *,
+  #inventory-print-area *,
+  #customers-print-area *,
+  #employees-print-area *,
+  #invoices-ledger-print-area *,
+  #jobs-print-area *,
+  #daily-work-print-area *,
+  #settings-print-area *,
+  #manual-print-area *,
   .sweds-paper-invoice * {
     box-shadow: none !important;
     text-shadow: none !important;
@@ -751,6 +832,19 @@ button.bg-wood-700:hover {
   #proforma-print-area,
   #bulk-print-area,
   #report-print-area,
+  #financial-ledger-print-area,
+  #financial-voucher-print-area,
+  #dashboard-print-area,
+  #documents-print-area,
+  #document-single-print-area,
+  #inventory-print-area,
+  #customers-print-area,
+  #employees-print-area,
+  #invoices-ledger-print-area,
+  #jobs-print-area,
+  #daily-work-print-area,
+  #settings-print-area,
+  #manual-print-area,
   #print-area {
     background-color: #ffffff !important;
     background: #ffffff !important;
@@ -857,7 +951,7 @@ button.bg-wood-700:hover {
   .border-wood-100,
   .border-slate-200,
   .divide-y > *,
-  td, 
+  td,
   th {
     border-color: #cbd5e1 !important;
     border-width: 1px !important;
@@ -920,19 +1014,6 @@ button.bg-wood-700:hover {
     opacity: 1 !important;
   }
 
-  /* Hide UI controls, buttons, forms, navigation on printout */
-  .no-print,
-  .print\:hidden,
-  *[class*="print:hidden"],
-  button,
-  select,
-  aside,
-  header:not(.print-header),
-  footer:not(.print-footer) {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
   /* Form elements border/background clean reset on printout */
   #invoice-print-area input,
   #invoice-print-area textarea,
@@ -963,27 +1044,6 @@ button.bg-wood-700:hover {
     resize: none !important;
     width: 100% !important;
     max-width: 100% !important;
-  }
-
-  /* Ensure the main print containers lay out flat on pure white background across the full A4 page */
-  #invoice-print-area,
-  #receipt-print-area,
-  #proforma-print-area,
-  #bulk-print-area,
-  #report-print-area,
-  #print-area {
-    position: relative !important;
-    left: auto !important;
-    top: auto !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    border: none !important;
-    background-color: #ffffff !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    overflow: visible !important;
   }
 
   /* Branded print header and footer styles */
@@ -1025,6 +1085,17 @@ button.bg-wood-700:hover {
   #bulk-print-area > div,
   #report-print-area,
   #report-print-area > div,
+  #dashboard-print-area,
+  #documents-print-area,
+  #document-single-print-area,
+  #inventory-print-area,
+  #customers-print-area,
+  #employees-print-area,
+  #invoices-ledger-print-area,
+  #jobs-print-area,
+  #daily-work-print-area,
+  #settings-print-area,
+  #manual-print-area,
   #print-area,
   #print-area > div,
   .sweds-paper-invoice,

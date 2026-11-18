@@ -28,7 +28,7 @@ import {
   ArrowLeft,
   FileCheck,
   UploadCloud,
-  Smartphone
+  Printer
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,11 +46,11 @@ import DailyWorkManager from './components/DailyWorkManager';
 import InvoiceReceiptManager from './components/InvoiceReceiptManager';
 import ProformaInvoiceDesk from './components/ProformaInvoiceDesk';
 import SettingsManager from './components/SettingsManager';
-import UserManualModal from './components/UserManualModal';
-import { AndroidApkModal } from './components/AndroidApkModal';
+import UserManualModal, { CHAPTERS as MANUAL_CHAPTERS } from './components/UserManualModal';
 import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
 import { downloadUserManualPdf } from './utils/userManualPdf';
+import { printDocument } from './utils/printHelper';
 
 // Seed data & types
 import { INITIAL_OFFICIAL_DOCUMENTS } from './initialDocuments';
@@ -107,7 +107,6 @@ export default function App() {
   const [proformaCustomerId, setProformaCustomerId] = useState<string | null>(null);
   const [proformaJobId, setProformaJobId] = useState<string | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = useState<boolean>(false);
-  const [isApkModalOpen, setIsApkModalOpen] = useState<boolean>(false);
 
   // Track tab history for universal Go Back navigation across all users
   useEffect(() => {
@@ -168,18 +167,8 @@ export default function App() {
     : (activeTab !== 'dashboard' ? 'dashboard' : null);
   const previousTabLabel = previousTabId ? getTabDisplayName(previousTabId) : null;
 
-  const handleTriggerInvoice = (jobId?: string, customerId?: string) => {
-    let targetJobId = jobId;
-    if (!targetJobId && customerId) {
-      const custJob = jobs.find(j => j.customerId === customerId);
-      if (custJob) {
-        targetJobId = custJob.id;
-      }
-    }
-    setInvoiceJobId(targetJobId || null);
-    if (customerId) {
-      setProformaCustomerId(customerId);
-    }
+  const handleTriggerInvoice = (jobId: string) => {
+    setInvoiceJobId(jobId);
     setInvoiceInitialSubTab('INVOICE');
     setActiveTab('invoices');
   };
@@ -203,17 +192,9 @@ export default function App() {
     setActiveTab('proforma');
   };
 
-  const handleTriggerReceipt = (jobId?: string, customerId?: string) => {
-    let targetJobId = jobId;
-    if (!targetJobId && customerId) {
-      const custJob = jobs.find(j => j.customerId === customerId);
-      if (custJob) {
-        targetJobId = custJob.id;
-      }
-    }
-    setInvoiceJobId(targetJobId || null);
-    if (customerId) {
-      setProformaCustomerId(customerId);
+  const handleTriggerReceipt = (jobId?: string) => {
+    if (jobId) {
+      setInvoiceJobId(jobId);
     }
     setInvoiceInitialSubTab('RECEIPT');
     setActiveTab('invoices');
@@ -242,6 +223,8 @@ export default function App() {
       if (dailyWorkLogs.length > 0) await saveBatchDocuments('dailyWorkLogs', dailyWorkLogs);
       if (registrationRequests.length > 0) await saveBatchDocuments('registrationRequests', registrationRequests);
       if (warningLetters.length > 0) await saveBatchDocuments('warningLetters', warningLetters);
+      if (paymentAuditLogs.length > 0) await saveBatchDocuments('paymentAuditLogs', paymentAuditLogs);
+      if (officialDocuments.length > 0) await saveBatchDocuments('officialDocuments', officialDocuments);
 
       const rawInvs = localStorage.getItem('swedswood_saved_invoices');
       if (rawInvs) {
@@ -523,6 +506,8 @@ export default function App() {
       await clearEntireCollection('registrationRequests');
       await clearEntireCollection('warningLetters');
       await clearEntireCollection('officialDocuments');
+      await clearEntireCollection('paymentAuditLogs');
+      await clearEntireCollection('savedInvoices');
       await clearEntireCollection('employees');
 
       await saveDocument('employees', LIVE_ADMIN_EMPLOYEE);
@@ -539,6 +524,7 @@ export default function App() {
     setDailyWorkLogs([]);
     setRegistrationRequests([]);
     setWarningLetters([]);
+    setPaymentAuditLogs([]);
     setOfficialDocuments([]);
 
     localStorage.setItem('swedsfree_inventory', JSON.stringify([]));
@@ -550,6 +536,7 @@ export default function App() {
     localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify([]));
     localStorage.setItem('swedsfree_registration_requests', JSON.stringify([]));
     localStorage.setItem('swedsfree_warning_letters', JSON.stringify([]));
+    localStorage.setItem('swedsfree_payment_audit_logs', JSON.stringify([]));
     localStorage.setItem('swedsfree_official_documents', JSON.stringify([]));
     localStorage.setItem('swedswood_saved_invoices', JSON.stringify([]));
 
@@ -575,6 +562,7 @@ export default function App() {
       const wLogs = await fetchCollectionFromFirestore<DailyWorkLog>('dailyWorkLogs');
       const reqs = await fetchCollectionFromFirestore<RegistrationRequest>('registrationRequests');
       const warns = await fetchCollectionFromFirestore<WarningLetter>('warningLetters');
+      const auditPays = await fetchCollectionFromFirestore<PaymentAuditLogEntry>('paymentAuditLogs');
       const invs = await fetchCollectionFromFirestore<SavedInvoice>('savedInvoices');
       const docs = await fetchCollectionFromFirestore<OfficialDocument>('officialDocuments');
 
@@ -587,6 +575,7 @@ export default function App() {
       const finalWLogs = wLogs;
       const finalReqs = reqs;
       const finalWarns = warns;
+      const finalAuditPays = auditPays;
       const finalInvs = invs;
       const finalDocs = docs;
 
@@ -599,6 +588,7 @@ export default function App() {
       setDailyWorkLogs(finalWLogs);
       setRegistrationRequests(finalReqs);
       setWarningLetters(finalWarns);
+      setPaymentAuditLogs(finalAuditPays);
       setOfficialDocuments(finalDocs);
 
       localStorage.setItem('swedsfree_inventory', JSON.stringify(finalInv));
@@ -610,6 +600,7 @@ export default function App() {
       localStorage.setItem('swedsfree_daily_work_logs', JSON.stringify(finalWLogs));
       localStorage.setItem('swedsfree_registration_requests', JSON.stringify(finalReqs));
       localStorage.setItem('swedsfree_warning_letters', JSON.stringify(finalWarns));
+      localStorage.setItem('swedsfree_payment_audit_logs', JSON.stringify(finalAuditPays));
       localStorage.setItem('swedsfree_official_documents', JSON.stringify(finalDocs));
       localStorage.setItem('swedswood_saved_invoices', JSON.stringify(finalInvs));
 
@@ -1073,12 +1064,17 @@ export default function App() {
 
   // B. Customer mutators
   const handleAddCustomer = (customer: Omit<Customer, 'id' | 'registrationDate'>) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
     const newCustomer: Customer = {
       ...customer,
       id: `cust-${Date.now()}`,
       registrationDate: new Date().toISOString().split('T')[0]
     };
-    setCustomers(prev => [...prev, newCustomer]);
+    setCustomers(prev => {
+      const updated = [...prev, newCustomer];
+      localStorage.setItem('swedsfree_customers', JSON.stringify(updated));
+      return updated;
+    });
     saveDocument('customers', newCustomer);
   };
 
@@ -1087,8 +1083,7 @@ export default function App() {
     const newEmployee: Employee = {
       ...employee,
       id: `emp-${Date.now()}`,
-      hireDate: new Date().toISOString().split('T')[0],
-      password: employee.password || '1234'
+      hireDate: new Date().toISOString().split('T')[0]
     };
     setEmployees(prev => [...prev, newEmployee]);
     saveDocument('employees', newEmployee);
@@ -1106,16 +1101,21 @@ export default function App() {
   };
 
   // D. Job mutators
-  const handleCreateJob = (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string }) => {
-    const finalJobId = job.id && job.id.trim() ? job.id.trim() : `COMM-${Date.now().toString().slice(-6)}`;
+  const handleCreateJob = (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string; materialsUsed?: JobMaterial[]; payments?: JobPayment[] }): string => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
     const newJob: Job = {
       ...job,
-      id: finalJobId,
-      materialsUsed: [],
-      payments: []
+      id: job.id || `job-${Date.now()}`,
+      materialsUsed: job.materialsUsed || [],
+      payments: job.payments || []
     };
-    setJobs(prev => [...prev, newJob]);
+    setJobs(prev => {
+      const updated = [...prev, newJob];
+      localStorage.setItem('swedsfree_jobs', JSON.stringify(updated));
+      return updated;
+    });
     saveDocument('jobs', newJob);
+    return newJob.id;
   };
 
   const handleDeleteJob = (jobId: string) => {
@@ -1218,6 +1218,7 @@ export default function App() {
 
   // Record Payment received from customer on custom woodwork job
   const handleRecordJobPayment = (jobId: string, payment: Omit<JobPayment, 'id'>) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
     const paymentId = `pay-${Date.now()}`;
     const dateStr = new Date().toISOString().split('T')[0];
 
@@ -1226,20 +1227,25 @@ export default function App() {
       id: paymentId
     };
 
-    const targetJob = jobs.find(j => j.id === jobId);
+    let resolvedJob: Job | undefined = jobs.find(j => j.id === jobId);
 
-    // 1. Log payment inside job object
-    setJobs(prev => prev.map(job => {
-      if (job.id === jobId) {
-        const updatedJob = {
-          ...job,
-          payments: [...job.payments, newPayment]
-        };
-        saveDocument('jobs', updatedJob);
-        return updatedJob;
-      }
-      return job;
-    }));
+    // 1. Log payment inside job object and persist immediately to localStorage + Firestore
+    setJobs(prev => {
+      const updatedJobs = prev.map(job => {
+        if (job.id === jobId) {
+          const updatedJob = {
+            ...job,
+            payments: [...job.payments, newPayment]
+          };
+          resolvedJob = updatedJob;
+          saveDocument('jobs', updatedJob);
+          return updatedJob;
+        }
+        return job;
+      });
+      localStorage.setItem('swedsfree_jobs', JSON.stringify(updatedJobs));
+      return updatedJobs;
+    });
 
     // 2. Add as income receipt in financials list
     const financialId = `fin-inc-job-${Date.now()}`;
@@ -1248,36 +1254,38 @@ export default function App() {
       type: 'INCOME',
       category: 'Job Payment',
       amount: payment.amount,
-      date: dateStr,
+      date: payment.date || dateStr,
       description: `Customer payment cleared (${payment.method}) for Job ID: ${jobId}`,
       referenceId: jobId
     };
-    setFinancialTransactions(prev => [...prev, finTx]);
+    setFinancialTransactions(prev => {
+      const updatedFin = [...prev, finTx];
+      localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(updatedFin));
+      return updatedFin;
+    });
     saveDocument('financialTransactions', finTx);
 
     // 3. Log to Payment Audit Trail
-    if (targetJob) {
-      const auditEntry: PaymentAuditLogEntry = {
-        id: `audit-pay-${Date.now()}`,
-        jobId: targetJob.id,
-        jobTitle: targetJob.title,
-        customerName: targetJob.customerName,
-        paymentId: paymentId,
-        action: 'CREATED',
-        amount: payment.amount,
-        method: payment.method,
-        date: payment.date || dateStr,
-        note: payment.note || '',
-        modifiedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'System Admin',
-        timestamp: new Date().toISOString()
-      };
-      setPaymentAuditLogs(prev => {
-        const updated = [auditEntry, ...prev];
-        localStorage.setItem('swedsfree_payment_audit_logs', JSON.stringify(updated));
-        return updated;
-      });
-      saveDocument('paymentAuditLogs', auditEntry);
-    }
+    const auditEntry: PaymentAuditLogEntry = {
+      id: `audit-pay-${Date.now()}`,
+      jobId: resolvedJob?.id || jobId,
+      jobTitle: resolvedJob?.title || `Commission ${jobId}`,
+      customerName: resolvedJob?.customerName || 'Client',
+      paymentId: paymentId,
+      action: 'CREATED',
+      amount: payment.amount,
+      method: payment.method,
+      date: payment.date || dateStr,
+      note: payment.note || '',
+      modifiedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'System Admin',
+      timestamp: new Date().toISOString()
+    };
+    setPaymentAuditLogs(prev => {
+      const updated = [auditEntry, ...prev];
+      localStorage.setItem('swedsfree_payment_audit_logs', JSON.stringify(updated));
+      return updated;
+    });
+    saveDocument('paymentAuditLogs', auditEntry);
   };
 
   // E. Manual financial ledger mutators
@@ -1518,49 +1526,39 @@ export default function App() {
   };
 
   const handleUpdateCustomer = (updatedCustomer: Customer) => {
-    setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setCustomers(prev => {
+      const updated = prev.map(c => c.id === updatedCustomer.id ? updatedCustomer : c);
+      localStorage.setItem('swedsfree_customers', JSON.stringify(updated));
+      return updated;
+    });
     saveDocument('customers', updatedCustomer);
-    setJobs(prev => prev.map(j => {
-      if (j.customerId === updatedCustomer.id) {
-        const updatedJ = { ...j, customerName: updatedCustomer.name };
-        saveDocument('jobs', updatedJ);
-        return updatedJ;
-      }
-      return j;
-    }));
+    setJobs(prev => {
+      const updated = prev.map(j => {
+        if (j.customerId === updatedCustomer.id) {
+          const updatedJ = { ...j, customerName: updatedCustomer.name };
+          saveDocument('jobs', updatedJ);
+          return updatedJ;
+        }
+        return j;
+      });
+      localStorage.setItem('swedsfree_jobs', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const handleUpdateEmployee = (updatedEmployee: Employee) => {
     setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
     saveDocument('employees', updatedEmployee);
-    if (currentUser?.id === updatedEmployee.id) {
-      setCurrentUser(updatedEmployee);
-      localStorage.setItem('swedsfree_current_user', JSON.stringify(updatedEmployee));
-    }
-  };
-
-  const handleResetEmployeePassword = (employeeId: string, newPassword: string) => {
-    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    setEmployees(prev => prev.map(emp => {
-      if (emp.id === employeeId) {
-        const updated: Employee = {
-          ...emp,
-          password: newPassword,
-          lastPasswordReset: nowStr
-        };
-        saveDocument('employees', updated);
-        if (currentUser?.id === employeeId) {
-          setCurrentUser(updated);
-          localStorage.setItem('swedsfree_current_user', JSON.stringify(updated));
-        }
-        return updated;
-      }
-      return emp;
-    }));
   };
 
   const handleUpdateJob = (updatedJob: Job) => {
-    setJobs(prev => prev.map(j => j.id === updatedJob.id ? updatedJob : j));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setJobs(prev => {
+      const updated = prev.map(j => j.id === updatedJob.id ? updatedJob : j);
+      localStorage.setItem('swedsfree_jobs', JSON.stringify(updated));
+      return updated;
+    });
     saveDocument('jobs', updatedJob);
   };
 
@@ -1683,7 +1681,6 @@ export default function App() {
       { id: 'reports', label: 'Audit Reports', icon: FileBarChart },
     ] : []),
     { id: 'settings', label: 'Settings', icon: Settings },
-    { id: 'apk', label: 'Android APK / App', icon: Smartphone, badge: 'APK' },
     { id: 'manual', label: 'User Manual (PDF)', icon: BookOpen },
   ];
 
@@ -1854,13 +1851,11 @@ export default function App() {
                       setMobileMenuOpen(false);
                       return;
                     }
-                    if (tab.id === 'apk') {
-                      setIsApkModalOpen(true);
-                      setMobileMenuOpen(false);
-                      return;
-                    }
                     if (tab.id === 'proforma') {
                       setInvoiceInitialSubTab('PROFORMA');
+                    } else if (tab.id === 'invoices') {
+                      setInvoiceInitialSubTab('INVOICE');
+                      setInvoiceJobId(null);
                     }
                     setActiveTab(tab.id);
                     setMobileMenuOpen(false);
@@ -1869,9 +1864,7 @@ export default function App() {
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     tab.id === 'manual'
                       ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-500/30'
-                      : tab.id === 'apk'
-                        ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 border border-emerald-500/30'
-                        : isProforma
+                      : isProforma
                         ? isActive
                           ? 'bg-amber-300 text-amber-950 border border-amber-500 shadow-xs font-black'
                           : 'bg-amber-50 hover:bg-amber-100/90 text-amber-950 border border-amber-300/90'
@@ -2069,14 +2062,6 @@ export default function App() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsApkModalOpen(true)}
-              className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-amber-400/40"
-              title="Install Android App (WebAPK) or download Android APK package"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-amber-200" />
-              <span>Android APK</span>
-            </button>
-            <button
               onClick={() => handleTriggerProforma()}
               className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-amber-500/50"
               title="Open PROFORMA INVOICE desk & quotation generator"
@@ -2184,10 +2169,8 @@ export default function App() {
                 onUpdateEmployee={handleUpdateEmployee}
                 onDeleteEmployee={handleDeleteEmployee}
                 onUpdateEmployeeStatus={handleUpdateEmployeeStatus}
-                onResetPassword={handleResetEmployeePassword}
                 showRegisterModalOnLoad={quickActionTrigger === 'register-employee'}
                 onCloseRegisterModal={() => setQuickActionTrigger(null)}
-                initialOpenPasswordsTab={quickActionTrigger === 'manage-passwords'}
                 currentUser={currentUser}
                 registrationRequests={registrationRequests}
                 onApproveRequest={handleApproveRequest}
@@ -2218,8 +2201,8 @@ export default function App() {
                 onCloseCreateModal={() => setQuickActionTrigger(null)}
                 currentUser={currentUser}
                 onTriggerInvoice={handleTriggerInvoice}
+                onTriggerProforma={(jobId) => handleTriggerProforma(undefined, jobId)}
                 onTriggerReceipt={handleTriggerReceipt}
-                onTriggerProforma={handleTriggerProforma}
               />
             )}
 
@@ -2359,10 +2342,6 @@ export default function App() {
                 fileInputRef={fileInputRef}
                 onClearData={handleClearAllSystemDataForGoLive}
                 onOpenManual={() => setIsManualModalOpen(true)}
-                onOpenPasswordManagement={() => {
-                  setActiveTab('employees');
-                  setQuickActionTrigger('manage-passwords');
-                }}
                 recordCounts={{
                   inventory: inventory.length,
                   customers: customers.length,
@@ -2393,7 +2372,15 @@ export default function App() {
                       Comprehensive 15-chapter operating manual covering architecture, offline dual-storage, woodwork commissions, invoicing, and financial management.
                     </p>
                   </div>
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => printDocument('manual')}
+                      className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4 text-amber-400" />
+                      <span>Print Manual</span>
+                    </button>
                     <button
                       onClick={() => setIsManualModalOpen(true)}
                       className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
@@ -2463,11 +2450,66 @@ export default function App() {
         />
       )}
 
-      {/* Android APK & Mobile App Center Modal */}
-      <AndroidApkModal
-        isOpen={isApkModalOpen}
-        onClose={() => setIsApkModalOpen(false)}
-      />
+      {/* DEDICATED PRINT LAYOUT FOR SYSTEM USER OPERATING MANUAL */}
+      <div id="manual-print-area" className="hidden bg-white text-black p-6 space-y-6">
+        <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
+            <p className="text-xs font-bold text-slate-600">2 Swed Free Avenue, Sussex &bull; swedswoodinfo@gmail.com</p>
+            <h2 className="text-sm font-black uppercase mt-2">Official System Operating Manual ({MANUAL_CHAPTERS.length} Chapters)</h2>
+          </div>
+          <div className="text-right text-xs font-mono">
+            <p><strong>Printed:</strong> {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+          </div>
+        </div>
+
+        {MANUAL_CHAPTERS.map(ch => (
+          <div key={ch.id} className="border-b border-slate-300 pb-4 space-y-3">
+            <div>
+              <span className="text-[10px] font-mono font-bold uppercase text-slate-500">Chapter {ch.num} &bull; {ch.badge}</span>
+              <h3 className="text-sm font-black uppercase">{ch.title}</h3>
+              <p className="text-xs text-slate-700 mt-0.5">{ch.summary}</p>
+            </div>
+            {ch.content.map((sec, sIdx) => (
+              <div key={sIdx} className="space-y-1.5 pl-2">
+                <h4 className="text-xs font-bold">{sec.heading}</h4>
+                {sec.text && <p className="text-[11px] leading-relaxed">{sec.text}</p>}
+                {sec.bullets && (
+                  <ul className="list-disc pl-5 space-y-1 text-[11px]">
+                    {sec.bullets.map((b, bIdx) => (
+                      <li key={bIdx}>
+                        <strong>{b.title}:</strong> {b.desc}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {sec.table && (
+                  <table className="w-full text-left border-collapse text-[10px] mt-1">
+                    <thead>
+                      <tr className="border-y border-slate-400 bg-slate-100">
+                        {sec.table.headers.map((h, hIdx) => (
+                          <th key={hIdx} className="py-1 px-2">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sec.table.rows.map((r, rIdx) => (
+                        <tr key={rIdx} className="border-b border-slate-200">
+                          {r.map((cell, cIdx) => (
+                            <td key={cIdx} className="py-1 px-2">{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {sec.tip && <p className="text-[10px] italic">Tip: {sec.tip}</p>}
+                {sec.warning && <p className="text-[10px] font-bold">Warning: {sec.warning}</p>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
 
     </div>
   );

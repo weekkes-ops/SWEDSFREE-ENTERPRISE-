@@ -20,9 +20,11 @@ import {
   UserCheck,
   Download,
   CheckCircle2,
-  Activity
+  Activity,
+  Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { printDocument } from '../utils/printHelper';
 
 interface InventoryManagerProps {
   inventory: InventoryItem[];
@@ -833,39 +835,51 @@ export default function InventoryManager({
           </p>
         </div>
         
-        {!isAuditor ? (
-          <div className="flex flex-wrap gap-2">
-            <button 
-              onClick={() => handleOpenLogModal('STOCK_IN')}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
-            >
-              <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
-              <span>Log Stock-In (+)</span>
-            </button>
-            <button 
-              onClick={() => handleOpenLogModal('STOCK_OUT')}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
-            >
-              <ArrowUpRight className="w-4 h-4 text-amber-600" />
-              <span>Log Stock-Out (-)</span>
-            </button>
-            <button 
-              onClick={() => {
-                setNewItemDate(new Date().toISOString().split('T')[0]);
-                setShowNewItemModal(true);
-              }}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>New Raw Material</span>
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold font-mono">
-            <ShieldAlert className="w-4 h-4 text-slate-500" />
-            <span>Auditor (Read-Only)</span>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => printDocument('inventory')}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            title="Print Stock Reserves & Movement Audit Ledger"
+          >
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>Print Stock &amp; Audit</span>
+          </button>
+
+          {!isAuditor ? (
+            <>
+              <button 
+                onClick={() => handleOpenLogModal('STOCK_IN')}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
+              >
+                <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
+                <span>Log Stock-In (+)</span>
+              </button>
+              <button 
+                onClick={() => handleOpenLogModal('STOCK_OUT')}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
+              >
+                <ArrowUpRight className="w-4 h-4 text-amber-600" />
+                <span>Log Stock-Out (-)</span>
+              </button>
+              <button 
+                onClick={() => {
+                  setNewItemDate(new Date().toISOString().split('T')[0]);
+                  setShowNewItemModal(true);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Raw Material</span>
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold font-mono">
+              <ShieldAlert className="w-4 h-4 text-slate-500" />
+              <span>Auditor (Read-Only)</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stock Movement KPI Highlights */}
@@ -2033,6 +2047,106 @@ export default function InventoryManager({
           </div>
         )}
       </AnimatePresence>
+
+      {/* DEDICATED PRINT LAYOUT FOR INVENTORY & STOCK AUDIT */}
+      <div id="inventory-print-area" className="hidden bg-white text-black p-6 space-y-6">
+        <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
+            <p className="text-xs font-bold text-slate-600">2 Swed Free Avenue, Sussex &bull; swedswoodinfo@gmail.com</p>
+            <h2 className="text-sm font-black uppercase mt-2">Inventory Reserves &amp; Real-Time Stock Audit Ledger</h2>
+          </div>
+          <div className="text-right text-xs font-mono">
+            <p><strong>Printed:</strong> {liveDateStr} {liveTimeStr}</p>
+            <p><strong>Operator:</strong> {operatorLabel}</p>
+            <p><strong>Materials:</strong> {sortedInventory.length} &bull; <strong>Movements:</strong> {sortedTransactions.length}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-3 text-xs">
+          <div className="border border-slate-300 p-3">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">Opening / Base Stock</span>
+            <strong className="text-base font-mono">{totalStockUnits.toLocaleString()} units</strong>
+          </div>
+          <div className="border border-slate-300 p-3">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">Total Stock-In</span>
+            <strong className="text-base font-mono">+{totalStockInUnits.toLocaleString()} units</strong>
+          </div>
+          <div className="border border-slate-300 p-3">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">Total Stock-Out</span>
+            <strong className="text-base font-mono">-{totalStockOutUnits.toLocaleString()} units</strong>
+          </div>
+          <div className="border border-slate-300 p-3">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">Current Net Balance</span>
+            <strong className="text-base font-mono">{totalBalanceUnits.toLocaleString()} units</strong>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-wider mb-2">Current Raw Timber &amp; Hardware Stock Reserves</h3>
+          <table className="w-full text-left border-collapse text-[11px]">
+            <thead>
+              <tr className="border-y border-slate-400 bg-slate-100">
+                <th className="py-2 px-2">Material</th>
+                <th className="py-2 px-2">Category</th>
+                <th className="py-2 px-2 text-right">Base</th>
+                <th className="py-2 px-2 text-right">Stock-In</th>
+                <th className="py-2 px-2 text-right">Stock-Out</th>
+                <th className="py-2 px-2 text-right">Balance</th>
+                <th className="py-2 px-2 text-right">Unit Cost</th>
+                <th className="py-2 px-2">Last Purpose / Entry</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedInventory.map(item => {
+                const mv = getItemStockMovement(item);
+                return (
+                  <tr key={item.id} className="border-b border-slate-200">
+                    <td className="py-1.5 px-2 font-bold">{item.name}</td>
+                    <td className="py-1.5 px-2">{item.category}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{mv.stock}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">+{mv.stockIn}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">-{mv.stockOut}</td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold">{mv.balance} {item.unit}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(item.unitCost, 0)}</td>
+                    <td className="py-1.5 px-2">{mv.lastDate} &bull; {mv.lastPurpose}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-wider mb-2">Stock Movement Audit Trail</h3>
+          <table className="w-full text-left border-collapse text-[10px]">
+            <thead>
+              <tr className="border-y border-slate-400 bg-slate-100">
+                <th className="py-1.5 px-2">Date / Time</th>
+                <th className="py-1.5 px-2">Material</th>
+                <th className="py-1.5 px-2">Type</th>
+                <th className="py-1.5 px-2 text-right">Qty</th>
+                <th className="py-1.5 px-2 text-right">Prev &rarr; New</th>
+                <th className="py-1.5 px-2">Purpose / Ref</th>
+                <th className="py-1.5 px-2">Operator</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedTransactions.map(tx => (
+                <tr key={tx.id} className="border-b border-slate-200">
+                  <td className="py-1.5 px-2 font-mono">{tx.date} {tx.time || ''}</td>
+                  <td className="py-1.5 px-2 font-bold">{tx.itemName}</td>
+                  <td className="py-1.5 px-2 font-mono">{tx.type}</td>
+                  <td className="py-1.5 px-2 text-right font-mono">{tx.quantity} {tx.unit || ''}</td>
+                  <td className="py-1.5 px-2 text-right font-mono">{tx.previousBalance ?? '-'} &rarr; {tx.newBalance ?? '-'}</td>
+                  <td className="py-1.5 px-2">{tx.purpose || '-'}</td>
+                  <td className="py-1.5 px-2">{tx.recordedBy || 'System Admin'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
     </div>
   );

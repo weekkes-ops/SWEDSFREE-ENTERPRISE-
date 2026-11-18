@@ -16,11 +16,9 @@ import {
   Clock,
   X,
   RotateCcw,
-  RefreshCw,
-  Smartphone
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AndroidApkModal } from './AndroidApkModal';
 
 interface LoginScreenProps {
   employees: Employee[];
@@ -45,8 +43,6 @@ export default function LoginScreen({
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState(false);
   const [freshSessionBadge, setFreshSessionBadge] = useState(false);
-  const [showApkModal, setShowApkModal] = useState(false);
-  const [showForgotModal, setShowForgotModal] = useState(false);
 
   // Registration Form States
   const [regName, setRegName] = useState('');
@@ -446,15 +442,6 @@ export default function LoginScreen({
                         id="login-password-input"
                       />
                     </div>
-                    <div className="flex items-center justify-end pt-1 text-[10px]">
-                      <button
-                        type="button"
-                        onClick={() => setShowForgotModal(true)}
-                        className="font-bold text-amber-600 hover:text-amber-700 cursor-pointer underline decoration-dotted"
-                      >
-                        Forgot PIN / Reset Code?
-                      </button>
-                    </div>
                   </div>
 
                   {error && (
@@ -510,16 +497,6 @@ export default function LoginScreen({
 
         {/* Footer info banner */}
         <div className="mt-6 space-y-2 text-center">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowApkModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-full text-[11px] font-bold shadow-xs transition cursor-pointer"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-amber-200" />
-              <span>Install Android App / APK</span>
-            </button>
-          </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-800 rounded-full text-[10px] font-bold">
             <Sparkles className="w-3 h-3 text-amber-600 shrink-0" />
             <span>Active Account Required: Users must hold an active account to backup data & access workshop tools.</span>
@@ -529,71 +506,6 @@ export default function LoginScreen({
           </p>
         </div>
       </motion.div>
-
-      {/* Forgot Password / Admin Reset Help Modal */}
-      <AnimatePresence>
-        {showForgotModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-amber-200 shadow-2xl w-full max-w-md overflow-hidden text-slate-800"
-            >
-              <div className="bg-gradient-to-r from-slate-900 to-amber-950 p-5 text-white flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <KeyRound className="w-5 h-5 text-amber-400" />
-                  <h3 className="font-display font-bold text-base">Password Reset Assistance</h3>
-                </div>
-                <button
-                  onClick={() => setShowForgotModal(false)}
-                  className="text-amber-300 hover:text-white font-bold text-xl cursor-pointer"
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className="p-6 space-y-4 text-xs">
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                  <p className="font-bold text-amber-900">
-                    Administrator Managed Access
-                  </p>
-                  <p className="text-amber-800 leading-relaxed">
-                    All workshop access passwords and PIN codes are securely managed by the System Administrator. The admin can instantly reset your PIN from the <strong>Admin Passwords Console</strong>.
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                  <p className="font-bold text-slate-900">Workshop Administrator Contact:</p>
-                  <div className="space-y-1 font-mono text-[11px] text-slate-700">
-                    <p>• Name: <strong>Mr. Paul Bindi (Admin)</strong></p>
-                    <p>• Phone / WhatsApp: <strong>+232 76 442590</strong></p>
-                    <p>• Email: <strong>paul.bindi@swedsfree.com</strong></p>
-                  </div>
-                </div>
-
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Please reach out to Mr. Paul Bindi to request a password reset. Once reset, your new PIN is immediately active for sign-in.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => setShowForgotModal(false)}
-                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-xs"
-                >
-                  Understood
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Android APK & Mobile App Center Modal */}
-      <AndroidApkModal
-        isOpen={showApkModal}
-        onClose={() => setShowApkModal(false)}
-      />
     </div>
   );
 }

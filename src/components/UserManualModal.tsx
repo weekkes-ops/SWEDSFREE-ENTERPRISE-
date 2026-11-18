@@ -19,10 +19,12 @@ import {
   HelpCircle,
   ChevronRight,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Printer
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { downloadUserManualPdf } from '../utils/userManualPdf';
+import { printDocument } from '../utils/printHelper';
 
 interface UserManualModalProps {
   isOpen: boolean;
@@ -46,7 +48,7 @@ interface ManualChapter {
   }[];
 }
 
-const CHAPTERS: ManualChapter[] = [
+export const CHAPTERS: ManualChapter[] = [
   {
     id: 'ch1',
     num: '01',
@@ -398,6 +400,15 @@ export default function UserManualModal({ isOpen, onClose }: UserManualModalProp
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => printDocument('manual')}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-xs transition cursor-pointer"
+              title="Print Complete Operating Manual"
+            >
+              <Printer className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Print Manual</span>
+            </button>
+
             <button
               onClick={handleDownload}
               disabled={isDownloading}

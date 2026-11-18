@@ -14,9 +14,11 @@ import {
   Sparkles,
   ChevronRight,
   Filter,
-  Trash2
+  Trash2,
+  Printer
 } from 'lucide-react';
 import { Employee, Job, DailyWorkLog } from '../types';
+import { printDocument } from '../utils/printHelper';
 
 interface DailyWorkManagerProps {
   employees: Employee[];
@@ -202,19 +204,30 @@ export default function DailyWorkManager({
           </p>
         </div>
         
-        {!isAuditor && (
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => {
-              resetForm();
-              setIsModalOpen(true);
-            }}
-            className="px-5 py-3 bg-amber-500 hover:bg-amber-600 font-bold text-slate-950 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_14px_0_rgba(245,158,11,0.25)] hover:shadow-[0_4px_20px_0_rgba(245,158,11,0.4)]"
-            id="btn-upload-work"
+            type="button"
+            onClick={() => printDocument('daily-work')}
+            className="px-4 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl flex items-center gap-2 transition border border-white/15 text-xs cursor-pointer"
           >
-            <Plus className="w-5 h-5" />
-            <span>Upload Daily Work</span>
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>Print Daily Logs</span>
           </button>
-        )}
+
+          {!isAuditor && (
+            <button
+              onClick={() => {
+                resetForm();
+                setIsModalOpen(true);
+              }}
+              className="px-5 py-3 bg-amber-500 hover:bg-amber-600 font-bold text-slate-950 rounded-xl flex items-center gap-2 transition duration-200 shadow-[0_4px_14px_0_rgba(245,158,11,0.25)] hover:shadow-[0_4px_20px_0_rgba(245,158,11,0.4)] cursor-pointer"
+              id="btn-upload-work"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Upload Daily Work</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter Toolbar */}
@@ -607,6 +620,55 @@ export default function DailyWorkManager({
           </div>
         </div>
       )}
+      {/* ==========================================
+          PRINT AREA: DAILY WORKSHOP & SITE LOGS
+         ========================================== */}
+      <div id="daily-work-print-area" className="hidden bg-white text-black p-6 space-y-6">
+        <div className="print-header">
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Swedswood Logo" className="w-12 h-12 object-contain" />
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
+              <p className="text-xs text-gray-600">2 Swed Free Avenue, Sussex &bull; Daily Workshop &amp; Site Activity Register</p>
+            </div>
+          </div>
+          <div className="text-right text-xs font-mono">
+            <p className="font-bold">Generated: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+            <p>Logs Included: {filteredLogs.length} of {workLogs.length}</p>
+          </div>
+        </div>
+
+        <table className="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr className="bg-slate-100 border-b border-slate-300 uppercase text-[10px]">
+              <th className="py-2 px-2">Date</th>
+              <th className="py-2 px-2">Shift Hours</th>
+              <th className="py-2 px-2">Artisan</th>
+              <th className="py-2 px-2">Site Location</th>
+              <th className="py-2 px-2">Linked Commission</th>
+              <th className="py-2 px-2">Progress Summary</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {filteredLogs.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-6 text-center text-gray-500">No daily work logs match the active filter.</td>
+              </tr>
+            ) : (
+              filteredLogs.map((log) => (
+                <tr key={log.id}>
+                  <td className="py-2 px-2 font-mono whitespace-nowrap">{log.date}</td>
+                  <td className="py-2 px-2 font-mono whitespace-nowrap">{log.timeStarted} - {log.timeEnd}</td>
+                  <td className="py-2 px-2 font-bold">{log.employeeName}</td>
+                  <td className="py-2 px-2">{log.location}</td>
+                  <td className="py-2 px-2">{log.jobTitle || 'General Workshop'}</td>
+                  <td className="py-2 px-2">{log.comment}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

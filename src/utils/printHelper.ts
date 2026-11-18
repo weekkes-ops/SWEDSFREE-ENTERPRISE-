@@ -1,12 +1,23 @@
-export type PrintDocumentType = 
-  | 'invoice' 
-  | 'receipt' 
-  | 'proforma' 
-  | 'bulk-invoices' 
-  | 'bulk-receipts' 
+export type PrintDocumentType =
+  | 'invoice'
+  | 'receipt'
+  | 'proforma'
+  | 'bulk-invoices'
+  | 'bulk-receipts'
   | 'report'
   | 'financial-ledger'
-  | 'financial-voucher';
+  | 'financial-voucher'
+  | 'dashboard'
+  | 'documents'
+  | 'document-single'
+  | 'inventory'
+  | 'customers'
+  | 'employees'
+  | 'invoices-ledger'
+  | 'jobs'
+  | 'daily-work'
+  | 'settings'
+  | 'manual';
 
 export const setPrintMode = (type: PrintDocumentType) => {
   const mode = type.toLowerCase();
@@ -59,53 +70,45 @@ const isElementVisible = (el: HTMLElement | null): boolean => {
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeprint', () => {
     if (!document.documentElement.getAttribute('data-print-mode')) {
-      // 1. Detect open Receipt modal
-      const receiptEl = document.getElementById('receipt-print-area');
-      if (isElementVisible(receiptEl)) {
-        setPrintMode('receipt');
-        return;
+      // 1. Check active visible modal overlays first
+      const visibleChecks: [string, PrintDocumentType][] = [
+        ['receipt-print-area', 'receipt'],
+        ['invoice-print-area', 'invoice'],
+        ['document-single-print-area', 'document-single'],
+        ['bulk-print-area', 'bulk-invoices'],
+        ['financial-voucher-print-area', 'financial-voucher'],
+        ['manual-print-area', 'manual'],
+        ['proforma-print-area', 'proforma'],
+        ['report-print-area', 'report'],
+        ['financial-ledger-print-area', 'financial-ledger'],
+      ];
+
+      for (const [elId, mode] of visibleChecks) {
+        if (isElementVisible(document.getElementById(elId))) {
+          setPrintMode(mode);
+          return;
+        }
       }
 
-      // 2. Detect open Invoice modal
-      const invoiceEl = document.getElementById('invoice-print-area');
-      if (isElementVisible(invoiceEl)) {
-        setPrintMode('invoice');
-        return;
-      }
+      // 2. Fallback to whichever active module's dedicated print container is mounted
+      const mountedChecks: [string, PrintDocumentType][] = [
+        ['invoices-ledger-print-area', 'invoices-ledger'],
+        ['customers-print-area', 'customers'],
+        ['jobs-print-area', 'jobs'],
+        ['inventory-print-area', 'inventory'],
+        ['employees-print-area', 'employees'],
+        ['daily-work-print-area', 'daily-work'],
+        ['documents-print-area', 'documents'],
+        ['dashboard-print-area', 'dashboard'],
+        ['settings-print-area', 'settings'],
+        ['manual-print-area', 'manual'],
+      ];
 
-      // 3. Detect Bulk Print container
-      const bulkEl = document.getElementById('bulk-print-area');
-      if (isElementVisible(bulkEl)) {
-        setPrintMode('bulk-invoices');
-        return;
-      }
-
-      // 4. Detect Proforma Desk
-      const proformaEl = document.getElementById('proforma-print-area');
-      if (isElementVisible(proformaEl)) {
-        setPrintMode('proforma');
-        return;
-      }
-
-      // 5. Detect Report Ledger
-      const reportEl = document.getElementById('report-print-area');
-      if (isElementVisible(reportEl)) {
-        setPrintMode('report');
-        return;
-      }
-
-      // 6. Detect open Financial Transaction Voucher modal
-      const finVoucherEl = document.getElementById('financial-voucher-print-area');
-      if (isElementVisible(finVoucherEl)) {
-        setPrintMode('financial-voucher');
-        return;
-      }
-
-      // 7. Detect Financial Ledger
-      const finLedgerEl = document.getElementById('financial-ledger-print-area');
-      if (isElementVisible(finLedgerEl)) {
-        setPrintMode('financial-ledger');
-        return;
+      for (const [elId, mode] of mountedChecks) {
+        if (document.getElementById(elId)) {
+          setPrintMode(mode);
+          return;
+        }
       }
     }
   });

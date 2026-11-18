@@ -24,16 +24,18 @@ import {
   X,
   Check,
   AlertCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { printDocument } from '../utils/printHelper';
 
 interface JobManagerProps {
   jobs: Job[];
   customers: Customer[];
   employees: Employee[];
   inventory: InventoryItem[];
-  onCreateJob: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string }) => void;
+  onCreateJob: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   onUpdateJob?: (updatedJob: Job) => void;
   onDeleteJob?: (jobId: string) => void;
   onDeleteJobMaterial?: (jobId: string, itemId: string) => void;
@@ -80,9 +82,7 @@ export default function JobManager({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showEditJobModal, setShowEditJobModal] = useState(false);
 
-  // Form states - Create Job (Manual Comm ID input supported)
-  const [commId, setCommId] = useState('');
-  const [commIdError, setCommIdError] = useState<string | null>(null);
+  // Form states - Create Job
   const [title, setTitle] = useState('');
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
   const [description, setDescription] = useState('');
@@ -129,7 +129,7 @@ export default function JobManager({
   const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
   const [editingPayment, setEditingPayment] = useState<JobPayment | null>(null);
   const [editPaymentAmount, setEditPaymentAmount] = useState<number>(0);
-  const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Cheque' | 'Mobile Money'>('Cash');
+  const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'Bank Transfer' | 'Check' | 'Mobile Money'>('Cash');
   const [editPaymentDate, setEditPaymentDate] = useState<string>('');
   const [editPaymentNote, setEditPaymentNote] = useState<string>('');
   const [editPaymentError, setEditPaymentError] = useState<string | null>(null);
@@ -276,17 +276,6 @@ export default function JobManager({
 
   const handleCreateJobSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const trimmedCommId = commId.trim();
-    if (!trimmedCommId) {
-      setCommIdError('Please enter a custom Comm ID (manual input required).');
-      return;
-    }
-
-    if (jobs.some(j => j.id.trim().toLowerCase() === trimmedCommId.toLowerCase())) {
-      setCommIdError(`Comm ID "${trimmedCommId}" already exists. Please choose a unique Comm ID.`);
-      return;
-    }
-
     if (!title.trim() || !customerId) return;
 
     const customer = customers.find(c => c.id === customerId);
@@ -297,10 +286,9 @@ export default function JobManager({
     const totalQty = items.reduce((sum, i) => sum + (i.quantity || 1), 0) || quantity || 1;
 
     onCreateJob({
-      id: trimmedCommId,
       customerId,
       customerName: customer.name,
-      title: title.trim(),
+      title,
       description,
       quantity: totalQty,
       items: validItems.length > 0 ? validItems : [
@@ -316,8 +304,6 @@ export default function JobManager({
     });
 
     // Reset Form
-    setCommId('');
-    setCommIdError(null);
     setTitle('');
     setDescription('');
     setQuantity(1);
@@ -399,7 +385,7 @@ export default function JobManager({
   const handleOpenEditPaymentModal = (p: JobPayment) => {
     setEditingPayment(p);
     setEditPaymentAmount(p.amount);
-    setEditPaymentMethod(p.method);
+    setEditPaymentMethod((p.method as any) === 'Cheque' ? 'Check' : p.method);
     setEditPaymentDate(p.date || new Date().toISOString().split('T')[0]);
     setEditPaymentNote(p.note || '');
     setEditPaymentError(null);
@@ -426,8 +412,7 @@ export default function JobManager({
 
     if (onUpdateJobPayment) {
       onUpdateJobPayment(activeSelectedJob.id, updatedPayment);
-    }
-    if (onUpdateJob) {
+    } else if (onUpdateJob) {
       const updatedPayments = activeSelectedJob.payments.map(p => p.id === editingPayment.id ? updatedPayment : p);
       onUpdateJob({ ...activeSelectedJob, payments: updatedPayments });
     }
@@ -443,8 +428,7 @@ export default function JobManager({
 
     if (onDeleteJobPayment) {
       onDeleteJobPayment(activeSelectedJob.id, paymentToDelete.id);
-    }
-    if (onUpdateJob) {
+    } else if (onUpdateJob) {
       const updatedPayments = activeSelectedJob.payments.filter(p => p.id !== paymentToDelete.id);
       onUpdateJob({ ...activeSelectedJob, payments: updatedPayments });
     }
@@ -461,10 +445,7 @@ export default function JobManager({
 
   // Filters logic
   const filteredJobs = jobs.filter(j => {
-    const term = searchTerm.toLowerCase();
-    const matchesSearch = j.title.toLowerCase().includes(term) || 
-                          j.customerName.toLowerCase().includes(term) ||
-                          j.id.toLowerCase().includes(term);
+    const matchesSearch = j.title.toLowerCase().includes(searchTerm.toLowerCase()) || j.customerName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || j.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -485,20 +466,32 @@ export default function JobManager({
           </p>
         </div>
         
-        {!isAuditor ? (
-          <button 
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs self-start sm:self-auto"
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => printDocument('jobs')}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            title="Print Commissions Queue & Selected Job Dossier"
           >
-            <Plus className="w-4 h-4" />
-            <span>New Job</span>
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>Print Job Lists</span>
           </button>
-        ) : (
-          <div className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold font-mono">
-            <ShieldAlert className="w-4 h-4 text-slate-500" />
-            <span>Auditor (Read-Only)</span>
-          </div>
-        )}
+
+          {!isAuditor ? (
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs self-start sm:self-auto cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Job</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold font-mono">
+              <ShieldAlert className="w-4 h-4 text-slate-500" />
+              <span>Auditor (Read-Only)</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -551,14 +544,7 @@ export default function JobManager({
                     className={`w-full text-left p-4 hover:bg-wood-50/20 transition flex flex-col gap-2 cursor-pointer ${isActive ? 'bg-wood-50/50 border-r-4 border-wood-600' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-1 w-full">
-                      <div className="flex-1 min-w-0 pr-1">
-                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                          <span className="font-mono text-[10px] font-extrabold text-wood-900 bg-wood-100/90 border border-wood-200/80 px-1.5 py-0.5 rounded tracking-tight">
-                            Comm ID: {job.id}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-bold text-gray-800 line-clamp-2">{job.title}</h4>
-                      </div>
+                      <h4 className="text-sm font-bold text-gray-800 line-clamp-2 pr-2">{job.title}</h4>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded border whitespace-nowrap uppercase ${job.status === 'Completed' || job.status === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
                           {job.status}
@@ -592,34 +578,7 @@ export default function JobManager({
                     
                     <div className="flex items-center justify-between mt-1 text-[10px] text-gray-400 font-semibold w-full font-mono">
                       <span>Val: {formatCurrency(job.quoteAmount, 0)}</span>
-                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        {onTriggerInvoice && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onTriggerInvoice(job.id);
-                            }}
-                            className="px-1.5 py-0.5 text-[9px] font-black uppercase text-blue-900 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded transition cursor-pointer"
-                            title={`Open Invoice for ${job.title}`}
-                          >
-                            INV
-                          </button>
-                        )}
-                        {onTriggerReceipt && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onTriggerReceipt(job.id);
-                            }}
-                            className="px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded transition cursor-pointer"
-                            title={`Open Receipt for ${job.title}`}
-                          >
-                            REC
-                          </button>
-                        )}
-                      </div>
+                      <span>Paid: {completePercent}%</span>
                     </div>
                   </div>
                 );
@@ -639,10 +598,43 @@ export default function JobManager({
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h2 className="text-base font-bold text-gray-900 font-display">{activeSelectedJob.title}</h2>
+                      {onTriggerInvoice && (
+                        <button
+                          type="button"
+                          onClick={() => onTriggerInvoice(activeSelectedJob.id)}
+                          className="px-2.5 py-1 text-[10px] font-black uppercase text-white bg-wood-950 hover:bg-wood-900 rounded-md transition flex items-center gap-1 cursor-pointer"
+                          title="Open Official Invoice for this job"
+                        >
+                          <FileText className="w-3 h-3 text-amber-400" />
+                          <span>Invoice</span>
+                        </button>
+                      )}
+                      {onTriggerProforma && (
+                        <button
+                          type="button"
+                          onClick={() => onTriggerProforma(activeSelectedJob.id)}
+                          className="px-2.5 py-1 text-[10px] font-black uppercase text-amber-950 bg-amber-300 hover:bg-amber-400 border border-amber-400 rounded-md transition flex items-center gap-1 cursor-pointer"
+                          title="Open Proforma Quote for this job"
+                        >
+                          <FileSpreadsheet className="w-3 h-3 text-amber-950" />
+                          <span>Proforma</span>
+                        </button>
+                      )}
+                      {onTriggerReceipt && (
+                        <button
+                          type="button"
+                          onClick={() => onTriggerReceipt(activeSelectedJob.id)}
+                          className="px-2.5 py-1 text-[10px] font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-md transition flex items-center gap-1 cursor-pointer"
+                          title="Open Clearance Receipt Desk for this job"
+                        >
+                          <Receipt className="w-3 h-3 text-emerald-700" />
+                          <span>Receipt</span>
+                        </button>
+                      )}
                       {!isAuditor && (
                         <button
                           onClick={() => handleOpenEditModal(activeSelectedJob)}
-                          className="px-2 py-0.5 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition"
+                          className="px-2 py-0.5 text-[10px] font-black uppercase text-wood-800 bg-wood-50 hover:bg-wood-100 border border-wood-200 rounded-md transition cursor-pointer"
                         >
                           Edit
                         </button>
@@ -660,36 +652,6 @@ export default function JobManager({
                         >
                           <Trash2 className="w-3 h-3 text-rose-600" />
                           <span>Delete Job</span>
-                        </button>
-                      )}
-                      {onTriggerInvoice && (
-                        <button
-                          onClick={() => onTriggerInvoice(activeSelectedJob.id)}
-                          className="px-2.5 py-1 text-[10px] font-black uppercase text-blue-950 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
-                          title={`Open Commercial Invoice for ${activeSelectedJob.title}`}
-                        >
-                          <FileText className="w-3 h-3 text-blue-700" />
-                          <span>Invoice</span>
-                        </button>
-                      )}
-                      {onTriggerReceipt && (
-                        <button
-                          onClick={() => onTriggerReceipt(activeSelectedJob.id)}
-                          className="px-2.5 py-1 text-[10px] font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
-                          title={`Open Payment Clearance Receipt for ${activeSelectedJob.title}`}
-                        >
-                          <Receipt className="w-3 h-3 text-emerald-700" />
-                          <span>Receipt</span>
-                        </button>
-                      )}
-                      {onTriggerProforma && (
-                        <button
-                          onClick={() => onTriggerProforma(activeSelectedJob.id)}
-                          className="px-2.5 py-1 text-[10px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-md transition flex items-center gap-1 shadow-xs cursor-pointer"
-                          title={`Draft Proforma Quotation for ${activeSelectedJob.title}`}
-                        >
-                          <FileSpreadsheet className="w-3 h-3 text-amber-900" />
-                          <span>Proforma</span>
                         </button>
                       )}
                     </div>
@@ -1009,16 +971,6 @@ export default function JobManager({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-bold text-emerald-800">+{formatCurrency(p.amount)}</span>
-                          {onTriggerReceipt && (
-                            <button
-                              onClick={() => onTriggerReceipt(activeSelectedJob.id)}
-                              className="px-2 py-0.5 text-[10px] font-black uppercase text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                              title="Open Payment Clearance Receipt"
-                            >
-                              <Receipt className="w-3 h-3 text-emerald-700" />
-                              <span>Receipt</span>
-                            </button>
-                          )}
                           {!isAuditor && (
                             <button
                               onClick={() => handleOpenEditPaymentModal(p)}
@@ -1081,59 +1033,6 @@ export default function JobManager({
               </div>
 
               <form onSubmit={handleCreateJobSubmit} className="p-6 space-y-4 max-h-[500px] overflow-y-auto">
-                {/* Manual Comm ID Input Section */}
-                <div className="p-3.5 bg-wood-50/80 border border-wood-200 rounded-xl space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-wood-950 uppercase flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-wood-600 inline-block"></span>
-                      <span>Comm ID (Commission Job ID) *</span>
-                      <span className="text-[11px] font-normal text-wood-600 font-sans lowercase">(manual input)</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const year = new Date().getFullYear();
-                        const nextNum = (jobs.length + 1).toString().padStart(3, '0');
-                        setCommId(`COMM-${year}-${nextNum}`);
-                        setCommIdError(null);
-                      }}
-                      className="text-[11px] font-bold text-wood-700 hover:text-wood-900 bg-white px-2 py-0.5 rounded border border-wood-300 shadow-2xs hover:bg-wood-100 transition cursor-pointer"
-                      title="Optional: Generate a suggested Comm ID"
-                    >
-                      Auto-Fill Comm ID
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Enter manual Comm ID e.g. COMM-2026-001 or JOB-104"
-                    value={commId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCommId(val);
-                      if (val.trim() && jobs.some(j => j.id.trim().toLowerCase() === val.trim().toLowerCase())) {
-                        setCommIdError(`Comm ID "${val.trim()}" is already assigned to an existing job. Please enter a unique ID.`);
-                      } else {
-                        setCommIdError(null);
-                      }
-                    }}
-                    className={`w-full px-4 py-2 bg-white border rounded-xl outline-hidden text-sm font-mono font-bold tracking-wide transition ${
-                      commIdError 
-                        ? 'border-red-400 bg-red-50/40 text-red-900 focus:border-red-500' 
-                        : 'border-wood-300 text-wood-950 focus:border-wood-600 focus:ring-1 focus:ring-wood-400'
-                    }`}
-                  />
-                  {commIdError ? (
-                    <p className="text-[11px] text-red-600 font-semibold flex items-center gap-1 pt-0.5">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      {commIdError}
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-wood-700/80 font-medium">
-                      Enter your custom manual Comm ID for this woodwork job (not system auto-generated).
-                    </p>
-                  )}
-                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-500 uppercase">Job / Commission Title *</label>
@@ -1560,7 +1459,8 @@ export default function JobManager({
                   >
                     <option value="Cash">Cash</option>
                     <option value="Bank Transfer">Bank Transfer / wire</option>
-                    <option value="Cheque">Check Clearance</option>
+                    <option value="Check">Check Clearance</option>
+                    <option value="Mobile Money">Mobile Money</option>
                   </select>
                 </div>
 
@@ -1708,15 +1608,6 @@ export default function JobManager({
               </div>
 
               <form onSubmit={handleEditJobSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-                <div className="p-3 bg-wood-50 rounded-xl border border-wood-200 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Comm ID</span>
-                    <span className="text-sm font-mono font-bold text-wood-950">{selectedJob?.id}</span>
-                  </div>
-                  <span className="text-[11px] text-wood-700 bg-white px-2.5 py-1 rounded-lg border border-wood-200 font-bold shadow-2xs font-mono">
-                    Commission Reference
-                  </span>
-                </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Commission Title *</label>
                   <input
@@ -1908,6 +1799,150 @@ export default function JobManager({
           </div>
         )}
       </AnimatePresence>
+
+      {/* DEDICATED PRINT LAYOUT FOR COMMISSIONS & JOB LISTS */}
+      <div id="jobs-print-area" className="hidden bg-white text-black p-6 space-y-6">
+        <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
+            <p className="text-xs font-bold text-slate-600">2 Swed Free Avenue, Sussex &bull; swedswoodinfo@gmail.com</p>
+            <h2 className="text-sm font-black uppercase mt-2">Commissions &amp; Woodwork Job Lists Schedule</h2>
+          </div>
+          <div className="text-right text-xs font-mono">
+            <p><strong>Printed:</strong> {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+            <p><strong>Operator:</strong> {operatorLabel}</p>
+            <p><strong>Filter:</strong> {statusFilter} &bull; <strong>Count:</strong> {filteredJobs.length} job(s)</p>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-wider mb-2">Commission Queue Summary</h3>
+          <table className="w-full text-left border-collapse text-[11px]">
+            <thead>
+              <tr className="border-y border-slate-400 bg-slate-100">
+                <th className="py-2 px-2">Job ID</th>
+                <th className="py-2 px-2">Commission Title</th>
+                <th className="py-2 px-2">Client</th>
+                <th className="py-2 px-2">Status</th>
+                <th className="py-2 px-2">Due Date</th>
+                <th className="py-2 px-2 text-right">Quote (Le)</th>
+                <th className="py-2 px-2 text-right">Paid (Le)</th>
+                <th className="py-2 px-2 text-right">Balance (Le)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredJobs.map(job => {
+                const paid = job.payments.reduce((s, p) => s + p.amount, 0);
+                const bal = Math.max(0, job.quoteAmount - paid);
+                return (
+                  <tr key={job.id} className="border-b border-slate-200">
+                    <td className="py-1.5 px-2 font-mono">{job.id}</td>
+                    <td className="py-1.5 px-2 font-bold">{job.title}</td>
+                    <td className="py-1.5 px-2">{job.customerName}</td>
+                    <td className="py-1.5 px-2">{job.status}</td>
+                    <td className="py-1.5 px-2 font-mono">{job.dueDate}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(job.quoteAmount, 0)}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(paid, 0)}</td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold">{formatCurrency(bal, 0)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {activeSelectedJob && (
+          <div className="border-t-2 border-slate-900 pt-4 space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-wider">
+              Selected Job Dossier: {activeSelectedJob.title} ({activeSelectedJob.id})
+            </h3>
+            <p className="text-xs">
+              <strong>Client:</strong> {activeSelectedJob.customerName} &bull; <strong>Status:</strong> {activeSelectedJob.status} &bull;{' '}
+              <strong>Start:</strong> {activeSelectedJob.startDate} &bull; <strong>Due:</strong> {activeSelectedJob.dueDate}
+            </p>
+
+            {activeSelectedJob.items && activeSelectedJob.items.length > 0 && (
+              <div>
+                <h4 className="text-[11px] font-black uppercase mb-1">Line Items</h4>
+                <table className="w-full text-left border-collapse text-[10px]">
+                  <thead>
+                    <tr className="border-y border-slate-300 bg-slate-50">
+                      <th className="py-1.5 px-2">Description</th>
+                      <th className="py-1.5 px-2 text-right">Qty</th>
+                      <th className="py-1.5 px-2 text-right">Unit Cost</th>
+                      <th className="py-1.5 px-2 text-right">Line Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeSelectedJob.items.map((it, idx) => (
+                      <tr key={it.id || idx} className="border-b border-slate-200">
+                        <td className="py-1.5 px-2">{it.description}</td>
+                        <td className="py-1.5 px-2 text-right font-mono">{it.quantity}</td>
+                        <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(it.unitCost, 0)}</td>
+                        <td className="py-1.5 px-2 text-right font-mono font-bold">{formatCurrency(it.totalCost, 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-[11px] font-black uppercase mb-1">Materials Consumed ({activeSelectedJob.materialsUsed.length})</h4>
+                <table className="w-full text-left border-collapse text-[10px]">
+                  <thead>
+                    <tr className="border-y border-slate-300 bg-slate-50">
+                      <th className="py-1 px-2">Material</th>
+                      <th className="py-1 px-2 text-right">Qty</th>
+                      <th className="py-1 px-2 text-right">Total Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeSelectedJob.materialsUsed.length === 0 ? (
+                      <tr><td colSpan={3} className="py-2 px-2 text-slate-500">No materials allocated yet.</td></tr>
+                    ) : (
+                      activeSelectedJob.materialsUsed.map((m, idx) => (
+                        <tr key={m.itemId + idx} className="border-b border-slate-200">
+                          <td className="py-1 px-2">{m.name}</td>
+                          <td className="py-1 px-2 text-right font-mono">{m.quantity}</td>
+                          <td className="py-1 px-2 text-right font-mono">{formatCurrency(m.totalCost, 0)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <h4 className="text-[11px] font-black uppercase mb-1">Cleared Payments ({activeSelectedJob.payments.length})</h4>
+                <table className="w-full text-left border-collapse text-[10px]">
+                  <thead>
+                    <tr className="border-y border-slate-300 bg-slate-50">
+                      <th className="py-1 px-2">Date</th>
+                      <th className="py-1 px-2">Method</th>
+                      <th className="py-1 px-2 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeSelectedJob.payments.length === 0 ? (
+                      <tr><td colSpan={3} className="py-2 px-2 text-slate-500">No payments cleared yet.</td></tr>
+                    ) : (
+                      activeSelectedJob.payments.map(p => (
+                        <tr key={p.id} className="border-b border-slate-200">
+                          <td className="py-1 px-2 font-mono">{p.date}</td>
+                          <td className="py-1 px-2">{p.method}</td>
+                          <td className="py-1 px-2 text-right font-mono font-bold">{formatCurrency(p.amount, 0)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
     </div>
   );

@@ -39,6 +39,7 @@ import {
   Job, 
   Employee 
 } from '../types';
+import { printDocument } from '../utils/printHelper';
 
 interface OfficialDocumentsManagerProps {
   documents: OfficialDocument[];
@@ -97,6 +98,7 @@ export default function OfficialDocumentsManager({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [viewingDoc, setViewingDoc] = useState<OfficialDocument | null>(null);
   const [editingDoc, setEditingDoc] = useState<OfficialDocument | null>(null);
+  const [printingDoc, setPrintingDoc] = useState<OfficialDocument | null>(null);
 
   useEffect(() => {
     if (initialOpenUploadModal) {
@@ -373,61 +375,10 @@ export default function OfficialDocumentsManager({
 
   // Direct print trigger
   const handlePrintDoc = (doc: OfficialDocument) => {
-    const win = window.open('', '_blank');
-    if (!win) {
-      alert('Please allow popups to preview and print official document scans.');
-      return;
-    }
-    win.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${doc.title} - ${doc.referenceNumber}</title>
-          <style>
-            body { font-family: sans-serif; margin: 20px; color: #1e293b; background: #fff; }
-            .header { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
-            .title { font-size: 20px; font-weight: bold; margin: 0; }
-            .ref { font-family: monospace; font-size: 13px; color: #475569; }
-            .meta { font-size: 12px; margin-bottom: 20px; line-height: 1.6; }
-            .doc-preview { text-align: center; }
-            .doc-preview img, .doc-preview svg { max-width: 100%; height: auto; border: 1px solid #cbd5e1; border-radius: 4px; }
-            @media print { body { margin: 0; } .header { border-bottom-width: 1px; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <p class="ref">SWEDS WOOD ENTERPRISE &bull; 2 SWED FREE AVENUE, SUSSEX</p>
-              <h1 class="title">${doc.title}</h1>
-            </div>
-            <div style="text-align: right;">
-              <span class="ref">REF: ${doc.referenceNumber}</span><br>
-              <span style="font-size: 11px; color: #64748b;">Category: ${doc.category}</span>
-            </div>
-          </div>
-          <div class="meta">
-            <strong>Issuing Authority:</strong> ${doc.issuingAuthority} &bull; 
-            <strong>Issue Date:</strong> ${doc.issueDate} 
-            ${doc.expiryDate ? `&bull; <strong>Expiry Date:</strong> ${doc.expiryDate}` : ''}
-            ${doc.customerName ? `<br><strong>Client:</strong> ${doc.customerName}` : ''}
-            ${doc.jobTitle ? `<br><strong>Associated Commission:</strong> ${doc.jobTitle}` : ''}
-          </div>
-          <div class="doc-preview">
-            ${
-              doc.fileType === 'application/pdf' || doc.fileUrl.startsWith('data:application/pdf') || /\.pdf$/i.test(doc.fileName)
-                ? `<iframe src="${doc.fileUrl}" style="width:100%;height:850px;border:none;"></iframe>`
-                : `<img src="${doc.fileUrl}" alt="${doc.title}" />`
-            }
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    win.document.close();
+    setPrintingDoc(doc);
+    setTimeout(() => {
+      printDocument('document-single');
+    }, 80);
   };
 
   // Export CSV Register of All Official Documents
@@ -528,6 +479,15 @@ export default function OfficialDocumentsManager({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => printDocument('documents')}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-xs transition shadow-2xs cursor-pointer"
+            title="Print Official Documents & Compliance Register"
+          >
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>Print Register</span>
+          </button>
+
           <button
             onClick={handleExportCSVRegister}
             className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-2xl text-xs border border-slate-200 transition shadow-2xs cursor-pointer"
@@ -1601,6 +1561,87 @@ export default function OfficialDocumentsManager({
         </div>
       )}
 
+      {/* ==========================================
+          PRINT AREA 1: COMPLIANCE DOCUMENTS REGISTER
+         ========================================== */}
+      <div id="documents-print-area" className="hidden bg-white text-black p-6 space-y-6">
+        <div className="print-header">
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Swedswood Logo" className="w-12 h-12 object-contain" />
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
+              <p className="text-xs text-gray-600">2 Swed Free Avenue, Sussex &bull; Official Documents &amp; Compliance Register</p>
+            </div>
+          </div>
+          <div className="text-right text-xs font-mono">
+            <p className="font-bold">Generated: {new Date().toLocaleDateString()}</p>
+            <p>Documents Listed: {filteredDocuments.length} / {documents.length}</p>
+          </div>
+        </div>
+
+        <table className="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr className="bg-slate-100 border-b border-slate-300 uppercase text-[10px]">
+              <th className="py-2 px-2">Reference #</th>
+              <th className="py-2 px-2">Title</th>
+              <th className="py-2 px-2">Category</th>
+              <th className="py-2 px-2">Authority</th>
+              <th className="py-2 px-2">Issue / Expiry</th>
+              <th className="py-2 px-2">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {filteredDocuments.map((doc) => (
+              <tr key={doc.id}>
+                <td className="py-1.5 px-2 font-mono font-bold">{doc.referenceNumber}</td>
+                <td className="py-1.5 px-2 font-bold">{doc.title}</td>
+                <td className="py-1.5 px-2">{doc.category}</td>
+                <td className="py-1.5 px-2">{doc.issuingAuthority}</td>
+                <td className="py-1.5 px-2 font-mono">{doc.issueDate} / {doc.expiryDate || 'Perpetual'}</td>
+                <td className="py-1.5 px-2">{doc.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ==========================================
+          PRINT AREA 2: SINGLE DOCUMENT SHEET
+         ========================================== */}
+      <div id="document-single-print-area" className="hidden bg-white text-black p-6 space-y-5">
+        {printingDoc && (
+          <>
+            <div className="print-header">
+              <div className="flex items-center gap-3">
+                <img src="/logo.svg" alt="Swedswood Logo" className="w-12 h-12 object-contain" />
+                <div>
+                  <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
+                  <p className="text-xs text-gray-600">2 Swed Free Avenue, Sussex &bull; Official Document Copy</p>
+                </div>
+              </div>
+              <div className="text-right text-xs font-mono">
+                <p className="font-bold">REF: {printingDoc.referenceNumber}</p>
+                <p>{printingDoc.category}</p>
+              </div>
+            </div>
+
+            <div className="border border-slate-300 rounded-xl p-4 text-xs space-y-1">
+              <h2 className="text-base font-black">{printingDoc.title}</h2>
+              <p><strong>Issuing Authority:</strong> {printingDoc.issuingAuthority} &bull; <strong>Status:</strong> {printingDoc.status}</p>
+              <p><strong>Issue Date:</strong> {printingDoc.issueDate} {printingDoc.expiryDate ? `• Expiry: ${printingDoc.expiryDate}` : ''}</p>
+              {printingDoc.customerName && <p><strong>Client:</strong> {printingDoc.customerName}</p>}
+              {printingDoc.jobTitle && <p><strong>Commission:</strong> {printingDoc.jobTitle}</p>}
+              {printingDoc.description && <p className="text-gray-700 pt-1">{printingDoc.description}</p>}
+            </div>
+
+            {printingDoc.fileUrl && !(printingDoc.fileType === 'application/pdf' || printingDoc.fileUrl.startsWith('data:application/pdf') || /\.pdf$/i.test(printingDoc.fileName)) && (
+              <div className="border border-slate-300 rounded-xl p-2 text-center">
+                <img src={printingDoc.fileUrl} alt={printingDoc.title} className="max-w-full max-h-[760px] mx-auto object-contain" />
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

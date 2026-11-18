@@ -16,9 +16,11 @@ import {
   X,
   Download,
   FileSpreadsheet,
-  FileCheck
+  FileCheck,
+  Printer
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { printDocument } from '../utils/printHelper';
 
 interface DashboardOverviewProps {
   inventory: InventoryItem[];
@@ -159,6 +161,13 @@ export default function DashboardOverview({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => printDocument('dashboard')}
+            className="flex items-center gap-1.5 px-4 py-2 bg-wood-700 hover:bg-wood-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-amber-300" />
+            <span>Print Hub Summary</span>
+          </button>
           <button
             onClick={handleExportMetricsCSV}
             className="flex items-center gap-1.5 px-4 py-2 bg-wood-950 hover:bg-wood-900 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
@@ -847,6 +856,107 @@ export default function DashboardOverview({
           )}
         </div>
 
+      </div>
+
+      {/* ==========================================
+          PRINT AREA: WORKSHOP HUB EXECUTIVE SUMMARY
+         ========================================== */}
+      <div id="dashboard-print-area" className="hidden bg-white text-black p-6 space-y-6">
+        <div className="print-header">
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Swedswood Logo" className="w-12 h-12 object-contain" />
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
+              <p className="text-xs text-gray-600">2 Swed Free Avenue, Sussex &bull; Workshop Hub Executive Summary</p>
+            </div>
+          </div>
+          <div className="text-right text-xs font-mono">
+            <p className="font-bold">Date: {new Date().toLocaleDateString()}</p>
+            <p>Prepared For: {currentUser?.name || 'Management'}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-3 text-xs">
+          <div className="p-3 border border-slate-300 rounded-lg">
+            <span className="uppercase text-[10px] text-gray-500 font-bold">Active Jobs</span>
+            <p className="text-lg font-black font-mono">{activeJobs.length}</p>
+          </div>
+          <div className="p-3 border border-slate-300 rounded-lg">
+            <span className="uppercase text-[10px] text-gray-500 font-bold">Cleared Revenue</span>
+            <p className="text-lg font-black font-mono">{formatCurrency(totalRevenue, 0)}</p>
+          </div>
+          <div className="p-3 border border-slate-300 rounded-lg">
+            <span className="uppercase text-[10px] text-gray-500 font-bold">Outstanding Due</span>
+            <p className="text-lg font-black font-mono">{formatCurrency(totalOutstanding, 0)}</p>
+          </div>
+          <div className="p-3 border border-slate-300 rounded-lg">
+            <span className="uppercase text-[10px] text-gray-500 font-bold">Inventory Value</span>
+            <p className="text-lg font-black font-mono">{formatCurrency(totalInventoryValue, 0)}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 text-xs border border-slate-300 rounded-lg p-3">
+          <div><span className="text-gray-500 uppercase text-[10px] font-bold block">{monthName} Income</span><strong className="font-mono">{formatCurrency(mtdIncome, 0)}</strong></div>
+          <div><span className="text-gray-500 uppercase text-[10px] font-bold block">{monthName} Expenditure</span><strong className="font-mono">{formatCurrency(mtdExpenditure, 0)}</strong></div>
+          <div><span className="text-gray-500 uppercase text-[10px] font-bold block">{monthName} Net Surplus</span><strong className="font-mono">{formatCurrency(mtdNet, 0)}</strong></div>
+        </div>
+
+        <div>
+          <h2 className="text-sm font-black uppercase mb-2">Active Commissions Queue ({activeJobs.length})</h2>
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-300 uppercase text-[10px]">
+                <th className="py-2 px-2">Commission</th>
+                <th className="py-2 px-2">Client</th>
+                <th className="py-2 px-2">Status</th>
+                <th className="py-2 px-2">Due Date</th>
+                <th className="py-2 px-2 text-right">Quote (Le)</th>
+                <th className="py-2 px-2 text-right">Paid (Le)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {activeJobs.map((job) => {
+                const paid = job.payments.reduce((s, p) => s + p.amount, 0);
+                return (
+                  <tr key={job.id}>
+                    <td className="py-1.5 px-2 font-bold">{job.title}</td>
+                    <td className="py-1.5 px-2">{job.customerName}</td>
+                    <td className="py-1.5 px-2">{job.status}</td>
+                    <td className="py-1.5 px-2 font-mono">{job.dueDate}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(job.quoteAmount, 0)}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(paid, 0)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {lowStockItems.length > 0 && (
+          <div>
+            <h2 className="text-sm font-black uppercase mb-2">Low-Stock Reorder Alerts ({lowStockItems.length})</h2>
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-100 border-b border-slate-300 uppercase text-[10px]">
+                  <th className="py-2 px-2">Material</th>
+                  <th className="py-2 px-2">Category</th>
+                  <th className="py-2 px-2 text-right">Current Stock</th>
+                  <th className="py-2 px-2 text-right">Threshold</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {lowStockItems.map((item) => (
+                  <tr key={item.id}>
+                    <td className="py-1.5 px-2 font-bold">{item.name}</td>
+                    <td className="py-1.5 px-2">{item.category}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{item.currentStock} {item.unit}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{item.minStockThreshold} {item.unit}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </motion.div>
   );

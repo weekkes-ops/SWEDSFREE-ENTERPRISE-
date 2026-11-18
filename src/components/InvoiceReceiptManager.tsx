@@ -110,7 +110,7 @@ interface InvoiceReceiptManagerProps {
   onUpdateJob?: (updatedJob: Job) => void;
   onUpdateJobPayment?: (jobId: string, payment: JobPayment) => void;
   onDeleteJobPayment?: (jobId: string, paymentId: string) => void;
-  onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string }) => void;
+  onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   paymentAuditLogs?: PaymentAuditLogEntry[];
   onGoBack?: () => void;
 }
@@ -134,7 +134,6 @@ export default function InvoiceReceiptManager({
 }: InvoiceReceiptManagerProps) {
   const isAuditor = currentUser?.role === 'Auditor';
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCustomerIdFilter, setSelectedCustomerIdFilter] = useState<string>(proformaCustomerId || 'ALL');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(jobs[0]?.id || null);
   
   // Top level tabs: Invoice Workspace vs Proforma Desk vs Saved Invoices Directory vs Receipt Workspace vs Payment Audit Log
@@ -829,8 +828,7 @@ export default function InvoiceReceiptManager({
 
     if (onUpdateJobPayment) {
       onUpdateJobPayment(editingPaymentItem.job.id, updatedPayment);
-    }
-    if (onUpdateJob) {
+    } else if (onUpdateJob) {
       const currentJob = jobs.find(j => j.id === editingPaymentItem.job.id) || editingPaymentItem.job;
       const updatedPayments = currentJob.payments.map(p => p.id === editingPaymentItem.payment.id ? updatedPayment : p);
       onUpdateJob({ ...currentJob, payments: updatedPayments });
@@ -853,8 +851,7 @@ export default function InvoiceReceiptManager({
 
     if (onDeleteJobPayment) {
       onDeleteJobPayment(job.id, payment.id);
-    }
-    if (onUpdateJob) {
+    } else if (onUpdateJob) {
       const currentJob = jobs.find(j => j.id === job.id) || job;
       const updatedPayments = currentJob.payments.filter(p => p.id !== payment.id);
       onUpdateJob({ ...currentJob, payments: updatedPayments });
@@ -869,12 +866,8 @@ export default function InvoiceReceiptManager({
     setTimeout(() => setSaveToast(null), 3500);
   };
 
-  // Sync to outer invoice / receipt creation request (e.g. from Jobs tracker or CustomerManager)
+  // Sync to outer invoice / receipt creation request (e.g. from Jobs tracker)
   useEffect(() => {
-    if (proformaCustomerId) {
-      setSelectedCustomerIdFilter(proformaCustomerId);
-    }
-
     if (initialSubTab === 'PROFORMA') {
       setSubTab('PROFORMA');
       if (invoiceJobId) {
@@ -883,17 +876,16 @@ export default function InvoiceReceiptManager({
       return;
     }
 
-    const resolvedJobId = invoiceJobId || (proformaCustomerId ? jobs.find(j => j.customerId === proformaCustomerId)?.id : null);
-
-    if (resolvedJobId) {
-      setSelectedJobId(resolvedJobId);
-      const job = jobs.find(j => j.id === resolvedJobId);
+    if (invoiceJobId) {
+      setSelectedJobId(invoiceJobId);
+      const job = jobs.find(j => j.id === invoiceJobId);
       if (job) {
         if (initialSubTab === 'RECEIPT') {
           setSubTab('RECEIPT');
           setIsInvoiceModalOpen(false);
           setActiveInvoice(null);
-          if (job.payments && job.payments.length > 0) {
+          setActiveDocSource('TEMPLATE');
+          if (job.payments.length > 0) {
             setActiveReceipt({ job, payment: job.payments[job.payments.length - 1] });
             setReceiptPdfMode('VIEW');
           } else {
@@ -902,6 +894,7 @@ export default function InvoiceReceiptManager({
         } else {
           setSubTab('INVOICE');
           setActiveReceipt(null);
+          setActiveDocSource('TEMPLATE');
           setActiveInvoice(job);
           setIsInvoiceModalOpen(true);
           setInvoicePdfMode('VIEW');
@@ -915,7 +908,7 @@ export default function InvoiceReceiptManager({
     } else if (initialSubTab) {
       setSubTab(initialSubTab);
     }
-  }, [invoiceJobId, proformaCustomerId, jobs, initialSubTab, onClearInvoiceJobId]);
+  }, [invoiceJobId, jobs, initialSubTab, onClearInvoiceJobId]);
 
   // Sync Invoice local editable states when an activeInvoice is selected/opened
   useEffect(() => {
@@ -989,20 +982,14 @@ export default function InvoiceReceiptManager({
     }
   }, [activeReceipt, currentUser]);
 
-  // Filter jobs based on search term and selected customer filter
+  // Filter jobs based on search term
   const filteredJobs = jobs.filter(j => {
-    if (selectedCustomerIdFilter !== 'ALL' && j.customerId !== selectedCustomerIdFilter) {
-      return false;
-    }
     const cust = customers.find(c => c.id === j.customerId);
     const searchString = `${j.title} ${j.customerName} ${cust?.company || ''} ${j.id}`.toLowerCase();
     return searchString.includes(searchTerm.toLowerCase());
   });
 
-  const selectedJob = (selectedJobId ? jobs.find(j => j.id === selectedJobId) : null)
-    || (filteredJobs.length > 0 ? filteredJobs[0] : null)
-    || jobs[0]
-    || null;
+  const selectedJob = jobs.find(j => j.id === selectedJobId) || jobs[0] || null;
   const selectedCustomer = selectedJob ? customers.find(c => c.id === selectedJob.customerId) : null;
 
   // Automatically keep activeInvoice in sync with selectedJob and jobs state updates when modal is actively open
@@ -1381,6 +1368,8 @@ export default function InvoiceReceiptManager({
     };
 
     setEditingSavedInvoiceId(saved.id);
+    setActiveDocSource('TEMPLATE');
+    setIsInvoiceModalOpen(true);
     setActiveInvoice(job);
     setInvoiceNo(saved.invoiceNo);
     setInvoiceDate(saved.date);
@@ -1841,7 +1830,7 @@ export default function InvoiceReceiptManager({
     setIsBulkModalOpen(false);
     setBulkPrintTarget('INVOICES');
     setTimeout(() => {
-      window.print();
+      printDocument('bulk-invoices');
     }, 300);
   };
 
@@ -1853,7 +1842,7 @@ export default function InvoiceReceiptManager({
     setIsBulkModalOpen(false);
     setBulkPrintTarget('RECEIPTS');
     setTimeout(() => {
-      window.print();
+      printDocument('bulk-receipts');
     }, 300);
   };
 
@@ -1930,223 +1919,6 @@ export default function InvoiceReceiptManager({
     <div className="space-y-6">
       {/* Main Billing Desk Workspace (Hides on print when modal preview or bulk print is open) */}
       <div className={`space-y-6 ${(activeInvoice || activeReceipt || bulkPrintTarget) ? 'print:hidden' : ''}`}>
-      
-      {/* Print styles override (Ensures print-area and bulk-print-area print cleanly on pure white paper with top header & zero watermarks) */}
-      <style>{`
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 8mm 10mm !important;
-          }
-
-          html, body {
-            background-color: #ffffff !important;
-            background: #ffffff !important;
-            color: #000000 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            min-height: 0 !important;
-            overflow: visible !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          body * {
-            visibility: hidden;
-          }
-
-          #print-area,
-          #print-area *,
-          #proforma-print-area,
-          #proforma-print-area *,
-          #bulk-print-area,
-          #bulk-print-area * {
-            visibility: visible !important;
-          }
-
-          .print-modal-container {
-            position: static !important;
-            display: block !important;
-            visibility: visible !important;
-            background: transparent !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            overflow: visible !important;
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: none !important;
-            box-shadow: none !important;
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
-            inset: auto !important;
-          }
-
-          #print-area,
-          #proforma-print-area,
-          #bulk-print-area {
-            position: static !important;
-            left: auto !important;
-            top: auto !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            background: #ffffff !important;
-            background-color: #ffffff !important;
-            color: #000000 !important;
-            padding: 0 !important;
-            margin: 0 auto !important;
-            box-shadow: none !important;
-            border: none !important;
-            overflow: visible !important;
-            display: block !important;
-            page-break-inside: auto !important;
-            break-inside: auto !important;
-          }
-
-          .invoice-header-container,
-          .receipt-header-container {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-            top: 0 !important;
-          }
-
-          .bulk-page-item {
-            page-break-after: always !important;
-            break-after: page !important;
-            display: block !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #ffffff !important;
-            background-color: #ffffff !important;
-          }
-
-          .bulk-page-item:last-child {
-            page-break-after: auto !important;
-            break-after: auto !important;
-          }
-
-          /* Hide non-print elements completely from document flow */
-          aside,
-          nav,
-          header:not(.print-header),
-          footer:not(.print-footer),
-          .no-print,
-          .print\\:hidden,
-          *[class*="print:hidden"],
-          *[class*="watermark" i],
-          .watermark,
-          .watermark-logo,
-          img[alt*="watermark" i],
-          div[class*="opacity-[0.0" i] {
-            display: none !important;
-            visibility: hidden !important;
-            height: 0 !important;
-            width: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-
-          .print-footer-summary {
-            display: grid !important;
-            grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
-            gap: 12px !important;
-            padding-top: 8px !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-          }
-
-          .print-customer-message-col {
-            grid-column: span 7 / span 7 !important;
-            display: flex !important;
-            flex-direction: column !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-          }
-
-          .print-totals-col {
-            grid-column: span 5 / span 5 !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: flex-end !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-          }
-
-          .print-total-card {
-            display: block !important;
-            visibility: visible !important;
-            border: 2px solid #0f172a !important;
-            border-radius: 3px !important;
-            background-color: #0f172a !important;
-            overflow: hidden !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-
-          .print-total-card-header {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            padding: 9px 12px !important;
-            background-color: #0f172a !important;
-            background: #0f172a !important;
-            color: #ffffff !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          .print-total-card-header span,
-          .print-total-card-header strong,
-          .print-total-card-header div {
-            color: #ffffff !important;
-            -webkit-text-fill-color: #ffffff !important;
-            font-weight: 900 !important;
-          }
-
-          .print-total-card-row {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            padding: 5px 12px !important;
-            font-size: 11px !important;
-            border-top: 1px solid #cbd5e1 !important;
-          }
-
-          #print-area input,
-          #print-area textarea,
-          #print-area select {
-            border: none !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            outline: none !important;
-            color: #000000 !important;
-            font-weight: bold !important;
-            appearance: none !important;
-            -webkit-appearance: none !important;
-            resize: none !important;
-            width: 100% !important;
-            max-width: 100% !important;
-          }
-
-          .print-only,
-          .print-only-inline {
-            display: inline !important;
-            visibility: visible !important;
-          }
-          .print-only-block {
-            display: block !important;
-            visibility: visible !important;
-          }
-
-          tr {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-        }
-      `}</style>
 
       {/* Top Section Header with SubTab buttons */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-5 rounded-2xl border border-wood-100 shadow-xs no-print">
@@ -2263,6 +2035,16 @@ export default function InvoiceReceiptManager({
               )}
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => printDocument('invoices-ledger')}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+            title="Print Saved Invoices & Clearance Receipts Register"
+          >
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>Print Ledger</span>
+          </button>
 
           <button
             onClick={() => {
@@ -2672,7 +2454,7 @@ export default function InvoiceReceiptManager({
                               <button
                                 onClick={() => {
                                   handleLoadSavedInvoice(inv);
-                                  setTimeout(() => window.print(), 200);
+                                  setTimeout(() => printDocument('invoice'), 260);
                                 }}
                                 className="p-1.5 bg-gray-100 hover:bg-blue-600 hover:text-white text-gray-700 rounded-lg transition cursor-pointer"
                                 title="Print Invoice"
@@ -3157,47 +2939,6 @@ export default function InvoiceReceiptManager({
                 <span>{subTab === 'RECEIPT' ? 'Bulk Print Receipts' : 'Bulk Print Invoices'}</span>
               </button>
             </div>
-            
-            {/* Customer Filter Dropdown */}
-            <div className="mb-2">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Client Filter:</span>
-                {selectedCustomerIdFilter !== 'ALL' && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCustomerIdFilter('ALL')}
-                    className="text-[9px] font-bold text-blue-600 hover:underline cursor-pointer"
-                  >
-                    All Clients
-                  </button>
-                )}
-              </div>
-              <select
-                value={selectedCustomerIdFilter}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedCustomerIdFilter(val);
-                  if (val !== 'ALL') {
-                    const custJobs = jobs.filter(j => j.customerId === val);
-                    if (custJobs.length > 0) {
-                      setSelectedJobId(custJobs[0].id);
-                    }
-                  }
-                }}
-                className="w-full px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-bold text-gray-800"
-              >
-                <option value="ALL">All Clients ({customers.length})</option>
-                {customers.map(c => {
-                  const cJobCount = jobs.filter(j => j.customerId === c.id).length;
-                  return (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.company ? `(${c.company})` : ''} • {cJobCount} order{cJobCount !== 1 ? 's' : ''}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
             <div className="relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
               <input
@@ -3212,42 +2953,8 @@ export default function InvoiceReceiptManager({
 
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
             {filteredJobs.length === 0 ? (
-              <div className="text-center py-12 px-4 space-y-3">
-                <FileText className="w-8 h-8 text-gray-300 mx-auto" />
-                <p className="text-gray-500 text-xs font-bold">
-                  {selectedCustomerIdFilter !== 'ALL'
-                    ? `No orders or invoices found for ${customers.find(c => c.id === selectedCustomerIdFilter)?.name || 'selected client'}.`
-                    : 'No orders match your query.'}
-                </p>
-                {selectedCustomerIdFilter !== 'ALL' && onCreateJob && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const c = customers.find(cust => cust.id === selectedCustomerIdFilter);
-                      if (c) {
-                        const newJob: Omit<Job, 'id' | 'materialsUsed' | 'payments'> = {
-                          title: `New Woodwork Order - ${c.name}`,
-                          customerId: c.id,
-                          customerName: c.name,
-                          description: 'Custom fine woodwork and timber craftsmanship commission',
-                          quantity: 1,
-                          assignedEmployees: [],
-                          status: 'Quote',
-                          startDate: new Date().toISOString().split('T')[0],
-                          dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-                          quoteAmount: 5000,
-                          laborCost: 0,
-                          otherCosts: 0
-                        };
-                        onCreateJob(newJob);
-                      }
-                    }}
-                    className="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Create Order & Issue Invoice</span>
-                  </button>
-                )}
+              <div className="text-center py-12 text-gray-400 text-xs font-medium">
+                No orders match your query.
               </div>
             ) : (
               filteredJobs.map(job => {
@@ -3451,6 +3158,7 @@ export default function InvoiceReceiptManager({
                   <div className="pt-2">
                     <button
                       onClick={() => {
+                        setIsInvoiceModalOpen(true);
                         setActiveInvoice(selectedJob);
                         setActiveDocSource('TEMPLATE');
                         setInvoicePdfMode('VIEW');
@@ -3753,6 +3461,7 @@ export default function InvoiceReceiptManager({
                               <span className="font-bold font-mono text-emerald-700 mr-1">{formatCurrency(p.amount, 0)}</span>
                               <button
                                 onClick={() => {
+                                  setActiveDocSource('TEMPLATE');
                                   setActiveReceipt({ job: selectedJob, payment: p });
                                   setReceiptPdfMode('VIEW');
                                 }}
@@ -3899,7 +3608,7 @@ export default function InvoiceReceiptManager({
       <AnimatePresence>
         {activeInvoice && (
           <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white print-modal-container">
-            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-4xl p-6 my-8 shadow-2xl relative print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
+            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-4xl p-6 my-8 shadow-2xl relative print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="invoice-print-area">
               
               {/* TOP WORKSPACE TOOLBAR (Hides on standard print) */}
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-4 border-b border-gray-200/60 no-print">
@@ -3996,7 +3705,10 @@ export default function InvoiceReceiptManager({
                   </button>
 
                   <button
-                    onClick={() => setActiveInvoice(null)}
+                    onClick={() => {
+                      setIsInvoiceModalOpen(false);
+                      setActiveInvoice(null);
+                    }}
                     className="px-3.5 py-2 border border-gray-300 text-gray-600 bg-white rounded-xl text-xs font-bold hover:bg-gray-50 transition cursor-pointer"
                   >
                     Close Workspace
@@ -5128,7 +4840,7 @@ export default function InvoiceReceiptManager({
       <AnimatePresence>
         {activeReceipt && (
           <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-start justify-center p-4 overflow-y-auto print:!static print:!block print:!overflow-visible print:!h-auto print:!max-h-none print:!p-0 print:!m-0 print:!bg-white print-modal-container">
-            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-2xl p-6 my-8 shadow-2xl relative print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="print-area">
+            <div className="bg-slate-100 text-slate-800 rounded-2xl w-full max-w-2xl p-6 my-8 shadow-2xl relative print:!block print:!overflow-visible print:!w-full print:!max-w-none print:!my-0 print:!p-0 print:!shadow-none print:!rounded-none print:!bg-white" id="receipt-print-area">
               
               {/* TOP WORKSPACE TOOLBAR (Hides on standard print) */}
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 mb-4 border-b border-gray-200/60 no-print">
@@ -6055,7 +5767,7 @@ export default function InvoiceReceiptManager({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => printDocument(bulkPrintTarget === 'RECEIPTS' ? 'bulk-receipts' : 'bulk-invoices')}
                 className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-2 transition cursor-pointer shadow-lg active:scale-95 ${
                   bulkPrintTarget === 'INVOICES'
                     ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
@@ -6713,6 +6425,105 @@ export default function InvoiceReceiptManager({
           </div>
         )}
       </AnimatePresence>
+
+      {/* DEDICATED PRINT LAYOUT FOR INVOICES & CLEARANCE RECEIPTS LEDGER */}
+      <div id="invoices-ledger-print-area" className="hidden bg-white text-black p-6 space-y-6">
+        <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
+            <p className="text-xs font-bold text-slate-600">2 Swed Free Avenue, Sussex &bull; swedswoodinfo@gmail.com</p>
+            <h2 className="text-sm font-black uppercase mt-2">Official Invoices &amp; Clearance Receipts Register</h2>
+          </div>
+          <div className="text-right text-xs font-mono">
+            <p><strong>Printed:</strong> {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+            <p><strong>Saved Invoices:</strong> {savedInvoices.length} &bull; <strong>Receipts:</strong> {allSystemReceipts.length}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 text-xs">
+          <div className="border border-slate-300 p-3">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">Total Saved Invoices</span>
+            <strong className="text-base font-mono">{savedInvoices.length}</strong>
+          </div>
+          <div className="border border-slate-300 p-3">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">Saved Invoices Total Value</span>
+            <strong className="text-base font-mono">
+              {formatCurrency(savedInvoices.reduce((s, inv) => s + (inv.subtotal || 0), 0))}
+            </strong>
+          </div>
+          <div className="border border-slate-300 p-3">
+            <span className="text-[10px] font-bold uppercase text-slate-500 block">Cleared Receipts Value</span>
+            <strong className="text-base font-mono">
+              {formatCurrency(allSystemReceipts.reduce((s, r) => s + (r.amount || 0), 0))}
+            </strong>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-wider mb-2">Saved Commercial Invoices ({savedInvoices.length})</h3>
+          <table className="w-full text-left border-collapse text-[10px]">
+            <thead>
+              <tr className="border-y border-slate-400 bg-slate-100">
+                <th className="py-1.5 px-2">Invoice #</th>
+                <th className="py-1.5 px-2">Date</th>
+                <th className="py-1.5 px-2">Client</th>
+                <th className="py-1.5 px-2">Status</th>
+                <th className="py-1.5 px-2">Prepared By</th>
+                <th className="py-1.5 px-2 text-right">Subtotal (Le)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {savedInvoices.length === 0 ? (
+                <tr><td colSpan={6} className="py-2 px-2 text-slate-500">No saved invoices recorded yet.</td></tr>
+              ) : (
+                savedInvoices.map(inv => (
+                  <tr key={inv.id} className="border-b border-slate-200">
+                    <td className="py-1.5 px-2 font-mono font-bold">{inv.invoiceNo}</td>
+                    <td className="py-1.5 px-2 font-mono">{inv.date}</td>
+                    <td className="py-1.5 px-2 font-bold">{inv.customerName}</td>
+                    <td className="py-1.5 px-2">{inv.status}</td>
+                    <td className="py-1.5 px-2">{inv.preparedBy}</td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold">{formatCurrency(inv.subtotal)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-wider mb-2">Payment Clearance Receipts Ledger ({allSystemReceipts.length})</h3>
+          <table className="w-full text-left border-collapse text-[10px]">
+            <thead>
+              <tr className="border-y border-slate-400 bg-slate-100">
+                <th className="py-1.5 px-2">Receipt #</th>
+                <th className="py-1.5 px-2">Date</th>
+                <th className="py-1.5 px-2">Client</th>
+                <th className="py-1.5 px-2">Commission / Project</th>
+                <th className="py-1.5 px-2">Method</th>
+                <th className="py-1.5 px-2 text-right">Amount Cleared (Le)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allSystemReceipts.length === 0 ? (
+                <tr><td colSpan={6} className="py-2 px-2 text-slate-500">No clearance receipts logged yet.</td></tr>
+              ) : (
+                allSystemReceipts.map(r => (
+                  <tr key={r.id} className="border-b border-slate-200">
+                    <td className="py-1.5 px-2 font-mono font-bold">{r.receiptNo}</td>
+                    <td className="py-1.5 px-2 font-mono">{r.date}</td>
+                    <td className="py-1.5 px-2 font-bold">{r.customerName}</td>
+                    <td className="py-1.5 px-2">{r.projectTitle}</td>
+                    <td className="py-1.5 px-2">{r.method}</td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold">{formatCurrency(r.amount)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }

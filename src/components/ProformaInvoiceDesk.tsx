@@ -59,7 +59,7 @@ interface ProformaInvoiceDeskProps {
   onClearInitialParams?: () => void;
   onSaveInvoiceRecord?: (invoice: SavedInvoice) => void;
   onDeleteInvoiceRecord?: (id: string) => void;
-  onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string }) => void;
+  onCreateJob?: (job: Omit<Job, 'id' | 'materialsUsed' | 'payments'>) => void;
   onSwitchToSavedInvoices?: () => void;
   onGoBack?: () => void;
 }
@@ -959,9 +959,7 @@ _For questions or deposit confirmation, please contact Sweds Wood Workshop (+232
 
     // Determine or create customer ID
     const custId = clientType === 'EXISTING' ? selectedCustomerId : `cust-prospect-${Date.now()}`;
-    const formattedCommId = proformaNo ? `COMM-${proformaNo.replace(/^PRO-?/i, '')}` : undefined;
-    const newJob: Omit<Job, 'id' | 'materialsUsed' | 'payments'> & { id?: string } = {
-      id: formattedCommId,
+    const newJob: Omit<Job, 'id' | 'materialsUsed' | 'payments'> = {
       title: projectTitle,
       description: `${projectDescription}\n\n[Converted from Proforma ${proformaNo}]\nLead Time: ${leadTime}\nTerms: ${paymentTerms}`,
       customerId: custId,
