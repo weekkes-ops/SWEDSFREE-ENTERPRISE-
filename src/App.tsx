@@ -29,7 +29,8 @@ import {
   FileCheck,
   UploadCloud,
   Printer,
-  Fuel
+  Fuel,
+  KeyRound
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -49,6 +50,7 @@ import ProformaInvoiceDesk from './components/ProformaInvoiceDesk';
 import SettingsManager from './components/SettingsManager';
 import FuelRequestManager from './components/FuelRequestManager';
 import ToolsManager from './components/ToolsManager';
+import PasswordManager from './components/PasswordManager';
 import UserManualModal, { CHAPTERS as MANUAL_CHAPTERS } from './components/UserManualModal';
 import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
@@ -164,6 +166,7 @@ export default function App() {
       case 'documents': return 'Official Documents';
       case 'fuel': return 'Fuel Requests (Diesel & Petrol)';
       case 'tools': return 'Tools & Equipment';
+      case 'passwords': return 'Password Manager';
       case 'settings': return 'Settings';
       default: return tabId;
     }
@@ -176,12 +179,14 @@ export default function App() {
   const previousTabLabel = previousTabId ? getTabDisplayName(previousTabId) : null;
 
   const handleTriggerInvoice = (jobId: string) => {
+    if (isEmployee) return;
     setInvoiceJobId(jobId);
     setInvoiceInitialSubTab('INVOICE');
     setActiveTab('invoices');
   };
 
   const handleTriggerProforma = (customerId?: string, jobId?: string) => {
+    if (isEmployee) return;
     let targetCustomerId = customerId;
     if (jobId) {
       setInvoiceJobId(jobId);
@@ -201,6 +206,7 @@ export default function App() {
   };
 
   const handleTriggerReceipt = (jobId?: string) => {
+    if (isEmployee) return;
     if (jobId) {
       setInvoiceJobId(jobId);
     }
@@ -1698,8 +1704,17 @@ export default function App() {
   };
 
   const handleUpdateEmployee = (updatedEmployee: Employee) => {
-    setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setEmployees(prev => {
+      const updated = prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp);
+      localStorage.setItem('swedsfree_employees', JSON.stringify(updated));
+      return updated;
+    });
     saveDocument('employees', updatedEmployee);
+    if (currentUser && currentUser.id === updatedEmployee.id) {
+      setCurrentUser(updatedEmployee);
+      localStorage.setItem('swedsfree_current_user', JSON.stringify(updatedEmployee));
+    }
   };
 
   const handleUpdateJob = (updatedJob: Job) => {
@@ -1786,6 +1801,7 @@ export default function App() {
 
   // Handle auto shortcuts redirection
   const handleOpenQuickAction = (action: string) => {
+    if (isEmployee) return;
     if (action === 'register-customer') {
       setActiveTab('customers');
       setQuickActionTrigger('register-customer');
@@ -1808,31 +1824,44 @@ export default function App() {
 
   const showManagementTabs = isAdmin || isManager || isAuditor;
 
+  // Redirect employees away from restricted tabs automatically
+  useEffect(() => {
+    if (currentUser && isEmployee) {
+      const allowedEmployeeTabs = ['dashboard', 'daily-work', 'passwords', 'manual'];
+      if (!allowedEmployeeTabs.includes(activeTab)) {
+        setActiveTab('dashboard');
+      }
+    }
+  }, [currentUser, isEmployee, activeTab]);
+
   // Navigation menu tabs metadata
   const navTabs = [
     { id: 'dashboard', label: 'Workshop Hub', icon: LayoutDashboard },
-    { 
-      id: 'documents', 
-      label: 'Official Documents', 
-      icon: FileCheck, 
-      badge: officialDocuments.length > 0 ? `${officialDocuments.length}` : 'Upload' 
-    },
     ...(showManagementTabs ? [
+      { 
+        id: 'documents', 
+        label: 'Official Documents', 
+        icon: FileCheck, 
+        badge: officialDocuments.length > 0 ? `${officialDocuments.length}` : 'Upload' 
+      },
       { id: 'inventory', label: 'Inventory', icon: Package },
       { id: 'customers', label: 'Clients/Customers', icon: UserCheck },
       { id: 'employees', label: 'Employees', icon: Users },
       { id: 'invoices', label: 'Invoices & Receipts', icon: Receipt },
+      { id: 'proforma', label: 'PROFORMA INVOICE', icon: FileSpreadsheet, badge: 'Quote' },
+      { id: 'jobs', label: 'Job lists', icon: Wrench },
+      { id: 'tools', label: 'Tools', icon: Hammer },
+      { id: 'fuel', label: 'Fuel Requests', icon: Fuel, badge: 'Diesel / Petrol' },
     ] : []),
-    { id: 'proforma', label: 'PROFORMA INVOICE', icon: FileSpreadsheet, badge: 'Quote' },
-    { id: 'jobs', label: 'Job lists', icon: Wrench },
-    { id: 'tools', label: 'Tools', icon: Hammer },
-    { id: 'fuel', label: 'Fuel Requests', icon: Fuel, badge: 'Diesel / Petrol' },
     { id: 'daily-work', label: 'Daily Logs', icon: Camera },
     ...(showManagementTabs ? [
       { id: 'finance', label: 'Financial Ledger', icon: DollarSign },
       { id: 'reports', label: 'Audit Reports', icon: FileBarChart },
     ] : []),
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'passwords', label: 'Password Manager', icon: KeyRound },
+    ...(showManagementTabs ? [
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ] : []),
     { id: 'manual', label: 'User Manual (PDF)', icon: BookOpen },
   ];
 
@@ -1963,30 +1992,32 @@ export default function App() {
           </div>
 
           {/* Quick Action Button for Uploading Official Documents (JPEG, PDF, PNG) */}
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-2.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
-                <FileCheck className="w-3.5 h-3.5 text-amber-700" />
-                <span>Documents &amp; Vault</span>
-              </span>
-              <span className="text-[9px] font-mono font-bold bg-amber-200/80 text-amber-950 px-1.5 py-0.5 rounded">
-                JPEG • PDF • PNG
-              </span>
+          {showManagementTabs && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-2.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                  <FileCheck className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Documents &amp; Vault</span>
+                </span>
+                <span className="text-[9px] font-mono font-bold bg-amber-200/80 text-amber-950 px-1.5 py-0.5 rounded">
+                  JPEG • PDF • PNG
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveTab('documents');
+                  setQuickActionTrigger('upload-doc');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full py-2 px-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+                id="sidebar-upload-official-doc-btn"
+                title="Upload official document scan (JPEG, PDF, PNG)"
+              >
+                <UploadCloud className="w-4 h-4" />
+                <span>+ Upload Official Doc</span>
+              </button>
             </div>
-            <button
-              onClick={() => {
-                setActiveTab('documents');
-                setQuickActionTrigger('upload-doc');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full py-2 px-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
-              id="sidebar-upload-official-doc-btn"
-              title="Upload official document scan (JPEG, PDF, PNG)"
-            >
-              <UploadCloud className="w-4 h-4" />
-              <span>+ Upload Official Doc</span>
-            </button>
-          </div>
+          )}
 
           {/* Nav Items List */}
           <nav className="space-y-1">
@@ -2213,14 +2244,16 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleTriggerProforma()}
-              className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-amber-500/50"
-              title="Open PROFORMA INVOICE desk & quotation generator"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-950" />
-              <span>PROFORMA INVOICE</span>
-            </button>
+            {showManagementTabs && (
+              <button
+                onClick={() => handleTriggerProforma()}
+                className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-amber-500/50"
+                title="Open PROFORMA INVOICE desk & quotation generator"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-amber-950" />
+                <span>PROFORMA INVOICE</span>
+              </button>
+            )}
             <button
               onClick={() => setIsManualModalOpen(true)}
               className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer shadow-xs"
@@ -2229,7 +2262,7 @@ export default function App() {
               <BookOpen className="w-3.5 h-3.5" />
               <span>User Manual (PDF)</span>
             </button>
-            {isOnline && (
+            {showManagementTabs && isOnline && (
               <button
                 onClick={performAutoOnlineSync}
                 disabled={syncStatus === 'syncing'}
@@ -2240,14 +2273,16 @@ export default function App() {
                 <span>{syncStatus === 'syncing' ? 'Syncing DB...' : 'Sync Online DB'}</span>
               </button>
             )}
-            <button
-              onClick={() => setActiveTab('settings')}
-              className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
-              title="Manage system settings and data backup/restore"
-            >
-              <Settings className="w-3.5 h-3.5 text-amber-400" />
-              <span>Settings & Backup</span>
-            </button>
+            {showManagementTabs && (
+              <button
+                onClick={() => setActiveTab('settings')}
+                className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer"
+                title="Manage system settings and data backup/restore"
+              >
+                <Settings className="w-3.5 h-3.5 text-amber-400" />
+                <span>Settings & Backup</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -2274,11 +2309,11 @@ export default function App() {
                 registrationRequests={registrationRequests}
                 onApproveRequest={handleApproveRequest}
                 onRejectRequest={handleRejectRequest}
-                onTriggerProforma={handleTriggerProforma}
+                onTriggerProforma={showManagementTabs ? handleTriggerProforma : undefined}
               />
             )}
 
-            {activeTab === 'inventory' && (
+            {showManagementTabs && activeTab === 'inventory' && (
               <InventoryManager
                 inventory={inventory}
                 transactions={inventoryTransactions}
@@ -2292,7 +2327,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'customers' && (
+            {showManagementTabs && activeTab === 'customers' && (
               <CustomerManager
                 customers={customers}
                 jobs={jobs}
@@ -2313,7 +2348,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'employees' && (
+            {showManagementTabs && activeTab === 'employees' && (
               <EmployeeManager
                 employees={employees}
                 jobs={jobs}
@@ -2334,7 +2369,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'jobs' && (
+            {showManagementTabs && activeTab === 'jobs' && (
               <JobManager
                 jobs={jobs}
                 customers={customers}
@@ -2358,7 +2393,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'invoices' && (
+            {showManagementTabs && activeTab === 'invoices' && (
               <InvoiceReceiptManager
                 jobs={jobs}
                 customers={customers}
@@ -2384,7 +2419,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'proforma' && (
+            {showManagementTabs && activeTab === 'proforma' && (
               <div className="space-y-6">
                 <ProformaInvoiceDesk
                   customers={customers}
@@ -2433,7 +2468,7 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'tools' && (
+            {showManagementTabs && activeTab === 'tools' && (
               <ToolsManager
                 tools={workshopTools}
                 toolLogs={toolLogs}
@@ -2446,7 +2481,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'fuel' && (
+            {showManagementTabs && activeTab === 'fuel' && (
               <FuelRequestManager
                 fuelRequests={fuelRequests}
                 employees={employees}
@@ -2470,7 +2505,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'finance' && (
+            {showManagementTabs && activeTab === 'finance' && (
               <FinancialLedger
                 transactions={financialTransactions}
                 onAddTransaction={handleAddFinancialTransaction}
@@ -2481,7 +2516,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'reports' && (
+            {showManagementTabs && activeTab === 'reports' && (
               <ReportGenerator
                 employees={employees}
                 customers={customers}
@@ -2493,7 +2528,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'documents' && (
+            {showManagementTabs && activeTab === 'documents' && (
               <OfficialDocumentsManager
                 documents={officialDocuments}
                 customers={customers}
@@ -2507,9 +2542,20 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'settings' && (
+            {activeTab === 'passwords' && (
+              <PasswordManager
+                employees={employees}
+                currentUser={currentUser}
+                onUpdateEmployee={handleUpdateEmployee}
+              />
+            )}
+
+            {showManagementTabs && activeTab === 'settings' && (
               <SettingsManager
                 currentUser={currentUser}
+                employees={employees}
+                onUpdateEmployee={handleUpdateEmployee}
+                onOpenPasswordManager={() => setActiveTab('passwords')}
                 isOnline={isOnline}
                 lastSyncTime={lastSyncTime}
                 syncStatus={syncStatus}

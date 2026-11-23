@@ -20,7 +20,8 @@ export type PrintDocumentType =
   | 'manual'
   | 'fuel'
   | 'fuel-single'
-  | 'tools';
+  | 'tools'
+  | 'passwords';
 
 export const setPrintMode = (type: PrintDocumentType) => {
   const mode = type.toLowerCase();
@@ -107,6 +108,7 @@ if (typeof window !== 'undefined') {
         ['manual-print-area', 'manual'],
         ['fuel-print-area', 'fuel'],
         ['tools-print-area', 'tools'],
+        ['passwords-print-area', 'passwords'],
       ];
 
       for (const [elId, mode] of mountedChecks) {

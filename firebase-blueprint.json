@@ -49,7 +49,10 @@
         "status": { "type": "string" },
         "baseSalary": { "type": "number" },
         "dailyRate": { "type": "number" },
-        "hireDate": { "type": "string" }
+        "hireDate": { "type": "string" },
+        "password": { "type": "string" },
+        "passwordUpdatedAt": { "type": "string" },
+        "passwordUpdatedBy": { "type": "string" }
       },
       "required": ["id", "name", "role"]
     },

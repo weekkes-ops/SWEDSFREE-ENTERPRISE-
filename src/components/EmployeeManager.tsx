@@ -22,10 +22,14 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Printer
+  Printer,
+  KeyRound,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { printDocument } from '../utils/printHelper';
+import { getRoleDefaultPassword, isUsingDefaultPassword } from './PasswordManager';
 
 interface EmployeeManagerProps {
   employees: Employee[];
@@ -82,12 +86,16 @@ export default function EmployeeManager({
   const [role, setRole] = useState<EmployeeRole>('Carpenter');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [initialPassword, setInitialPassword] = useState('');
+  const [showInitialPassword, setShowInitialPassword] = useState(false);
 
   // Form states - Edit Employee
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState<EmployeeRole>('Carpenter');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   // Form states - Warning Letter
   const [warnType, setWarnType] = useState('First Written Warning');
@@ -108,12 +116,26 @@ export default function EmployeeManager({
     setEditRole(emp.role);
     setEditPhone(emp.phone);
     setEditEmail(emp.email);
+    setEditPassword('');
+    setShowEditPassword(false);
     setShowEditModal(true);
+  };
+
+  const canManageEmployeePassword = (emp: Employee): boolean => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'Admin') return true;
+    if (currentUser.role === 'Manager') return emp.role !== 'Admin';
+    return currentUser.id === emp.id;
   };
 
   const handleEditSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!selectedEmployee || !editName.trim()) return;
+
+    const hasNewPassword = editPassword.trim().length > 0 && canManageEmployeePassword(selectedEmployee);
+    if (hasNewPassword && editPassword.trim().length < 4) {
+      return;
+    }
 
     const updated: Employee = {
       ...selectedEmployee,
@@ -121,12 +143,20 @@ export default function EmployeeManager({
       role: editRole,
       phone: editPhone,
       email: editEmail,
+      ...(hasNewPassword
+        ? {
+            password: editPassword.trim(),
+            passwordUpdatedAt: new Date().toISOString(),
+            passwordUpdatedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'Admin'
+          }
+        : {})
     };
 
     if (onUpdateEmployee) {
       onUpdateEmployee(updated);
     }
     setSelectedEmployee(updated);
+    setEditPassword('');
     setShowEditModal(false);
   };
 
@@ -156,12 +186,19 @@ export default function EmployeeManager({
     e.preventDefault();
     if (!name.trim() || !phone.trim() || !email.trim()) return;
 
+    const resolvedPassword = initialPassword.trim().length >= 4
+      ? initialPassword.trim()
+      : getRoleDefaultPassword(role);
+
     onAddEmployee({
       name,
       role,
       phone,
       email,
-      status: 'Active'
+      status: 'Active',
+      password: resolvedPassword,
+      passwordUpdatedAt: new Date().toISOString(),
+      passwordUpdatedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'Admin'
     });
 
     // Reset Form
@@ -169,6 +206,8 @@ export default function EmployeeManager({
     setRole('Carpenter');
     setPhone('');
     setEmail('');
+    setInitialPassword('');
+    setShowInitialPassword(false);
 
     setShowRegisterModal(false);
     if (onCloseRegisterModal) onCloseRegisterModal();
@@ -556,7 +595,7 @@ export default function EmployeeManager({
                 </div>
 
                 {/* Worker specifications contact info */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4 border-y border-gray-50 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 py-4 border-y border-gray-50 text-sm">
                   <div className="space-y-1">
                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
                       <Phone className="w-3 h-3 text-wood-600" /> Phone number
@@ -574,6 +613,31 @@ export default function EmployeeManager({
                       <Calendar className="w-3 h-3 text-wood-600" /> Hire Date
                     </span>
                     <p className="text-gray-700 font-mono text-xs font-semibold">{selectedEmployee.hireDate}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                      <KeyRound className="w-3 h-3 text-wood-600" /> Login Password
+                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                          isUsingDefaultPassword(selectedEmployee)
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        }`}
+                      >
+                        {isUsingDefaultPassword(selectedEmployee) ? 'Default PIN' : 'Custom Set'}
+                      </span>
+                      {!isAuditor && canManageEmployeePassword(selectedEmployee) && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(selectedEmployee)}
+                          className="text-[10px] font-bold text-amber-700 hover:underline cursor-pointer"
+                        >
+                          Change PIN
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -875,6 +939,32 @@ export default function EmployeeManager({
                   </div>
                 </div>
 
+                {canManageEmployeePassword(selectedEmployee) && (
+                  <div className="space-y-1 pt-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Set New Login Password / PIN (Optional)</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showEditPassword ? 'text' : 'password'}
+                        minLength={4}
+                        placeholder="Leave blank to keep current password..."
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        className="w-full pl-4 pr-10 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword((v) => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 cursor-pointer"
+                      >
+                        {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2 pt-4">
                   <button 
                     type="button" 
@@ -1089,6 +1179,30 @@ export default function EmployeeManager({
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium"
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Initial Login Password / PIN (Defaults to {getRoleDefaultPassword(role)})</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showInitialPassword ? 'text' : 'password'}
+                      minLength={4}
+                      placeholder={`Leave blank for default PIN (${getRoleDefaultPassword(role)})`}
+                      value={initialPassword}
+                      onChange={(e) => setInitialPassword(e.target.value)}
+                      className="w-full pl-4 pr-10 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowInitialPassword((v) => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700 cursor-pointer"
+                    >
+                      {showInitialPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 

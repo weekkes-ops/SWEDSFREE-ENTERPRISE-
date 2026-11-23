@@ -346,6 +346,7 @@ button.bg-wood-700:hover {
   #daily-work-print-area,
   #settings-print-area,
   #manual-print-area,
+  #passwords-print-area,
   #print-area {
     display: none !important;
     visibility: hidden !important;
@@ -665,6 +666,20 @@ button.bg-wood-700:hover {
     overflow: visible !important;
   }
 
+  html[data-print-mode="passwords"] #passwords-print-area,
+  html[data-print-mode="passwords"] #passwords-print-area *,
+  body[data-print-mode="passwords"] #passwords-print-area,
+  body[data-print-mode="passwords"] #passwords-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="passwords"] #passwords-print-area,
+  body[data-print-mode="passwords"] #passwords-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
   /* FALLBACK FOR DIRECT/NATIVE PRINT (when no data-print-mode attribute is set) */
   html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area,
   html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area *,
@@ -755,6 +770,7 @@ button.bg-wood-700:hover {
   #fuel-print-area,
   #fuel-single-print-area,
   #tools-print-area,
+  #passwords-print-area,
   #print-area {
     position: relative !important;
     left: auto !important;
@@ -849,6 +865,7 @@ button.bg-wood-700:hover {
   #fuel-print-area *,
   #fuel-single-print-area *,
   #tools-print-area *,
+  #passwords-print-area *,
   .sweds-paper-invoice * {
     box-shadow: none !important;
     text-shadow: none !important;
@@ -899,6 +916,7 @@ button.bg-wood-700:hover {
   #fuel-print-area,
   #fuel-single-print-area,
   #tools-print-area,
+  #passwords-print-area,
   #print-area {
     background-color: #ffffff !important;
     background: #ffffff !important;
@@ -1164,6 +1182,7 @@ button.bg-wood-700:hover {
   #fuel-print-area,
   #fuel-single-print-area,
   #tools-print-area,
+  #passwords-print-area,
   #print-area,
   #print-area > div,
   .sweds-paper-invoice,

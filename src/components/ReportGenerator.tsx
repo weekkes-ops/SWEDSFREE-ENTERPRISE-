@@ -236,8 +236,6 @@ export default function ReportGenerator({
   const inwardsQty = invInwards.reduce((sum, t) => sum + t.quantity, 0);
   const inwardsVal = invInwards.reduce((sum, t) => sum + t.totalValue, 0);
 
-  const lowStockCount = inventory.filter(i => i.currentStock <= i.minStockThreshold).length;
-
   const handlePrint = () => {
     printDocument('report');
   };
@@ -854,8 +852,8 @@ export default function ReportGenerator({
               <Package className="w-4 h-4 text-wood-600" />
               Raw Materials & Hardware Stock Balance Audit ({selectedPeriod})
             </h3>
-            <span className="text-xs text-amber-800 bg-amber-50 px-2.5 py-1 rounded border border-amber-100 font-bold">
-              {lowStockCount} items below threshold
+            <span className="text-xs text-slate-700 bg-slate-50 px-2.5 py-1 rounded border border-slate-200 font-bold">
+              {inventory.length} tracked materials
             </span>
           </div>
 

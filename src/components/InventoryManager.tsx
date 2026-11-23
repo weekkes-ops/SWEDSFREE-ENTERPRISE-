@@ -6,7 +6,6 @@ import {
   ArrowUpRight, 
   Search, 
   Filter, 
-  AlertTriangle, 
   History, 
   Flame, 
   Trash2,
@@ -69,7 +68,6 @@ export default function InventoryManager({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<WoodCategory | 'All'>('All');
-  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [showNewItemModal, setShowNewItemModal] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'STOCK' | 'LOGS'>('STOCK');
@@ -410,8 +408,7 @@ export default function InventoryManager({
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || item.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
-    const matchesLowStock = !showLowStockOnly || item.currentStock <= 5;
-    return matchesSearch && matchesCategory && matchesLowStock;
+    return matchesSearch && matchesCategory;
   });
 
   const sortedInventory = [...filteredInventory].sort((a, b) => {
@@ -431,13 +428,8 @@ export default function InventoryManager({
       valA = a.currentStock;
       valB = b.currentStock;
     } else if (stockSortField === 'status') {
-      const getStatusRank = (item: InventoryItem) => {
-        if (item.currentStock < 5) return 3;
-        if (item.currentStock <= item.minStockThreshold) return 2;
-        return 1;
-      };
-      valA = getStatusRank(a);
-      valB = getStatusRank(b);
+      valA = a.currentStock > 0 ? 1 : 0;
+      valB = b.currentStock > 0 ? 1 : 0;
     } else if (stockSortField === 'date') {
       valA = a.lastUpdatedTimestamp || a.lastUpdated || '';
       valB = b.lastUpdatedTimestamp || b.lastUpdated || '';
@@ -1008,20 +1000,6 @@ export default function InventoryManager({
                   Card Grid View
                 </button>
               </div>
-
-              {/* Low Stock checkbox */}
-              <label className="flex items-center gap-2 cursor-pointer py-1 select-none">
-                <input
-                  type="checkbox"
-                  checked={showLowStockOnly}
-                  onChange={(e) => setShowLowStockOnly(e.target.checked)}
-                  className="rounded border-gray-300 text-wood-600 focus:ring-wood-500 w-4 h-4"
-                />
-                <span className="text-xs font-bold text-amber-700 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Show Low Stock Only
-                </span>
-              </label>
             </div>
           </div>
 
@@ -1146,16 +1124,10 @@ export default function InventoryManager({
                     ) : (
                       sortedInventory.map(item => {
                         const movement = getItemStockMovement(item);
-                        const isLow = movement.balance <= 5;
-                        const isWarningThreshold = movement.balance <= 2;
                         return (
                           <tr 
                             key={item.id} 
-                            className={`transition ${
-                              isWarningThreshold 
-                                ? 'bg-amber-50/80 hover:bg-amber-100/50 text-amber-950 font-semibold border-l-4 border-amber-500' 
-                                : 'hover:bg-gray-50/50 text-gray-700'
-                            }`}
+                            className="transition hover:bg-gray-50/50 text-gray-700"
                           >
                             <td className="py-3.5 px-4">
                               <p className="font-bold text-gray-900">{item.name}</p>
@@ -1184,7 +1156,7 @@ export default function InventoryManager({
                             </td>
                             {/* Balance Column */}
                             <td className="py-3.5 px-4 text-right font-mono font-black text-sm bg-wood-50/20 whitespace-nowrap">
-                              <span className={movement.balance <= 5 ? 'text-red-700 font-black' : 'text-wood-950 font-black'}>
+                              <span className="text-wood-950 font-black">
                                 {movement.balance}
                               </span> <span className="text-[10px] text-gray-400 font-sans font-normal">{item.unit}</span>
                             </td>
@@ -1203,17 +1175,13 @@ export default function InventoryManager({
                               </p>
                             </td>
                             <td className="py-3.5 px-4 text-center">
-                              {isWarningThreshold ? (
-                                <span className="text-amber-900 text-[10px] font-black uppercase">
-                                  CRITICAL (&le; 2 UNITS)
-                                </span>
-                              ) : isLow ? (
-                                <span className="text-red-700 text-[10px] font-black uppercase">
-                                  LOW STOCK (&le; 5 UNITS)
+                              {movement.balance > 0 ? (
+                                <span className="text-emerald-700 text-[10px] font-black uppercase">
+                                  IN STOCK
                                 </span>
                               ) : (
-                                <span className="text-emerald-700 text-[10px] font-black uppercase">
-                                  HEALTHY
+                                <span className="text-slate-500 text-[10px] font-black uppercase">
+                                  OUT OF STOCK
                                 </span>
                               )}
                             </td>
@@ -1302,37 +1270,21 @@ export default function InventoryManager({
               ) : (
                 sortedInventory.map(item => {
                   const movement = getItemStockMovement(item);
-                  const isLow = movement.balance <= item.minStockThreshold;
-                  const isWarningThreshold = movement.balance < 5;
                   return (
                     <motion.div
                       key={item.id}
                       layoutId={`inv-${item.id}`}
                       whileHover={{ y: -3 }}
-                      className={`bg-white p-5 rounded-2xl border ${
-                        isWarningThreshold 
-                          ? 'border-amber-300 bg-amber-50/30' 
-                          : isLow 
-                            ? 'border-red-200 bg-red-50/5' 
-                            : 'border-wood-100'
-                      } shadow-xs flex flex-col justify-between`}
+                      className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs flex flex-col justify-between"
                     >
                       <div>
                         <div className="flex items-start justify-between gap-1 text-xs">
                           <span className="text-wood-800 font-bold uppercase">
                             {item.category}
                           </span>
-                          {isWarningThreshold ? (
-                            <span className="flex items-center gap-1 text-amber-800 text-[10px] font-extrabold">
-                              <AlertTriangle className="w-3 h-3" />
-                              STOCK &lt; 5 UNITS
-                            </span>
-                          ) : isLow && (
-                            <span className="flex items-center gap-1 text-red-800 text-[10px] font-extrabold">
-                              <AlertTriangle className="w-3 h-3" />
-                              REORDER LEVEL
-                            </span>
-                          )}
+                          <span className={`text-[10px] font-extrabold uppercase ${movement.balance > 0 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                            {movement.balance > 0 ? 'IN STOCK' : 'OUT OF STOCK'}
+                          </span>
                         </div>
                         <h3 className="text-sm font-bold text-gray-900 mt-1.5 line-clamp-2 leading-snug">
                           {item.name}

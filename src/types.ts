@@ -78,6 +78,8 @@ export interface Employee {
   status: EmployeeStatus;
   hireDate: string;
   password?: string;
+  passwordUpdatedAt?: string;
+  passwordUpdatedBy?: string;
 }
 
 export type JobStatus = 'Quote' | 'In Progress' | 'Ready for Sander' | 'Ready for Polishing' | 'Completed' | 'Delivered';

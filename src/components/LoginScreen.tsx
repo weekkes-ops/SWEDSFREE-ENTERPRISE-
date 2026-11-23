@@ -16,7 +16,9 @@ import {
   Clock,
   X,
   RotateCcw,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -40,6 +42,7 @@ export default function LoginScreen({
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState(false);
   const [freshSessionBadge, setFreshSessionBadge] = useState(false);
@@ -50,6 +53,7 @@ export default function LoginScreen({
   const [regPhone, setRegPhone] = useState('');
   const [regRole, setRegRole] = useState<EmployeeRole>('Carpenter');
   const [regPassword, setRegPassword] = useState('1234');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [regError, setRegError] = useState('');
 
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -314,13 +318,21 @@ export default function LoginScreen({
                     <div className="relative">
                       <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <input
-                        type="password"
+                        type={showRegPassword ? 'text' : 'password'}
                         required
                         placeholder="Choose a PIN or password..."
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-amber-500 text-slate-900 font-mono"
+                        className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-amber-500 text-slate-900 font-mono"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword((prev) => !prev)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                        title={showRegPassword ? 'Hide PIN' : 'Show PIN'}
+                      >
+                        {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -430,7 +442,7 @@ export default function LoginScreen({
                     <div className="relative">
                       <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4.5 h-4.5" />
                       <input
-                        type="password"
+                        type={showLoginPassword ? 'text' : 'password'}
                         required
                         placeholder="Enter access code..."
                         value={password}
@@ -438,9 +450,17 @@ export default function LoginScreen({
                           setPassword(e.target.value);
                           setError('');
                         }}
-                        className="w-full pl-11 pr-4 py-3 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-amber-500 font-mono text-slate-900 placeholder-slate-400"
+                        className="w-full pl-11 pr-11 py-3 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-amber-500 font-mono text-slate-900 placeholder-slate-400"
                         id="login-password-input"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                        title={showLoginPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 

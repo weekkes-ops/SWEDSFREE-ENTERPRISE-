@@ -29,9 +29,13 @@ import {
 import { Employee } from '../types';
 import { downloadUserManualPdf } from '../utils/userManualPdf';
 import { printDocument } from '../utils/printHelper';
+import PasswordManager from './PasswordManager';
 
 interface SettingsManagerProps {
   currentUser: Employee | null;
+  employees?: Employee[];
+  onUpdateEmployee?: (employee: Employee) => void;
+  onOpenPasswordManager?: () => void;
   isOnline: boolean;
   lastSyncTime: string;
   syncStatus: 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
@@ -56,6 +60,9 @@ interface SettingsManagerProps {
 
 export default function SettingsManager({
   currentUser,
+  employees = [],
+  onUpdateEmployee,
+  onOpenPasswordManager,
   isOnline,
   lastSyncTime,
   syncStatus,
@@ -202,6 +209,17 @@ export default function SettingsManager({
               </a>
             </div>
           </div>
+
+          {/* PASSWORD MANAGER SECTION (Self-Service + Admin/Manager Credential Vault) */}
+          {onUpdateEmployee && (
+            <PasswordManager
+              employees={employees.length > 0 ? employees : (currentUser ? [currentUser] : [])}
+              currentUser={currentUser}
+              onUpdateEmployee={onUpdateEmployee}
+              embedded={true}
+              onOpenFullView={onOpenPasswordManager}
+            />
+          )}
           
           {/* EXCLUSIVE BACKUP & RESTORE SECTION */}
           <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-xs space-y-6 relative overflow-hidden">

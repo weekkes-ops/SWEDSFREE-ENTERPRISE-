@@ -4,7 +4,6 @@ import {
   Users, 
   DollarSign, 
   Package, 
-  AlertTriangle, 
   ArrowUpRight, 
   ArrowDownRight, 
   Clock, 
@@ -17,7 +16,10 @@ import {
   Download,
   FileSpreadsheet,
   FileCheck,
-  Printer
+  Printer,
+  Camera,
+  KeyRound,
+  BookOpen
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { printDocument } from '../utils/printHelper';
@@ -52,7 +54,11 @@ export default function DashboardOverview({
   onTriggerProforma
 }: DashboardOverviewProps) {
   
-  const isManager = !currentUser || currentUser.role === 'Manager';
+  const isManager =
+    !currentUser ||
+    currentUser.role === 'Admin' ||
+    currentUser.role === 'Manager' ||
+    currentUser.role === 'Auditor';
 
   // Calculate Month-to-Date (MTD) financial statistics
   const now = new Date();
@@ -73,11 +79,11 @@ export default function DashboardOverview({
   // Calculate analytics
   const activeJobs = isManager 
     ? jobs.filter(j => j.status !== 'Completed' && j.status !== 'Delivered')
-    : jobs.filter(j => j.status !== 'Completed' && j.status !== 'Delivered' && j.assignedEmployees.includes(currentUser.id));
+    : [];
 
   const completedJobsCount = isManager
     ? jobs.filter(j => j.status === 'Completed' || j.status === 'Delivered').length
-    : jobs.filter(j => (j.status === 'Completed' || j.status === 'Delivered') && j.assignedEmployees.includes(currentUser.id)).length;
+    : 0;
   
   const totalRevenue = jobs.reduce((sum, job) => {
     const jobPayments = job.payments.reduce((pSum, p) => pSum + p.amount, 0);
@@ -93,7 +99,6 @@ export default function DashboardOverview({
     return sum + (item.currentStock * item.unitCost);
   }, 0);
 
-  const lowStockItems = inventory.filter(item => item.currentStock <= item.minStockThreshold);
   const activeEmployees = employees.filter(e => e.status === 'Active');
 
   // Stagger animation variants
@@ -113,17 +118,24 @@ export default function DashboardOverview({
   };
 
   const handleExportMetricsCSV = () => {
-    const data = [
-      ["Metric", "Value", "Context"],
-      ["Total Active Jobs", activeJobs.length, "Unfinished commissions"],
-      ["Completed Projects", completedJobsCount, "Finished or delivered commissions"],
-      ["Total Revenue", formatCurrency(totalRevenue), "Total payments received"],
-      ["Outstanding Balance", formatCurrency(totalOutstanding), "Unpaid quote amounts"],
-      ["Total Inventory Value", formatCurrency(totalInventoryValue), "Sum of current stock * unit cost"],
-      ["Low Stock Alerts", lowStockItems.length, "Materials at or below threshold"],
-      ["Active Workforce Count", activeEmployees.length, "Artisans registry count"],
-      ["Registered Customers", customers.length, "Clients directory count"]
-    ];
+    const data = isManager
+      ? [
+          ["Metric", "Value", "Context"],
+          ["Total Active Jobs", activeJobs.length, "Unfinished commissions"],
+          ["Completed Projects", completedJobsCount, "Finished or delivered commissions"],
+          ["Total Revenue", formatCurrency(totalRevenue), "Total payments received"],
+          ["Outstanding Balance", formatCurrency(totalOutstanding), "Unpaid quote amounts"],
+          ["Total Inventory Value", formatCurrency(totalInventoryValue), "Sum of current stock * unit cost"],
+          ["Tracked Inventory Materials", inventory.length, "Total raw wood & hardware materials"],
+          ["Active Workforce Count", activeEmployees.length, "Artisans registry count"],
+          ["Registered Customers", customers.length, "Clients directory count"]
+        ]
+      : [
+          ["Metric", "Value", "Context"],
+          ["Staff Member", currentUser?.name || 'Employee', currentUser?.role || 'Workshop Staff'],
+          ["Status", currentUser?.status || 'Active', "Workshop personnel registry"],
+          ["Date", new Date().toLocaleDateString('en-US'), "Workshop Hub export"]
+        ];
 
     const csvContent = "\uFEFF" + data.map(row => row.map(val => {
       const stringified = String(val).replace(/"/g, '""');
@@ -156,7 +168,7 @@ export default function DashboardOverview({
           <p className="text-sm text-gray-500 mt-1">
             {isManager 
               ? 'Real-time operations, inventory reserves, and financial metrics for SWED WOOD WORK MANAGEMENT SYSTEM.'
-              : `You are authenticated as an artisan (${currentUser?.role}). Log your work and view assigned commissions.`
+              : `You are signed in as ${currentUser?.role}. Upload your daily work logs, voice reports, and manage your account password.`
             }
           </p>
         </div>
@@ -250,59 +262,6 @@ export default function DashboardOverview({
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Low Inventory Stock Alert Notification Banner */}
-      {lowStockItems.length > 0 && (
-        <motion.div 
-          variants={itemVariants}
-          className="bg-red-50 border border-red-200 rounded-2xl p-5 shadow-xs space-y-3.5 relative overflow-hidden"
-          id="low-stock-notification-banner"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-600 rounded-xl">
-                <AlertTriangle className="w-5 h-5 animate-pulse" />
-              </div>
-              <div className="space-y-0.5">
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  Low Inventory Stock Alert Indicator
-                  <span className="bg-red-100 border border-red-300 text-red-800 text-[10px] font-black px-2 py-0.5 rounded-full">
-                    {lowStockItems.length} Item(s) Below Minimum
-                  </span>
-                </h3>
-                <p className="text-xs text-gray-600">
-                  The following timber/hardware stock items have fallen below their defined minimum threshold. Restock recommended.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('inventory')}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-xs transition"
-            >
-              Restock Inventory
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1 relative z-10">
-            {lowStockItems.map(item => (
-              <div 
-                key={item.id}
-                className="bg-white/90 p-3 rounded-xl border border-red-200 flex items-center justify-between gap-3 text-xs shadow-xs"
-              >
-                <div className="space-y-0.5 min-w-0">
-                  <p className="font-bold text-gray-800 truncate">{item.name}</p>
-                  <p className="text-[10px] text-gray-500 font-semibold uppercase">{item.category} &bull; {item.unit}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="bg-red-100 text-red-800 text-[11px] font-black font-mono px-2 py-0.5 rounded-md border border-red-200">
-                    {item.currentStock} {item.unit}
-                  </span>
                 </div>
               </div>
             ))}
@@ -430,9 +389,9 @@ export default function DashboardOverview({
                 <h3 className="text-2xl font-bold font-mono text-wood-900">
                   {formatCurrency(totalInventoryValue)}
                 </h3>
-                <div className="flex items-center gap-1 text-xs text-amber-600 font-medium">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>{lowStockItems.length} low stock alerts</span>
+                <div className="flex items-center gap-1 text-xs text-wood-600 font-medium">
+                  <Package className="w-3.5 h-3.5" />
+                  <span>{inventory.length} materials registered</span>
                 </div>
               </div>
               <div className="p-3.5 bg-amber-50 rounded-xl text-amber-600 border border-amber-100">
@@ -484,24 +443,25 @@ export default function DashboardOverview({
               </div>
             </motion.div>
 
-            {/* Assigned Commissions */}
+            {/* Daily Reporting Card */}
             <motion.div 
               variants={itemVariants}
               whileHover={{ y: -3 }}
-              className="bg-white p-6 rounded-2xl border border-wood-100 shadow-xs flex items-center justify-between"
+              className="bg-white p-6 rounded-2xl border border-wood-100 shadow-xs flex items-center justify-between cursor-pointer"
+              onClick={() => setActiveTab('daily-work')}
             >
               <div className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">My Assigned Jobs</span>
-                <h3 className="text-2xl font-bold font-mono text-wood-900">
-                  {activeJobs.length} <span className="text-sm font-sans text-gray-400 font-normal">Active</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Daily Work Logs</span>
+                <h3 className="text-2xl font-bold font-display text-wood-900">
+                  Submit Report
                 </h3>
                 <div className="flex items-center gap-1 text-xs text-wood-600 font-medium">
-                  <FolderKanban className="w-3.5 h-3.5" />
-                  <span>{completedJobsCount} completed jobs</span>
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Photo &amp; voice log upload</span>
                 </div>
               </div>
               <div className="p-3.5 bg-wood-50 rounded-xl text-wood-600 border border-wood-100">
-                <Wrench className="w-6 h-6" />
+                <Camera className="w-6 h-6" />
               </div>
             </motion.div>
 
@@ -517,7 +477,7 @@ export default function DashboardOverview({
                   Active
                 </h3>
                 <div className="flex items-center gap-1 text-xs text-amber-600 font-medium">
-                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <Clock className="w-3.5 h-3.5" />
                   <span>Always upload at end-of-day</span>
                 </div>
               </div>
@@ -553,41 +513,42 @@ export default function DashboardOverview({
       {/* Main Body Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left Column - Critical Alerts & Shortcuts */}
+        {/* Left Column - Shortcuts & Operational Code */}
         <div className="lg:col-span-1 space-y-6">
           {/* Quick Actions Shortcuts */}
           <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
             <h3 className="font-display font-bold text-gray-900">Quick Workshop Actions</h3>
             <div className="grid grid-cols-1 gap-2">
-              <button 
-                onClick={() => {
-                  if (onTriggerProforma) {
-                    onTriggerProforma();
-                  } else {
-                    setActiveTab('proforma');
-                  }
-                }}
-                className="flex items-center justify-between p-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 transition text-sm font-bold text-amber-950 shadow-xs cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <FileSpreadsheet className="w-4 h-4 text-amber-900" />
-                  <span>Draft Proforma Invoice</span>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-amber-700" />
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('documents')}
-                className="flex items-center justify-between p-3 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100 transition text-sm font-bold text-sky-950 shadow-xs cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <FileCheck className="w-4 h-4 text-sky-700" />
-                  <span>Official Documents &amp; Vault</span>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-sky-600" />
-              </button>
-              {isManager ? (
+              {isManager && (
                 <>
+                  <button 
+                    onClick={() => {
+                      if (onTriggerProforma) {
+                        onTriggerProforma();
+                      } else {
+                        setActiveTab('proforma');
+                      }
+                    }}
+                    className="flex items-center justify-between p-3 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 transition text-sm font-bold text-amber-950 shadow-xs cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-amber-900" />
+                      <span>Draft Proforma Invoice</span>
+                    </div>
+                    <ArrowUpRight className="w-4 h-4 text-amber-700" />
+                  </button>
+
+                  <button 
+                    onClick={() => setActiveTab('documents')}
+                    className="flex items-center justify-between p-3 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100 transition text-sm font-bold text-sky-950 shadow-xs cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileCheck className="w-4 h-4 text-sky-700" />
+                      <span>Official Documents &amp; Vault</span>
+                    </div>
+                    <ArrowUpRight className="w-4 h-4 text-sky-600" />
+                  </button>
+
                   <button 
                     onClick={() => onOpenQuickAction('register-customer')}
                     className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-wood-50 hover:border-wood-200 transition text-sm font-medium text-gray-700"
@@ -627,23 +588,37 @@ export default function DashboardOverview({
                     <Wrench className="w-4 h-4" />
                   </button>
                 </>
-              ) : (
+              )}
+              {!isManager && (
                 <>
                   <button 
                     onClick={() => setActiveTab('daily-work')}
-                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-wood-50 hover:border-wood-200 transition text-sm font-medium text-gray-700 font-bold"
+                    className="flex items-center justify-between p-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition text-sm font-bold text-amber-950 cursor-pointer"
                   >
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 bg-amber-500 rounded-full animate-ping"></span>
-                      Upload Daily Work Log
+                    <span className="flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-amber-700" />
+                      <span>Upload Daily Work Log</span>
+                    </span>
+                    <ArrowUpRight className="w-4 h-4 text-amber-700" />
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('passwords')}
+                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-wood-50 hover:border-wood-200 transition text-sm font-medium text-gray-700 cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <KeyRound className="w-4 h-4 text-wood-700" />
+                      <span>Password Manager</span>
                     </span>
                     <ArrowUpRight className="w-4 h-4 text-gray-400" />
                   </button>
                   <button 
-                    onClick={() => setActiveTab('jobs')}
-                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-wood-50 hover:border-wood-200 transition text-sm font-medium text-gray-700"
+                    onClick={() => setActiveTab('manual')}
+                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-wood-50 hover:border-wood-200 transition text-sm font-medium text-gray-700 cursor-pointer"
                   >
-                    <span>View My Assigned Jobs</span>
+                    <span className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-wood-700" />
+                      <span>System User Manual (PDF)</span>
+                    </span>
                     <ArrowUpRight className="w-4 h-4 text-gray-400" />
                   </button>
                 </>
@@ -651,20 +626,20 @@ export default function DashboardOverview({
             </div>
           </motion.div>
 
-          {/* Low Stock Watchlist or Artisan guidelines */}
+          {/* Artisan Guidelines or Inventory Snapshot */}
           {!isManager ? (
             <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
               <h3 className="font-display font-bold text-gray-900 flex items-center gap-1.5">
-                <AlertTriangle className="w-4 h-4 text-amber-500 animate-pulse" />
+                <UserCheck className="w-4 h-4 text-amber-600" />
                 Artisan Operational Code
               </h3>
               <div className="space-y-3 text-xs text-gray-600 leading-relaxed">
                 <p className="font-bold text-gray-800">Please adhere to the daily workshop reporting rules:</p>
                 <ul className="list-disc list-inside space-y-2 pl-1 text-gray-500 font-medium">
                   <li>Record clock-in and clock-out times accurately.</li>
-                  <li>Upload clear photo proofs of finished workpieces or raw assemblies.</li>
-                  <li>Log precise material usage against your active jobs.</li>
-                  <li>Leave detailed progress descriptions for sanders and polishers.</li>
+                  <li>Upload clear photo proofs or voice notes of finished workpieces.</li>
+                  <li>Log precise daily workshop progress notes for supervisor review.</li>
+                  <li>Keep your workshop login PIN/password secure in Password Manager.</li>
                 </ul>
               </div>
             </motion.div>
@@ -672,31 +647,31 @@ export default function DashboardOverview({
             <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-display font-bold text-gray-900 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  Low Stock Alerts
+                  <Package className="w-4 h-4 text-wood-600" />
+                  Workshop Stock Directory
                 </h3>
-                <span className="bg-amber-50 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-amber-200">
-                  {lowStockItems.length} critical
+                <span className="bg-wood-50 text-wood-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-wood-200">
+                  {inventory.length} materials
                 </span>
               </div>
 
-              {lowStockItems.length === 0 ? (
+              {inventory.length === 0 ? (
                 <p className="text-xs text-gray-500 text-center py-4 bg-gray-50 rounded-xl">
-                  All raw materials and hardware are optimally stocked.
+                  No raw materials or hardware registered yet.
                 </p>
               ) : (
                 <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
-                  {lowStockItems.map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-red-50/50 rounded-xl border border-red-100">
+                  {inventory.slice(0, 5).map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-gray-800 truncate">{item.name}</p>
                         <p className="text-[10px] text-gray-400 font-semibold">{item.category}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-mono font-bold text-red-600">
+                        <p className="text-xs font-mono font-bold text-wood-900">
                           {item.currentStock} {item.unit}
                         </p>
-                        <p className="text-[10px] text-amber-700 font-bold uppercase">Low Balance</p>
+                        <p className="text-[10px] text-gray-500 font-semibold uppercase">On Hand</p>
                       </div>
                     </div>
                   ))}
@@ -704,7 +679,7 @@ export default function DashboardOverview({
               )}
               <button 
                 onClick={() => setActiveTab('inventory')}
-                className="w-full text-center text-xs font-semibold text-wood-600 hover:text-wood-700 hover:underline"
+                className="w-full text-center text-xs font-semibold text-wood-600 hover:text-wood-700 hover:underline cursor-pointer"
               >
                 Manage Inventory Stock &rarr;
               </button>
@@ -712,145 +687,178 @@ export default function DashboardOverview({
           )}
         </div>
 
-        {/* Right Columns - Job & Commission Progress board */}
+        {/* Right Columns */}
         <div className="lg:col-span-2 space-y-6">
-          <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display font-bold text-gray-900">Active Commissions & Job Pipelines</h3>
-              <button 
-                onClick={() => setActiveTab('jobs')}
-                className="text-xs font-semibold text-wood-600 hover:text-wood-700 hover:underline"
-              >
-                View All Jobs
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {activeJobs.length === 0 ? (
-                <div className="text-center py-10 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-                  <p className="text-sm text-gray-500">No active woodwork commissions registered.</p>
+          {isManager ? (
+            <>
+              <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display font-bold text-gray-900">Active Commissions &amp; Job Pipelines</h3>
                   <button 
-                    onClick={() => {
-                      setActiveTab('jobs');
-                      onOpenQuickAction('create-job');
-                    }}
-                    className="text-xs text-wood-600 font-semibold underline mt-1"
+                    onClick={() => setActiveTab('jobs')}
+                    className="text-xs font-semibold text-wood-600 hover:text-wood-700 hover:underline"
                   >
-                    Initiate one now
+                    View All Jobs
                   </button>
                 </div>
-              ) : (
-                activeJobs.slice(0, 3).map(job => {
-                  const paid = job.payments.reduce((sum, p) => sum + p.amount, 0);
-                  const completionPercentage = Math.round((paid / job.quoteAmount) * 100);
-                  
-                  // Status badge style mapper
-                  const getStatusStyle = (status: string) => {
-                    switch (status) {
-                      case 'Quote': return 'bg-gray-100 text-gray-700 border-gray-200';
-                      case 'In Progress': return 'bg-amber-50 text-amber-700 border-amber-200';
-                      case 'Ready for Sander': return 'bg-blue-50 text-blue-700 border-blue-200';
-                      case 'Ready for Polishing': return 'bg-purple-50 text-purple-700 border-purple-200';
-                      case 'Completed': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                      default: return 'bg-green-100 text-green-800 border-green-200';
-                    }
-                  };
 
-                  return (
-                    <div key={job.id} className="p-4 rounded-xl border border-wood-100 hover:bg-wood-50/30 transition">
-                      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                        <div>
-                          <h4 className="text-sm font-bold text-gray-800">{job.title}</h4>
-                          <p className="text-xs text-gray-400">Client: {job.customerName}</p>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {onTriggerProforma && (
-                            <button
-                              onClick={() => onTriggerProforma(job.customerId, job.id)}
-                              className="px-2.5 py-1 text-[10px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer"
-                              title={`Create / View Proforma Invoice for ${job.title}`}
-                            >
-                              <FileSpreadsheet className="w-3 h-3 text-amber-900" />
-                              <span>PROFORMA</span>
-                            </button>
-                          )}
-                          <span className={`text-[10px] font-semibold tracking-wider uppercase px-2.5 py-1 rounded-full border ${getStatusStyle(job.status)}`}>
-                            {job.status}
-                          </span>
-                        </div>
-                      </div>
+                <div className="space-y-3">
+                  {activeJobs.length === 0 ? (
+                    <div className="text-center py-10 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                      <p className="text-sm text-gray-500">No active woodwork commissions registered.</p>
+                      <button 
+                        onClick={() => {
+                          setActiveTab('jobs');
+                          onOpenQuickAction('create-job');
+                        }}
+                        className="text-xs text-wood-600 font-semibold underline mt-1"
+                      >
+                        Initiate one now
+                      </button>
+                    </div>
+                  ) : (
+                    activeJobs.slice(0, 3).map(job => {
+                      const paid = job.payments.reduce((sum, p) => sum + p.amount, 0);
+                      const completionPercentage = Math.round((paid / job.quoteAmount) * 100);
                       
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 py-2 text-xs border-y border-gray-50 font-medium">
-                        <div>
-                          <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Due Date</span>
-                          <span className="text-gray-700 font-mono text-xs">{job.dueDate}</span>
+                      // Status badge style mapper
+                      const getStatusStyle = (status: string) => {
+                        switch (status) {
+                          case 'Quote': return 'bg-gray-100 text-gray-700 border-gray-200';
+                          case 'In Progress': return 'bg-amber-50 text-amber-700 border-amber-200';
+                          case 'Ready for Sander': return 'bg-blue-50 text-blue-700 border-blue-200';
+                          case 'Ready for Polishing': return 'bg-purple-50 text-purple-700 border-purple-200';
+                          case 'Completed': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                          default: return 'bg-green-100 text-green-800 border-green-200';
+                        }
+                      };
+
+                      return (
+                        <div key={job.id} className="p-4 rounded-xl border border-wood-100 hover:bg-wood-50/30 transition">
+                          <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                            <div>
+                              <h4 className="text-sm font-bold text-gray-800">{job.title}</h4>
+                              <p className="text-xs text-gray-400">Client: {job.customerName}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {onTriggerProforma && (
+                                <button
+                                  onClick={() => onTriggerProforma(job.customerId, job.id)}
+                                  className="px-2.5 py-1 text-[10px] font-black uppercase text-amber-950 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-lg transition flex items-center gap-1 shadow-xs cursor-pointer"
+                                  title={`Create / View Proforma Invoice for ${job.title}`}
+                                >
+                                  <FileSpreadsheet className="w-3 h-3 text-amber-900" />
+                                  <span>PROFORMA</span>
+                                </button>
+                              )}
+                              <span className={`text-[10px] font-semibold tracking-wider uppercase px-2.5 py-1 rounded-full border ${getStatusStyle(job.status)}`}>
+                                {job.status}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 py-2 text-xs border-y border-gray-50 font-medium">
+                            <div>
+                              <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Due Date</span>
+                              <span className="text-gray-700 font-mono text-xs">{job.dueDate}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Quote Price</span>
+                              <span className="text-wood-800 font-mono text-xs font-bold">{formatCurrency(job.quoteAmount, 0)}</span>
+                            </div>
+                            <div className="col-span-2 md:col-span-1">
+                              <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Financial Progress</span>
+                              <span className="text-emerald-700 font-mono text-xs font-bold">
+                                {formatCurrency(paid, 0)} paid ({completionPercentage}%)
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-2.5">
+                            <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1">
+                              <span>Craftsmen Assigned</span>
+                              <span>Material Logged: {job.materialsUsed.length} item(s)</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {job.assignedEmployees.map(empId => {
+                                const emp = employees.find(e => e.id === empId);
+                                if (!emp) return null;
+                                return (
+                                  <span key={empId} className="bg-wood-100 text-wood-900 text-[10px] px-2 py-0.5 rounded font-medium border border-wood-200/50">
+                                    {emp.name} ({emp.role})
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Quote Price</span>
-                          <span className="text-wood-800 font-mono text-xs font-bold">{formatCurrency(job.quoteAmount, 0)}</span>
-                        </div>
-                        <div className="col-span-2 md:col-span-1">
-                          <span className="text-[10px] text-gray-400 uppercase tracking-wider block">Financial Progress</span>
-                          <span className="text-emerald-700 font-mono text-xs font-bold">
-                            {formatCurrency(paid, 0)} paid ({completionPercentage}%)
+                      );
+                    })
+                  )}
+                </div>
+              </motion.div>
+
+              {/* Quick Inventory Stock Overview */}
+              <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
+                <h3 className="font-display font-bold text-gray-900">Raw Wood Stock Health</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {inventory.slice(0, 4).map(item => {
+                    const stockRatio = Math.min(100, Math.round((item.currentStock / 500) * 100)); // normalized to 500 BF/Sheets max scale
+                    
+                    return (
+                      <div key={item.id} className="p-3.5 rounded-xl border border-gray-100 bg-gray-50/50 space-y-2">
+                        <div className="flex items-start justify-between gap-1">
+                          <div>
+                            <p className="text-xs font-bold text-gray-800 line-clamp-1">{item.name}</p>
+                            <p className="text-[10px] text-gray-400 font-semibold">{item.category}</p>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-wood-100 text-wood-800">
+                            {item.currentStock} {item.unit}
                           </span>
                         </div>
+                        {/* Linear visual level */}
+                        <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            style={{ width: `${stockRatio}%` }}
+                            className="h-full rounded-full bg-wood-500"
+                          />
+                        </div>
                       </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            </>
+          ) : (
+            <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-wood-100 shadow-xs space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-gray-900">Daily Workshop Reporting Portal</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    File your daily attendance, photo progress proofs, and voice status updates directly to workshop supervisors.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('daily-work')}
+                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer shrink-0"
+                >
+                  Open Daily Logs &rarr;
+                </button>
+              </div>
 
-                      <div className="mt-2.5">
-                        <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1">
-                          <span>Craftsmen Assigned</span>
-                          <span>Material Logged: {job.materialsUsed.length} item(s)</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {job.assignedEmployees.map(empId => {
-                            const emp = employees.find(e => e.id === empId);
-                            if (!emp) return null;
-                            return (
-                              <span key={empId} className="bg-wood-100 text-wood-900 text-[10px] px-2 py-0.5 rounded font-medium border border-wood-200/50">
-                                {emp.name} ({emp.role})
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </motion.div>
-
-          {/* Quick Inventory Stock Overview */}
-          {isManager && (
-            <motion.div variants={itemVariants} className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs space-y-4">
-              <h3 className="font-display font-bold text-gray-900">Raw Wood Stock Health</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {inventory.slice(0, 4).map(item => {
-                  const stockRatio = Math.min(100, Math.round((item.currentStock / 500) * 100)); // normalized to 500 BF/Sheets max scale
-                  const isLow = item.currentStock <= item.minStockThreshold;
-                  
-                  return (
-                    <div key={item.id} className="p-3.5 rounded-xl border border-gray-100 bg-gray-50/50 space-y-2">
-                      <div className="flex items-start justify-between gap-1">
-                        <div>
-                          <p className="text-xs font-bold text-gray-800 line-clamp-1">{item.name}</p>
-                          <p className="text-[10px] text-gray-400 font-semibold">{item.category}</p>
-                        </div>
-                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${isLow ? 'bg-red-100 text-red-800' : 'bg-wood-100 text-wood-800'}`}>
-                          {item.currentStock} {item.unit}
-                        </span>
-                      </div>
-                      {/* Linear visual level */}
-                      <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          style={{ width: `${stockRatio}%` }}
-                          className={`h-full rounded-full ${isLow ? 'bg-red-500' : 'bg-wood-500'}`}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200 space-y-1.5">
+                  <p className="font-bold text-amber-950">Photo &amp; Voice Reporting</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Record a voice message or attach progress photos of your carpentry, sanding, or polishing work inside Daily Logs.
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <p className="font-bold text-slate-900">Account Security &amp; Manual</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Update your login PIN/password anytime in Password Manager or read the 15-chapter System User Manual.
+                  </p>
+                </div>
               </div>
             </motion.div>
           )}
@@ -867,7 +875,9 @@ export default function DashboardOverview({
             <img src="/logo.svg" alt="Swedswood Logo" className="w-12 h-12 object-contain" />
             <div>
               <h1 className="text-xl font-black uppercase tracking-tight">SWEDS WOOD ENTERPRISE</h1>
-              <p className="text-xs text-gray-600">2 Swed Free Avenue, Sussex &bull; Workshop Hub Executive Summary</p>
+              <p className="text-xs text-gray-600">
+                2 Swed Free Avenue, Sussex &bull; {isManager ? 'Workshop Hub Executive Summary' : 'Artisan Workshop Summary'}
+              </p>
             </div>
           </div>
           <div className="text-right text-xs font-mono">
@@ -876,85 +886,72 @@ export default function DashboardOverview({
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-3 text-xs">
-          <div className="p-3 border border-slate-300 rounded-lg">
-            <span className="uppercase text-[10px] text-gray-500 font-bold">Active Jobs</span>
-            <p className="text-lg font-black font-mono">{activeJobs.length}</p>
-          </div>
-          <div className="p-3 border border-slate-300 rounded-lg">
-            <span className="uppercase text-[10px] text-gray-500 font-bold">Cleared Revenue</span>
-            <p className="text-lg font-black font-mono">{formatCurrency(totalRevenue, 0)}</p>
-          </div>
-          <div className="p-3 border border-slate-300 rounded-lg">
-            <span className="uppercase text-[10px] text-gray-500 font-bold">Outstanding Due</span>
-            <p className="text-lg font-black font-mono">{formatCurrency(totalOutstanding, 0)}</p>
-          </div>
-          <div className="p-3 border border-slate-300 rounded-lg">
-            <span className="uppercase text-[10px] text-gray-500 font-bold">Inventory Value</span>
-            <p className="text-lg font-black font-mono">{formatCurrency(totalInventoryValue, 0)}</p>
-          </div>
-        </div>
+        {isManager ? (
+          <>
+            <div className="grid grid-cols-4 gap-3 text-xs">
+              <div className="p-3 border border-slate-300 rounded-lg">
+                <span className="uppercase text-[10px] text-gray-500 font-bold">Active Jobs</span>
+                <p className="text-lg font-black font-mono">{activeJobs.length}</p>
+              </div>
+              <div className="p-3 border border-slate-300 rounded-lg">
+                <span className="uppercase text-[10px] text-gray-500 font-bold">Cleared Revenue</span>
+                <p className="text-lg font-black font-mono">{formatCurrency(totalRevenue, 0)}</p>
+              </div>
+              <div className="p-3 border border-slate-300 rounded-lg">
+                <span className="uppercase text-[10px] text-gray-500 font-bold">Outstanding Due</span>
+                <p className="text-lg font-black font-mono">{formatCurrency(totalOutstanding, 0)}</p>
+              </div>
+              <div className="p-3 border border-slate-300 rounded-lg">
+                <span className="uppercase text-[10px] text-gray-500 font-bold">Inventory Value</span>
+                <p className="text-lg font-black font-mono">{formatCurrency(totalInventoryValue, 0)}</p>
+              </div>
+            </div>
 
-        <div className="grid grid-cols-3 gap-3 text-xs border border-slate-300 rounded-lg p-3">
-          <div><span className="text-gray-500 uppercase text-[10px] font-bold block">{monthName} Income</span><strong className="font-mono">{formatCurrency(mtdIncome, 0)}</strong></div>
-          <div><span className="text-gray-500 uppercase text-[10px] font-bold block">{monthName} Expenditure</span><strong className="font-mono">{formatCurrency(mtdExpenditure, 0)}</strong></div>
-          <div><span className="text-gray-500 uppercase text-[10px] font-bold block">{monthName} Net Surplus</span><strong className="font-mono">{formatCurrency(mtdNet, 0)}</strong></div>
-        </div>
+            <div className="grid grid-cols-3 gap-3 text-xs border border-slate-300 rounded-lg p-3">
+              <div><span className="text-gray-500 uppercase text-[10px] font-bold block">{monthName} Income</span><strong className="font-mono">{formatCurrency(mtdIncome, 0)}</strong></div>
+              <div><span className="text-gray-500 uppercase text-[10px] font-bold block">{monthName} Expenditure</span><strong className="font-mono">{formatCurrency(mtdExpenditure, 0)}</strong></div>
+              <div><span className="text-gray-500 uppercase text-[10px] font-bold block">{monthName} Net Surplus</span><strong className="font-mono">{formatCurrency(mtdNet, 0)}</strong></div>
+            </div>
 
-        <div>
-          <h2 className="text-sm font-black uppercase mb-2">Active Commissions Queue ({activeJobs.length})</h2>
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-100 border-b border-slate-300 uppercase text-[10px]">
-                <th className="py-2 px-2">Commission</th>
-                <th className="py-2 px-2">Client</th>
-                <th className="py-2 px-2">Status</th>
-                <th className="py-2 px-2">Due Date</th>
-                <th className="py-2 px-2 text-right">Quote (Le)</th>
-                <th className="py-2 px-2 text-right">Paid (Le)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {activeJobs.map((job) => {
-                const paid = job.payments.reduce((s, p) => s + p.amount, 0);
-                return (
-                  <tr key={job.id}>
-                    <td className="py-1.5 px-2 font-bold">{job.title}</td>
-                    <td className="py-1.5 px-2">{job.customerName}</td>
-                    <td className="py-1.5 px-2">{job.status}</td>
-                    <td className="py-1.5 px-2 font-mono">{job.dueDate}</td>
-                    <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(job.quoteAmount, 0)}</td>
-                    <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(paid, 0)}</td>
+            <div>
+              <h2 className="text-sm font-black uppercase mb-2">Active Commissions Queue ({activeJobs.length})</h2>
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 uppercase text-[10px]">
+                    <th className="py-2 px-2">Commission</th>
+                    <th className="py-2 px-2">Client</th>
+                    <th className="py-2 px-2">Status</th>
+                    <th className="py-2 px-2">Due Date</th>
+                    <th className="py-2 px-2 text-right">Quote (Le)</th>
+                    <th className="py-2 px-2 text-right">Paid (Le)</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {lowStockItems.length > 0 && (
-          <div>
-            <h2 className="text-sm font-black uppercase mb-2">Low-Stock Reorder Alerts ({lowStockItems.length})</h2>
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-300 uppercase text-[10px]">
-                  <th className="py-2 px-2">Material</th>
-                  <th className="py-2 px-2">Category</th>
-                  <th className="py-2 px-2 text-right">Current Stock</th>
-                  <th className="py-2 px-2 text-right">Threshold</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {lowStockItems.map((item) => (
-                  <tr key={item.id}>
-                    <td className="py-1.5 px-2 font-bold">{item.name}</td>
-                    <td className="py-1.5 px-2">{item.category}</td>
-                    <td className="py-1.5 px-2 text-right font-mono">{item.currentStock} {item.unit}</td>
-                    <td className="py-1.5 px-2 text-right font-mono">{item.minStockThreshold} {item.unit}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {activeJobs.map((job) => {
+                    const paid = job.payments.reduce((s, p) => s + p.amount, 0);
+                    return (
+                      <tr key={job.id}>
+                        <td className="py-1.5 px-2 font-bold">{job.title}</td>
+                        <td className="py-1.5 px-2">{job.customerName}</td>
+                        <td className="py-1.5 px-2">{job.status}</td>
+                        <td className="py-1.5 px-2 font-mono">{job.dueDate}</td>
+                        <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(job.quoteAmount, 0)}</td>
+                        <td className="py-1.5 px-2 text-right font-mono">{formatCurrency(paid, 0)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="border border-slate-300 rounded-lg p-4 text-xs space-y-2">
+            <p><strong>Staff Member:</strong> {currentUser?.name || '-'}</p>
+            <p><strong>Role:</strong> {currentUser?.role || '-'}</p>
+            <p><strong>Registry Status:</strong> {currentUser?.status || 'Active'}</p>
+            <p className="text-gray-600 pt-2">
+              Please upload daily work logs (photo proof &amp; voice messages) via the Daily Logs section before end-of-day.
+            </p>
           </div>
         )}
       </div>
