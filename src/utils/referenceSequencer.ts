@@ -6,7 +6,7 @@
  * to avoid double entry and maintain consistency.
  */
 
-export function getNextAscendingReference(prefix: 'INV' | 'PRO' | 'REC', year?: number): string {
+export function getNextAscendingReference(prefix: 'INV' | 'PRO' | 'REC' | 'FUEL' | 'TOOL', year?: number): string {
   const targetYear = year || new Date().getFullYear();
   const yearStr = String(targetYear);
   const pattern = new RegExp(`^${prefix}-${yearStr}-(\\d+)$`, 'i');
@@ -14,28 +14,30 @@ export function getNextAscendingReference(prefix: 'INV' | 'PRO' | 'REC', year?: 
   let highestSeq = 0;
 
   // 1. Scan savedInvoices in localStorage (both potential keys)
-  try {
-    const keysToCheck = ['swedswood_saved_invoices', 'swedsfree_savedInvoices'];
-    for (const key of keysToCheck) {
-      const rawSaved = localStorage.getItem(key);
-      if (rawSaved) {
-        const list = JSON.parse(rawSaved);
-        if (Array.isArray(list)) {
-          list.forEach((doc: any) => {
-            const ref = doc.invoiceNo || doc.proformaNo || doc.receiptNo || doc.id || '';
-            const match = ref.match(pattern);
-            if (match && match[1]) {
-              const seq = parseInt(match[1], 10);
-              if (!isNaN(seq) && seq > highestSeq) {
-                highestSeq = seq;
+  if (prefix === 'INV' || prefix === 'PRO' || prefix === 'REC') {
+    try {
+      const keysToCheck = ['swedswood_saved_invoices', 'swedsfree_savedInvoices'];
+      for (const key of keysToCheck) {
+        const rawSaved = localStorage.getItem(key);
+        if (rawSaved) {
+          const list = JSON.parse(rawSaved);
+          if (Array.isArray(list)) {
+            list.forEach((doc: any) => {
+              const ref = doc.invoiceNo || doc.proformaNo || doc.receiptNo || doc.id || '';
+              const match = ref.match(pattern);
+              if (match && match[1]) {
+                const seq = parseInt(match[1], 10);
+                if (!isNaN(seq) && seq > highestSeq) {
+                  highestSeq = seq;
+                }
               }
-            }
-          });
+            });
+          }
         }
       }
+    } catch (e) {
+      console.error('Error scanning saved invoices for sequence:', e);
     }
-  } catch (e) {
-    console.error('Error scanning saved invoices for sequence:', e);
   }
 
   // 2. Scan jobs payments for receipts
@@ -66,6 +68,45 @@ export function getNextAscendingReference(prefix: 'INV' | 'PRO' | 'REC', year?: 
     }
   }
 
+  // 2b. Scan fuel requests or workshop tools
+  if (prefix === 'FUEL') {
+    try {
+      const rawFuel = localStorage.getItem('swedsfree_fuel_requests');
+      if (rawFuel) {
+        const list = JSON.parse(rawFuel);
+        if (Array.isArray(list)) {
+          list.forEach((f: any) => {
+            const ref = f.requestNo || f.id || '';
+            const match = ref.match(pattern);
+            if (match && match[1]) {
+              const seq = parseInt(match[1], 10);
+              if (!isNaN(seq) && seq > highestSeq) highestSeq = seq;
+            }
+          });
+        }
+      }
+    } catch {}
+  }
+
+  if (prefix === 'TOOL') {
+    try {
+      const rawTools = localStorage.getItem('swedsfree_workshop_tools');
+      if (rawTools) {
+        const list = JSON.parse(rawTools);
+        if (Array.isArray(list)) {
+          list.forEach((t: any) => {
+            const ref = t.toolCode || t.id || '';
+            const match = ref.match(pattern);
+            if (match && match[1]) {
+              const seq = parseInt(match[1], 10);
+              if (!isNaN(seq) && seq > highestSeq) highestSeq = seq;
+            }
+          });
+        }
+      }
+    } catch {}
+  }
+
   // 3. Scan a persistent sequence counter key in localStorage to guarantee monotonic ascension
   const storageCounterKey = `swedsfree_seq_${prefix}_${yearStr}`;
   const storedCounter = parseInt(localStorage.getItem(storageCounterKey) || '0', 10);
@@ -77,7 +118,7 @@ export function getNextAscendingReference(prefix: 'INV' | 'PRO' | 'REC', year?: 
   return `${prefix}-${yearStr}-${String(nextSeq).padStart(4, '0')}`;
 }
 
-export function commitAscendingReference(prefix: 'INV' | 'PRO' | 'REC', refString: string): void {
+export function commitAscendingReference(prefix: 'INV' | 'PRO' | 'REC' | 'FUEL' | 'TOOL', refString: string): void {
   const match = refString.match(new RegExp(`^${prefix}-(\\d{4})-(\\d+)$`, 'i'));
   if (match) {
     const yearStr = match[1];

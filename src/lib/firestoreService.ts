@@ -5,9 +5,36 @@ import {
   deleteDoc, 
   onSnapshot, 
   writeBatch,
-  getDocs
+  getDocs,
+  getDocFromServer
 } from 'firebase/firestore';
 import { db } from './firebase';
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
 
 export function isFirestoreAvailable(): boolean {
   try {
@@ -15,6 +42,55 @@ export function isFirestoreAvailable(): boolean {
   } catch {
     return false;
   }
+}
+
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null
+): FirestoreErrorInfo {
+  let localUser: { id?: string; email?: string } | null = null;
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('swedsfree_current_user') : null;
+    if (raw) localUser = JSON.parse(raw);
+  } catch {}
+
+  const errMessage = error instanceof Error ? error.message : String(error);
+  const errInfo: FirestoreErrorInfo = {
+    error: errMessage,
+    authInfo: {
+      userId: localUser?.id || null,
+      email: localUser?.email || null,
+      emailVerified: null,
+      isAnonymous: null,
+      tenantId: null,
+      providerInfo: []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  if (errMessage.toLowerCase().includes('missing or insufficient permissions')) {
+    throw new Error(JSON.stringify(errInfo));
+  }
+  return errInfo;
+}
+
+export async function testConnection(): Promise<boolean> {
+  if (!isFirestoreAvailable()) return false;
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.error('Please check your Firebase configuration (the client is offline).');
+    }
+    return false;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  testConnection();
 }
 
 // Helper to remove undefined fields which Firestore rejects
@@ -58,12 +134,17 @@ export function subscribeToCollection<T extends { id: string }>(
         onData(items);
       },
       (err) => {
-        console.error(`Firestore subscription error on ${collectionName}:`, err);
+        try {
+          handleFirestoreError(err, OperationType.GET, collectionName);
+        } catch (wrappedErr: any) {
+          if (onError) onError(wrappedErr);
+          return;
+        }
         if (onError) onError(err);
       }
     );
   } catch (err: any) {
-    console.error(`Failed to subscribe to ${collectionName}:`, err);
+    handleFirestoreError(err, OperationType.GET, collectionName);
     if (onError) onError(err);
     return () => {};
   }
@@ -81,7 +162,7 @@ export async function saveDocument<T extends { id: string }>(
     const cleanData = sanitizeForFirestore(item);
     await setDoc(docRef, cleanData, { merge: true });
   } catch (err) {
-    console.error(`Error saving document ${item.id} to ${collectionName}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, `${collectionName}/${item.id}`);
   }
 }
 
@@ -95,7 +176,7 @@ export async function deleteDocument(
     const docRef = doc(db, collectionName, String(id));
     await deleteDoc(docRef);
   } catch (err) {
-    console.error(`Error deleting document ${id} from ${collectionName}:`, err);
+    handleFirestoreError(err, OperationType.DELETE, `${collectionName}/${id}`);
   }
 }
 
@@ -114,7 +195,7 @@ export async function saveBatchDocuments<T extends { id: string }>(
     });
     await batch.commit();
   } catch (err) {
-    console.error(`Error saving batch to ${collectionName}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, collectionName);
     // Fallback to sequential save if batch hits limits
     for (const item of items) {
       await saveDocument(collectionName, item);
@@ -136,7 +217,7 @@ export async function deleteBatchDocuments(
     });
     await batch.commit();
   } catch (err) {
-    console.error(`Error deleting batch from ${collectionName}:`, err);
+    handleFirestoreError(err, OperationType.DELETE, collectionName);
     for (const id of ids) {
       await deleteDocument(collectionName, id);
     }
@@ -156,7 +237,7 @@ export async function clearEntireCollection(collectionName: string): Promise<voi
     });
     await batch.commit();
   } catch (err) {
-    console.error(`Error clearing entire collection ${collectionName}:`, err);
+    handleFirestoreError(err, OperationType.DELETE, collectionName);
   }
 }
 
@@ -174,7 +255,7 @@ export async function fetchCollectionFromFirestore<T extends { id: string }>(
     });
     return items;
   } catch (err) {
-    console.error(`Error fetching collection ${collectionName} from Firestore:`, err);
+    handleFirestoreError(err, OperationType.LIST, collectionName);
     return [];
   }
 }

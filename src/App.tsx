@@ -28,7 +28,8 @@ import {
   ArrowLeft,
   FileCheck,
   UploadCloud,
-  Printer
+  Printer,
+  Fuel
 } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,6 +47,8 @@ import DailyWorkManager from './components/DailyWorkManager';
 import InvoiceReceiptManager from './components/InvoiceReceiptManager';
 import ProformaInvoiceDesk from './components/ProformaInvoiceDesk';
 import SettingsManager from './components/SettingsManager';
+import FuelRequestManager from './components/FuelRequestManager';
+import ToolsManager from './components/ToolsManager';
 import UserManualModal, { CHAPTERS as MANUAL_CHAPTERS } from './components/UserManualModal';
 import LoginScreen from './components/LoginScreen';
 import { LogOut } from 'lucide-react';
@@ -92,7 +95,10 @@ import {
   WarningLetter,
   SavedInvoice,
   PaymentAuditLogEntry,
-  OfficialDocument
+  OfficialDocument,
+  FuelRequest,
+  WorkshopTool,
+  ToolMovementLog
 } from './types';
 
 export default function App() {
@@ -156,6 +162,8 @@ export default function App() {
       case 'finance': return 'Financial Ledger';
       case 'reports': return 'Audit Reports';
       case 'documents': return 'Official Documents';
+      case 'fuel': return 'Fuel Requests (Diesel & Petrol)';
+      case 'tools': return 'Tools & Equipment';
       case 'settings': return 'Settings';
       default: return tabId;
     }
@@ -225,6 +233,9 @@ export default function App() {
       if (warningLetters.length > 0) await saveBatchDocuments('warningLetters', warningLetters);
       if (paymentAuditLogs.length > 0) await saveBatchDocuments('paymentAuditLogs', paymentAuditLogs);
       if (officialDocuments.length > 0) await saveBatchDocuments('officialDocuments', officialDocuments);
+      if (fuelRequests.length > 0) await saveBatchDocuments('fuelRequests', fuelRequests);
+      if (workshopTools.length > 0) await saveBatchDocuments('workshopTools', workshopTools);
+      if (toolLogs.length > 0) await saveBatchDocuments('toolLogs', toolLogs);
 
       const rawInvs = localStorage.getItem('swedswood_saved_invoices');
       if (rawInvs) {
@@ -304,7 +315,10 @@ export default function App() {
       warningLetters,
       savedInvoices,
       paymentAuditLogs,
-      officialDocuments
+      officialDocuments,
+      fuelRequests,
+      workshopTools,
+      toolLogs
     };
     const jsonStr = JSON.stringify(backupData, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -357,6 +371,9 @@ export default function App() {
           { key: 'warningLetters', localKey: 'swedsfree_warning_letters', data: data.warningLetters, setter: setWarningLetters },
           { key: 'paymentAuditLogs', localKey: 'swedsfree_payment_audit_logs', data: data.paymentAuditLogs, setter: setPaymentAuditLogs },
           { key: 'officialDocuments', localKey: 'swedsfree_official_documents', data: data.officialDocuments, setter: setOfficialDocuments },
+          { key: 'fuelRequests', localKey: 'swedsfree_fuel_requests', data: data.fuelRequests, setter: setFuelRequests },
+          { key: 'workshopTools', localKey: 'swedsfree_workshop_tools', data: data.workshopTools, setter: setWorkshopTools },
+          { key: 'toolLogs', localKey: 'swedsfree_tool_logs', data: data.toolLogs, setter: setToolLogs },
           { key: 'savedInvoices', localKey: 'swedswood_saved_invoices', data: data.savedInvoices, setter: null },
         ];
 
@@ -452,6 +469,9 @@ export default function App() {
   const [warningLetters, setWarningLetters] = useState<WarningLetter[]>(() => getStoredData('swedsfree_warning_letters', []));
   const [paymentAuditLogs, setPaymentAuditLogs] = useState<PaymentAuditLogEntry[]>(() => getStoredData('swedsfree_payment_audit_logs', []));
   const [officialDocuments, setOfficialDocuments] = useState<OfficialDocument[]>(() => getStoredData('swedsfree_official_documents', []));
+  const [fuelRequests, setFuelRequests] = useState<FuelRequest[]>(() => getStoredData('swedsfree_fuel_requests', []));
+  const [workshopTools, setWorkshopTools] = useState<WorkshopTool[]>(() => getStoredData('swedsfree_workshop_tools', []));
+  const [toolLogs, setToolLogs] = useState<ToolMovementLog[]>(() => getStoredData('swedsfree_tool_logs', []));
 
   // 1-minute inactivity timeout configuration (60,000ms = 1 minute)
   const [inactivityNotice, setInactivityNotice] = useState<string | null>(null);
@@ -508,6 +528,9 @@ export default function App() {
       await clearEntireCollection('officialDocuments');
       await clearEntireCollection('paymentAuditLogs');
       await clearEntireCollection('savedInvoices');
+      await clearEntireCollection('fuelRequests');
+      await clearEntireCollection('workshopTools');
+      await clearEntireCollection('toolLogs');
       await clearEntireCollection('employees');
 
       await saveDocument('employees', LIVE_ADMIN_EMPLOYEE);
@@ -526,6 +549,9 @@ export default function App() {
     setWarningLetters([]);
     setPaymentAuditLogs([]);
     setOfficialDocuments([]);
+    setFuelRequests([]);
+    setWorkshopTools([]);
+    setToolLogs([]);
 
     localStorage.setItem('swedsfree_inventory', JSON.stringify([]));
     localStorage.setItem('swedsfree_customers', JSON.stringify([]));
@@ -538,6 +564,9 @@ export default function App() {
     localStorage.setItem('swedsfree_warning_letters', JSON.stringify([]));
     localStorage.setItem('swedsfree_payment_audit_logs', JSON.stringify([]));
     localStorage.setItem('swedsfree_official_documents', JSON.stringify([]));
+    localStorage.setItem('swedsfree_fuel_requests', JSON.stringify([]));
+    localStorage.setItem('swedsfree_workshop_tools', JSON.stringify([]));
+    localStorage.setItem('swedsfree_tool_logs', JSON.stringify([]));
     localStorage.setItem('swedswood_saved_invoices', JSON.stringify([]));
 
     setActiveTab('dashboard');
@@ -565,6 +594,9 @@ export default function App() {
       const auditPays = await fetchCollectionFromFirestore<PaymentAuditLogEntry>('paymentAuditLogs');
       const invs = await fetchCollectionFromFirestore<SavedInvoice>('savedInvoices');
       const docs = await fetchCollectionFromFirestore<OfficialDocument>('officialDocuments');
+      const fuels = await fetchCollectionFromFirestore<FuelRequest>('fuelRequests');
+      const tools = await fetchCollectionFromFirestore<WorkshopTool>('workshopTools');
+      const tLogs = await fetchCollectionFromFirestore<ToolMovementLog>('toolLogs');
 
       const finalInv = inv;
       const finalCust = cust;
@@ -590,6 +622,9 @@ export default function App() {
       setWarningLetters(finalWarns);
       setPaymentAuditLogs(finalAuditPays);
       setOfficialDocuments(finalDocs);
+      setFuelRequests(fuels);
+      setWorkshopTools(tools);
+      setToolLogs(tLogs);
 
       localStorage.setItem('swedsfree_inventory', JSON.stringify(finalInv));
       localStorage.setItem('swedsfree_customers', JSON.stringify(finalCust));
@@ -602,6 +637,9 @@ export default function App() {
       localStorage.setItem('swedsfree_warning_letters', JSON.stringify(finalWarns));
       localStorage.setItem('swedsfree_payment_audit_logs', JSON.stringify(finalAuditPays));
       localStorage.setItem('swedsfree_official_documents', JSON.stringify(finalDocs));
+      localStorage.setItem('swedsfree_fuel_requests', JSON.stringify(fuels));
+      localStorage.setItem('swedsfree_workshop_tools', JSON.stringify(tools));
+      localStorage.setItem('swedsfree_tool_logs', JSON.stringify(tLogs));
       localStorage.setItem('swedswood_saved_invoices', JSON.stringify(finalInvs));
 
       setLastSyncTime(new Date().toLocaleTimeString());
@@ -650,6 +688,9 @@ export default function App() {
     syncCollection('warningLetters', setWarningLetters, 'swedsfree_warning_letters');
     syncCollection('paymentAuditLogs', setPaymentAuditLogs, 'swedsfree_payment_audit_logs');
     syncCollection('officialDocuments', setOfficialDocuments, 'swedsfree_official_documents');
+    syncCollection('fuelRequests', setFuelRequests, 'swedsfree_fuel_requests');
+    syncCollection('workshopTools', setWorkshopTools, 'swedsfree_workshop_tools');
+    syncCollection('toolLogs', setToolLogs, 'swedsfree_tool_logs');
 
     // Mark initialization complete without clearing data automatically
     if (localStorage.getItem('swedsfree_initial_purge_done') !== 'true') {
@@ -870,6 +911,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('swedsfree_warning_letters', JSON.stringify(warningLetters));
   }, [warningLetters]);
+
+  useEffect(() => {
+    localStorage.setItem('swedsfree_fuel_requests', JSON.stringify(fuelRequests));
+  }, [fuelRequests]);
+
+  useEffect(() => {
+    localStorage.setItem('swedsfree_workshop_tools', JSON.stringify(workshopTools));
+  }, [workshopTools]);
+
+  useEffect(() => {
+    localStorage.setItem('swedsfree_tool_logs', JSON.stringify(toolLogs));
+  }, [toolLogs]);
 
   // PURGE SAMPLE GENERATED DATA ACTION
   const handleResetDatabase = async () => {
@@ -1378,6 +1431,103 @@ export default function App() {
     deleteDocument('officialDocuments', id);
   };
 
+  // Fuel Request handlers
+  const handleAddFuelRequest = (req: FuelRequest) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setFuelRequests(prev => {
+      const updated = [req, ...prev];
+      localStorage.setItem('swedsfree_fuel_requests', JSON.stringify(updated));
+      return updated;
+    });
+    saveDocument('fuelRequests', req);
+  };
+
+  const handleUpdateFuelRequest = (updatedReq: FuelRequest) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setFuelRequests(prev => {
+      const updated = prev.map(r => r.id === updatedReq.id ? updatedReq : r);
+      localStorage.setItem('swedsfree_fuel_requests', JSON.stringify(updated));
+      return updated;
+    });
+    saveDocument('fuelRequests', updatedReq);
+  };
+
+  const handleDeleteFuelRequest = (id: string) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setFuelRequests(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      localStorage.setItem('swedsfree_fuel_requests', JSON.stringify(updated));
+      return updated;
+    });
+    deleteDocument('fuelRequests', id);
+  };
+
+  const handleRecordFuelExpense = (req: FuelRequest) => {
+    if (!req.totalCost || req.totalCost <= 0) return;
+    const tx: FinancialTransaction = {
+      id: `fin-fuel-${Date.now()}`,
+      type: 'EXPENDITURE',
+      category: req.equipmentOrVehicle.toLowerCase().includes('generator') ? 'Tools and generator' : 'Transportation',
+      amount: req.totalCost,
+      quantity: req.quantityLiters,
+      unitCost: req.unitCost,
+      date: req.requestDate,
+      description: `${req.fuelType} Fuel (${req.quantityLiters}L) — ${req.equipmentOrVehicle} [${req.requestNo}]`,
+      referenceId: req.requestNo
+    };
+    setFinancialTransactions(prev => {
+      const updated = [tx, ...prev];
+      localStorage.setItem('swedsfree_fin_transactions', JSON.stringify(updated));
+      return updated;
+    });
+    saveDocument('financialTransactions', tx);
+  };
+
+  // Workshop Tools handlers
+  const handleAddTool = (tool: WorkshopTool, logEntry: ToolMovementLog) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setWorkshopTools(prev => {
+      const updated = [tool, ...prev];
+      localStorage.setItem('swedsfree_workshop_tools', JSON.stringify(updated));
+      return updated;
+    });
+    setToolLogs(prev => {
+      const updated = [logEntry, ...prev];
+      localStorage.setItem('swedsfree_tool_logs', JSON.stringify(updated));
+      return updated;
+    });
+    saveDocument('workshopTools', tool);
+    saveDocument('toolLogs', logEntry);
+  };
+
+  const handleUpdateTool = (updatedTool: WorkshopTool, logEntry?: ToolMovementLog) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setWorkshopTools(prev => {
+      const updated = prev.map(t => t.id === updatedTool.id ? updatedTool : t);
+      localStorage.setItem('swedsfree_workshop_tools', JSON.stringify(updated));
+      return updated;
+    });
+    saveDocument('workshopTools', updatedTool);
+    if (logEntry) {
+      setToolLogs(prev => {
+        const updated = [logEntry, ...prev];
+        localStorage.setItem('swedsfree_tool_logs', JSON.stringify(updated));
+        return updated;
+      });
+      saveDocument('toolLogs', logEntry);
+    }
+  };
+
+  const handleDeleteTool = (id: string) => {
+    localStorage.setItem('swedsfree_seed_disabled', 'true');
+    setWorkshopTools(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      localStorage.setItem('swedsfree_workshop_tools', JSON.stringify(updated));
+      return updated;
+    });
+    deleteDocument('workshopTools', id);
+  };
+
   // Record Updators
   const handleUpdateInventoryItem = (updatedItem: InventoryItem) => {
     setInventory(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
@@ -1675,6 +1825,8 @@ export default function App() {
     ] : []),
     { id: 'proforma', label: 'PROFORMA INVOICE', icon: FileSpreadsheet, badge: 'Quote' },
     { id: 'jobs', label: 'Job lists', icon: Wrench },
+    { id: 'tools', label: 'Tools', icon: Hammer },
+    { id: 'fuel', label: 'Fuel Requests', icon: Fuel, badge: 'Diesel / Petrol' },
     { id: 'daily-work', label: 'Daily Logs', icon: Camera },
     ...(showManagementTabs ? [
       { id: 'finance', label: 'Financial Ledger', icon: DollarSign },
@@ -2279,6 +2431,32 @@ export default function App() {
                   onGoBack={handleGoBack}
                 />
               </div>
+            )}
+
+            {activeTab === 'tools' && (
+              <ToolsManager
+                tools={workshopTools}
+                toolLogs={toolLogs}
+                employees={employees}
+                jobs={jobs}
+                currentUser={currentUser}
+                onAddTool={handleAddTool}
+                onUpdateTool={handleUpdateTool}
+                onDeleteTool={handleDeleteTool}
+              />
+            )}
+
+            {activeTab === 'fuel' && (
+              <FuelRequestManager
+                fuelRequests={fuelRequests}
+                employees={employees}
+                jobs={jobs}
+                currentUser={currentUser}
+                onAddFuelRequest={handleAddFuelRequest}
+                onUpdateFuelRequest={handleUpdateFuelRequest}
+                onDeleteFuelRequest={handleDeleteFuelRequest}
+                onRecordFuelExpense={handleRecordFuelExpense}
+              />
             )}
 
             {activeTab === 'daily-work' && (

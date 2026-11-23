@@ -15,7 +15,10 @@ import {
   ChevronRight,
   Filter,
   Trash2,
-  Printer
+  Printer,
+  Mic,
+  Square,
+  Volume2
 } from 'lucide-react';
 import { Employee, Job, DailyWorkLog } from '../types';
 import { printDocument } from '../utils/printHelper';
@@ -79,6 +82,12 @@ export default function DailyWorkManager({
   const [location, setLocation] = useState('');
   const [comment, setComment] = useState('');
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [voiceNoteUrl, setVoiceNoteUrl] = useState<string>('');
+  const [voiceDurationSeconds, setVoiceDurationSeconds] = useState<number>(0);
+  const [voiceMimeType, setVoiceMimeType] = useState<string>('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
   
   // Keep form employeeId locked if currentUser is not Manager or Admin
   React.useEffect(() => {
@@ -87,9 +96,150 @@ export default function DailyWorkManager({
     }
   }, [currentUser, isModalOpen]);
   
-  // Drag & Drop State
+  // Drag & Drop + Voice Recorder Refs
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioUploadRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingSecondsRef = useRef<number>(0);
+
+  const stopRecordingResources = () => {
+    if (recordingTimerRef.current !== null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      stopRecordingResources();
+    };
+  }, []);
+
+  const formatDuration = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const rem = secs % 60;
+    return `${String(mins).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
+  };
+
+  const handleStartRecording = async () => {
+    setRecordingError(null);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setRecordingError('Live microphone recording is not supported in this browser. You can upload an audio clip instead.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      audioChunksRef.current = [];
+      recordingSecondsRef.current = 0;
+      setRecordingSeconds(0);
+
+      const candidateTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+      const chosenMime = candidateTypes.find((mt) => {
+        try {
+          return MediaRecorder.isTypeSupported(mt);
+        } catch {
+          return false;
+        }
+      });
+
+      const recorder = chosenMime
+        ? new MediaRecorder(stream, { mimeType: chosenMime, audioBitsPerSecond: 24000 })
+        : new MediaRecorder(stream, { audioBitsPerSecond: 24000 });
+
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) {
+          audioChunksRef.current.push(ev.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const mime = recorder.mimeType || chosenMime || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mime });
+        stopRecordingResources();
+        setIsRecording(false);
+
+        if (audioBlob.size > 680 * 1024) {
+          setRecordingError('Voice note exceeded 680 KB limit. Please record a shorter update (under 2 minutes).');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (typeof event.target?.result === 'string') {
+            setVoiceNoteUrl(event.target.result);
+            setVoiceMimeType(mime);
+            setVoiceDurationSeconds(Math.max(1, recordingSecondsRef.current));
+          }
+        };
+        reader.readAsDataURL(audioBlob);
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(250);
+      setIsRecording(true);
+
+      recordingTimerRef.current = window.setInterval(() => {
+        recordingSecondsRef.current += 1;
+        setRecordingSeconds(recordingSecondsRef.current);
+        if (recordingSecondsRef.current >= 120) {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+          }
+        }
+      }, 1000);
+    } catch (err: any) {
+      stopRecordingResources();
+      setIsRecording(false);
+      setRecordingError('Microphone access was denied or unavailable. Allow microphone permission or attach an audio file.');
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    } else {
+      stopRecordingResources();
+      setIsRecording(false);
+    }
+  };
+
+  const handleAudioFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRecordingError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('audio/')) {
+      setRecordingError('Please select a valid audio file (MP3, WAV, M4A, WEBM, OGG).');
+      return;
+    }
+    if (file.size > 680 * 1024) {
+      setRecordingError('Audio file is too large (max 680 KB for cloud sync). Please record or upload a shorter voice message.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (typeof ev.target?.result === 'string') {
+        const dataUrl = ev.target.result;
+        setVoiceNoteUrl(dataUrl);
+        setVoiceMimeType(file.type);
+        const audioEl = new Audio(dataUrl);
+        audioEl.onloadedmetadata = () => {
+          if (isFinite(audioEl.duration)) {
+            setVoiceDurationSeconds(Math.max(1, Math.round(audioEl.duration)));
+          }
+        };
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Filter logs
   const filteredLogs = workLogs.filter(log => {
@@ -146,6 +296,7 @@ export default function DailyWorkManager({
 
   // Reset form
   const resetForm = () => {
+    if (isRecording) handleStopRecording();
     setEmployeeId(currentUser && currentUser.role !== 'Manager' && currentUser.role !== 'Admin' ? currentUser.id : '');
     setJobId('');
     setDate(new Date().toISOString().split('T')[0]);
@@ -154,12 +305,21 @@ export default function DailyWorkManager({
     setLocation('');
     setComment('');
     setImagePreview('');
+    setVoiceNoteUrl('');
+    setVoiceDurationSeconds(0);
+    setVoiceMimeType('');
+    setRecordingSeconds(0);
+    setRecordingError(null);
   };
 
   // Handle Submit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isRecording) {
+      alert('Please stop your active voice recording before submitting the work log.');
+      return;
+    }
     if (!employeeId) {
       alert('Please select an Artisan.');
       return;
@@ -168,8 +328,9 @@ export default function DailyWorkManager({
       alert('Please specify the location.');
       return;
     }
-    if (!comment || comment.trim().length < 10) {
-      alert('Please add a descriptive comment of at least 10 characters.');
+    const finalComment = comment.trim() || (voiceNoteUrl ? 'Voice progress message attached by artisan.' : '');
+    if (!voiceNoteUrl && finalComment.length < 10) {
+      alert('Please add a descriptive comment of at least 10 characters or record a voice progress message.');
       return;
     }
     
@@ -185,8 +346,11 @@ export default function DailyWorkManager({
       timeStarted,
       timeEnd,
       location,
-      comment,
-      pictureUrl: imagePreview || PRESET_IMAGES[0].url // Default to first preset if empty
+      comment: finalComment,
+      pictureUrl: imagePreview || PRESET_IMAGES[0].url,
+      voiceNoteUrl: voiceNoteUrl || undefined,
+      voiceDurationSeconds: voiceNoteUrl ? (voiceDurationSeconds || 1) : undefined,
+      voiceMimeType: voiceNoteUrl ? (voiceMimeType || 'audio/webm') : undefined
     });
     
     setIsModalOpen(false);
@@ -348,6 +512,22 @@ export default function DailyWorkManager({
                     <p className="text-xs text-slate-400 italic leading-relaxed pt-1">
                       "{log.comment}"
                     </p>
+
+                    {/* Attached Voice Message Player */}
+                    {log.voiceNoteUrl && (
+                      <div className="mt-2 p-2.5 rounded-2xl bg-amber-50 border border-amber-200 space-y-1.5">
+                        <div className="flex items-center justify-between text-[10px] font-black uppercase text-amber-800">
+                          <span className="flex items-center gap-1">
+                            <Volume2 className="w-3.5 h-3.5 text-amber-600" />
+                            Employee Voice Update
+                          </span>
+                          {log.voiceDurationSeconds && (
+                            <span className="font-mono">{formatDuration(log.voiceDurationSeconds)}</span>
+                          )}
+                        </div>
+                        <audio controls preload="metadata" src={log.voiceNoteUrl} className="w-full h-8" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Footer status link */}
@@ -382,7 +562,11 @@ export default function DailyWorkManager({
                 </div>
               </div>
               <button 
-                onClick={() => setIsModalOpen(false)}
+                type="button"
+                onClick={() => {
+                  if (isRecording) handleStopRecording();
+                  setIsModalOpen(false);
+                }}
                 className="p-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white rounded-lg transition"
               >
                 ✕
@@ -586,10 +770,12 @@ export default function DailyWorkManager({
 
               {/* Achievements Comment */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 block">End-of-day Progress Comment *</label>
+                <label className="text-xs font-bold text-slate-300 block">
+                  End-of-day Progress Comment {voiceNoteUrl ? '(Optional when Voice Message is attached)' : '*'}
+                </label>
                 <textarea
-                  required
-                  rows={4}
+                  required={!voiceNoteUrl}
+                  rows={3}
                   placeholder="Detail exactly what woodwork tasks were accomplished (sanding, joinery, carving, coating applied, hardware fitted etc.)"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
@@ -598,11 +784,99 @@ export default function DailyWorkManager({
                 />
               </div>
 
+              {/* Employee Voice Recording / Audio Message */}
+              <div className="space-y-2.5 p-4 rounded-2xl bg-amber-50/70 border border-amber-200">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <label className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                      <Mic className="w-4 h-4 text-amber-600" />
+                      <span>Voice Message Report (Optional — max 2 mins)</span>
+                    </label>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Record a spoken progress update about the job directly from your microphone or attach a short audio note.
+                    </p>
+                  </div>
+                  <input
+                    ref={audioUploadRef}
+                    type="file"
+                    accept="audio/*"
+                    onChange={handleAudioFileUpload}
+                    className="hidden"
+                  />
+                </div>
+
+                {recordingError && (
+                  <p className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                    {recordingError}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {!isRecording ? (
+                    <button
+                      type="button"
+                      onClick={handleStartRecording}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition"
+                      id="btn-start-voice-record"
+                    >
+                      <Mic className="w-3.5 h-3.5" />
+                      <span>{voiceNoteUrl ? 'Re-record Voice Message' : 'Record Voice Message'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStopRecording}
+                      className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-xs flex items-center gap-2 shadow-xs cursor-pointer animate-pulse"
+                      id="btn-stop-voice-record"
+                    >
+                      <Square className="w-3.5 h-3.5 text-red-400 fill-red-400" />
+                      <span>Stop Recording ({formatDuration(recordingSeconds)})</span>
+                    </button>
+                  )}
+
+                  {!isRecording && (
+                    <button
+                      type="button"
+                      onClick={() => audioUploadRef.current?.click()}
+                      className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-xl text-xs border border-slate-300 cursor-pointer transition"
+                    >
+                      Attach Audio File
+                    </button>
+                  )}
+                </div>
+
+                {voiceNoteUrl && !isRecording && (
+                  <div className="pt-2 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-emerald-700">
+                      <span className="flex items-center gap-1">
+                        <Volume2 className="w-3.5 h-3.5" />
+                        Voice message ready ({formatDuration(voiceDurationSeconds)})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVoiceNoteUrl('');
+                          setVoiceDurationSeconds(0);
+                          setVoiceMimeType('');
+                        }}
+                        className="text-red-600 hover:underline cursor-pointer"
+                      >
+                        Remove Audio
+                      </button>
+                    </div>
+                    <audio controls src={voiceNoteUrl} className="w-full h-9" />
+                  </div>
+                )}
+              </div>
+
               {/* Footer */}
               <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    if (isRecording) handleStopRecording();
+                    setIsModalOpen(false);
+                  }}
                   className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 font-bold rounded-xl transition"
                 >
                   Cancel
@@ -613,7 +887,7 @@ export default function DailyWorkManager({
                   id="btn-submit-work-log"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>Verify & Submit Log</span>
+                  <span>Verify &amp; Submit Log</span>
                 </button>
               </div>
             </form>
@@ -646,7 +920,7 @@ export default function DailyWorkManager({
               <th className="py-2 px-2">Artisan</th>
               <th className="py-2 px-2">Site Location</th>
               <th className="py-2 px-2">Linked Commission</th>
-              <th className="py-2 px-2">Progress Summary</th>
+              <th className="py-2 px-2">Progress Summary &amp; Voice Note</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -662,7 +936,14 @@ export default function DailyWorkManager({
                   <td className="py-2 px-2 font-bold">{log.employeeName}</td>
                   <td className="py-2 px-2">{log.location}</td>
                   <td className="py-2 px-2">{log.jobTitle || 'General Workshop'}</td>
-                  <td className="py-2 px-2">{log.comment}</td>
+                  <td className="py-2 px-2">
+                    {log.comment}
+                    {log.voiceNoteUrl && (
+                      <div className="text-[10px] font-bold mt-0.5">
+                        [Voice Report Attached: {formatDuration(log.voiceDurationSeconds || 1)}]
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))
             )}

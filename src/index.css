@@ -623,6 +623,48 @@ button.bg-wood-700:hover {
     overflow: visible !important;
   }
 
+  html[data-print-mode="fuel"] #fuel-print-area,
+  html[data-print-mode="fuel"] #fuel-print-area *,
+  body[data-print-mode="fuel"] #fuel-print-area,
+  body[data-print-mode="fuel"] #fuel-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="fuel"] #fuel-print-area,
+  body[data-print-mode="fuel"] #fuel-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="fuel-single"] #fuel-single-print-area,
+  html[data-print-mode="fuel-single"] #fuel-single-print-area *,
+  body[data-print-mode="fuel-single"] #fuel-single-print-area,
+  body[data-print-mode="fuel-single"] #fuel-single-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="fuel-single"] #fuel-single-print-area,
+  body[data-print-mode="fuel-single"] #fuel-single-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  html[data-print-mode="tools"] #tools-print-area,
+  html[data-print-mode="tools"] #tools-print-area *,
+  body[data-print-mode="tools"] #tools-print-area,
+  body[data-print-mode="tools"] #tools-print-area * {
+    visibility: visible !important;
+  }
+  html[data-print-mode="tools"] #tools-print-area,
+  body[data-print-mode="tools"] #tools-print-area {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
   /* FALLBACK FOR DIRECT/NATIVE PRINT (when no data-print-mode attribute is set) */
   html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area,
   html:not([data-print-mode]) body:not([data-print-mode]) #receipt-print-area *,
@@ -650,6 +692,7 @@ button.bg-wood-700:hover {
   div:has(> #receipt-print-area),
   div:has(> #document-single-print-area),
   div:has(> #financial-voucher-print-area),
+  div:has(> #fuel-single-print-area),
   div:has(> #manual-print-area),
   div:has(> #print-area),
   div:has(> #bulk-print-area) {
@@ -681,7 +724,9 @@ button.bg-wood-700:hover {
   html[data-print-mode="customers"] div:has(> #receipt-print-area),
   body[data-print-mode="customers"] div:has(> #receipt-print-area),
   html[data-print-mode="documents"] div:has(> #document-single-print-area),
-  body[data-print-mode="documents"] div:has(> #document-single-print-area) {
+  body[data-print-mode="documents"] div:has(> #document-single-print-area),
+  html[data-print-mode="fuel"] div:has(> #fuel-single-print-area),
+  body[data-print-mode="fuel"] div:has(> #fuel-single-print-area) {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
@@ -707,6 +752,9 @@ button.bg-wood-700:hover {
   #daily-work-print-area,
   #settings-print-area,
   #manual-print-area,
+  #fuel-print-area,
+  #fuel-single-print-area,
+  #tools-print-area,
   #print-area {
     position: relative !important;
     left: auto !important;
@@ -798,6 +846,9 @@ button.bg-wood-700:hover {
   #daily-work-print-area *,
   #settings-print-area *,
   #manual-print-area *,
+  #fuel-print-area *,
+  #fuel-single-print-area *,
+  #tools-print-area *,
   .sweds-paper-invoice * {
     box-shadow: none !important;
     text-shadow: none !important;
@@ -845,6 +896,9 @@ button.bg-wood-700:hover {
   #daily-work-print-area,
   #settings-print-area,
   #manual-print-area,
+  #fuel-print-area,
+  #fuel-single-print-area,
+  #tools-print-area,
   #print-area {
     background-color: #ffffff !important;
     background: #ffffff !important;
@@ -1069,6 +1123,17 @@ button.bg-wood-700:hover {
     padding-top: 8px;
   }
 
+  .print-system-footer {
+    display: block !important;
+    margin-top: 24px;
+    padding-top: 10px;
+    border-top: 2px solid #000000 !important;
+    font-size: 8.5pt !important;
+    color: #334155 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
   /* Prevent awkward page breaks inside individual rows, but allow containers to paginate freely across multiple pages */
   tr {
     page-break-inside: avoid !important;
@@ -1096,6 +1161,9 @@ button.bg-wood-700:hover {
   #daily-work-print-area,
   #settings-print-area,
   #manual-print-area,
+  #fuel-print-area,
+  #fuel-single-print-area,
+  #tools-print-area,
   #print-area,
   #print-area > div,
   .sweds-paper-invoice,

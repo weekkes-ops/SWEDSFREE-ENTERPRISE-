@@ -185,6 +185,9 @@ export interface DailyWorkLog {
   location: string;
   comment: string;
   pictureUrl?: string;
+  voiceNoteUrl?: string;
+  voiceDurationSeconds?: number;
+  voiceMimeType?: string;
 }
 
 export interface RegistrationRequest {
@@ -315,5 +318,94 @@ export interface OfficialDocument {
   uploadedAt: string; // YYYY-MM-DD or ISO
   tags: string[];
 }
+
+export type FuelType = 'Diesel' | 'Petrol';
+export type FuelRequestStatus = 'Pending' | 'Approved' | 'Dispensed' | 'Rejected';
+export type FuelRequestUrgency = 'Routine' | 'Urgent' | 'Critical';
+
+export interface FuelRequest {
+  id: string;
+  requestNo: string; // e.g. FUEL-2026-0001
+  fuelType: FuelType;
+  quantityLiters: number;
+  unitCost: number; // Le per liter
+  totalCost: number; // Le
+  equipmentOrVehicle: string;
+  purpose: string;
+  linkedJobId?: string;
+  linkedJobTitle?: string;
+  vendorOrStation?: string;
+  odometerOrHours?: string;
+  requestedById: string;
+  requestedByName: string;
+  requestedByRole: string;
+  requestDate: string; // YYYY-MM-DD
+  requestTime?: string;
+  urgency: FuelRequestUrgency;
+  status: FuelRequestStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  dispensedBy?: string;
+  dispensedAt?: string;
+  notes?: string;
+  createdAt: string;
+  lastUpdated: string;
+}
+
+export type ToolCategory =
+  | 'Power Tools'
+  | 'Hand Tools'
+  | 'Measuring & Layout'
+  | 'Clamps & Vices'
+  | 'Safety Gear'
+  | 'Generators & Heavy Machinery'
+  | 'Other';
+
+export type ToolCondition = 'Excellent' | 'Good' | 'Needs Maintenance' | 'Damaged' | 'Retired';
+export type ToolStatus = 'Available' | 'Checked Out' | 'In Maintenance' | 'Lost / Retired';
+
+export interface WorkshopTool {
+  id: string;
+  toolCode: string; // e.g. TOOL-2026-0001
+  name: string;
+  category: ToolCategory;
+  brandOrModel?: string;
+  serialNumber?: string;
+  quantityTotal: number;
+  quantityAvailable: number;
+  condition: ToolCondition;
+  status: ToolStatus;
+  assignedToId?: string;
+  assignedToName?: string;
+  assignedJobId?: string;
+  assignedJobTitle?: string;
+  location: string;
+  purchaseDate?: string;
+  unitValue: number; // Replacement cost in Le
+  lastServiceDate?: string;
+  nextServiceDate?: string;
+  notes?: string;
+  lastUpdated: string;
+  lastModifiedBy?: string;
+}
+
+export interface ToolMovementLog {
+  id: string;
+  toolId: string;
+  toolName: string;
+  toolCode: string;
+  action: 'ADDED' | 'CHECKED_OUT' | 'RETURNED' | 'MAINTENANCE' | 'REPAIRED' | 'UPDATED';
+  employeeId?: string;
+  employeeName?: string;
+  jobId?: string;
+  jobTitle?: string;
+  quantity: number;
+  conditionAfter: string;
+  date: string;
+  time: string;
+  notes?: string;
+  recordedBy: string;
+}
+
 
 
