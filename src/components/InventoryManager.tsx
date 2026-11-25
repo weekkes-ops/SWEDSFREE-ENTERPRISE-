@@ -20,7 +20,11 @@ import {
   Download,
   CheckCircle2,
   Activity,
-  Printer
+  Printer,
+  Camera,
+  Image as ImageIcon,
+  X,
+  ZoomIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { printDocument } from '../utils/printHelper';
@@ -81,6 +85,9 @@ export default function InventoryManager({
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [previewingItem, setPreviewingItem] = useState<InventoryItem | null>(null);
+  const [previewImageIdx, setPreviewImageIdx] = useState(0);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
 
   // Form states - New Item with Stock Movement (Stock, Stock-In, Stock-Out, Balance, Date, Time, Purpose)
   const [newItemName, setNewItemName] = useState('');
@@ -92,6 +99,7 @@ export default function InventoryManager({
   const [newItemMaterialCode, setNewItemMaterialCode] = useState('');
   const [newItemSize, setNewItemSize] = useState('');
   const [newItemLocation, setNewItemLocation] = useState('');
+  const [newItemImages, setNewItemImages] = useState<string[]>([]);
   const [newItemDate, setNewItemDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newItemPurpose, setNewItemPurpose] = useState('Opening Stock Receipt / Supplier Inward');
 
@@ -105,7 +113,89 @@ export default function InventoryManager({
   const [editItemMaterialCode, setEditItemMaterialCode] = useState('');
   const [editItemSize, setEditItemSize] = useState('');
   const [editItemLocation, setEditItemLocation] = useState('');
+  const [editItemImages, setEditItemImages] = useState<string[]>([]);
   const [editItemPurpose, setEditItemPurpose] = useState('Physical Stock Audit & Balance Verification');
+
+  const getItemImages = (item: InventoryItem): string[] => {
+    if (Array.isArray(item.images) && item.images.length > 0) {
+      return item.images.filter(Boolean);
+    }
+    return item.imageUrl ? [item.imageUrl] : [];
+  };
+
+  const compressMaterialImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('Please upload valid image files (JPG, PNG, WEBP).'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Failed to read image file.'));
+      reader.onload = (ev) => {
+        const rawDataUrl = ev.target?.result as string;
+        if (!rawDataUrl) {
+          reject(new Error('Empty image data.'));
+          return;
+        }
+        if (file.type === 'image/svg+xml') {
+          resolve(rawDataUrl);
+          return;
+        }
+        const img = new window.Image();
+        img.onerror = () => resolve(rawDataUrl);
+        img.onload = () => {
+          const maxDim = 800;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(rawDataUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.78));
+        };
+        img.src = rawDataUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleMaterialImageFiles = async (files: FileList | null, mode: 'NEW' | 'EDIT') => {
+    if (!files || files.length === 0) return;
+    setImageUploadError(null);
+    const currentList = mode === 'NEW' ? newItemImages : editItemImages;
+    const remainingSlots = Math.max(0, 4 - currentList.length);
+    if (remainingSlots === 0) {
+      setImageUploadError('Maximum of 4 identification photos per material.');
+      return;
+    }
+    const selectedFiles = Array.from(files).slice(0, remainingSlots);
+    if (files.length > remainingSlots) {
+      setImageUploadError('Only the first 4 identification photos can be stored per material.');
+    }
+    try {
+      const processed = await Promise.all(selectedFiles.map(compressMaterialImage));
+      if (mode === 'NEW') {
+        setNewItemImages(prev => [...prev, ...processed].slice(0, 4));
+      } else {
+        setEditItemImages(prev => [...prev, ...processed].slice(0, 4));
+      }
+    } catch (err: any) {
+      setImageUploadError(err?.message || 'Unable to process image.');
+    }
+  };
 
   // Helper to compute Stock, Stock-In, Stock-Out, and Balance for tracking stock movement
   const getItemStockMovement = (item: InventoryItem) => {
@@ -156,6 +246,8 @@ export default function InventoryManager({
     setEditItemMaterialCode(item.materialCode || '');
     setEditItemSize(item.size || '');
     setEditItemLocation(item.location || '');
+    setEditItemImages(getItemImages(item));
+    setImageUploadError(null);
     setEditItemPurpose(item.lastMovementPurpose || 'Physical Stock Audit & Balance Adjustment');
     setShowEditItemModal(true);
   };
@@ -197,6 +289,8 @@ export default function InventoryManager({
         materialCode: editItemMaterialCode.trim(),
         size: editItemSize.trim(),
         location: editItemLocation.trim(),
+        imageUrl: editItemImages[0] || '',
+        images: editItemImages,
         lastUpdated: dateStr,
         lastUpdatedTime: timeStr,
         lastUpdatedTimestamp: isoStr,
@@ -286,6 +380,8 @@ export default function InventoryManager({
       materialCode: newItemMaterialCode.trim(),
       size: newItemSize.trim(),
       location: newItemLocation.trim(),
+      imageUrl: newItemImages[0] || '',
+      images: newItemImages,
       lastUpdatedTime: timeStr,
       lastUpdatedTimestamp: now.toISOString(),
       lastMovementPurpose: newItemPurpose.trim(),
@@ -307,6 +403,8 @@ export default function InventoryManager({
     setNewItemMaterialCode('');
     setNewItemSize('');
     setNewItemLocation('');
+    setNewItemImages([]);
+    setImageUploadError(null);
     setNewItemDate(new Date().toISOString().split('T')[0]);
     setNewItemPurpose('Opening Stock Receipt / Supplier Inward');
     setShowNewItemModal(false);
@@ -879,6 +977,7 @@ export default function InventoryManager({
               <button 
                 onClick={() => {
                   setNewItemDate(new Date().toISOString().split('T')[0]);
+                  setImageUploadError(null);
                   setShowNewItemModal(true);
                 }}
                 className="flex items-center gap-1.5 px-4 py-2.5 bg-wood-600 hover:bg-wood-700 text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
@@ -980,7 +1079,7 @@ export default function InventoryManager({
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                 <input
                   type="text"
-                  placeholder="Search wood or hardware materials..."
+                  placeholder="Search by material name, code, size, category, or location..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 focus:border-wood-300 focus:bg-white rounded-xl outline-hidden font-medium text-gray-800 placeholder-gray-400"
@@ -1146,18 +1245,55 @@ export default function InventoryManager({
                     ) : (
                       sortedInventory.map(item => {
                         const movement = getItemStockMovement(item);
+                        const itemPhotos = getItemImages(item);
                         return (
                           <tr 
                             key={item.id} 
                             className="transition hover:bg-gray-50/50 text-gray-700"
                           >
                             <td className="py-3.5 px-4">
-                              <p className="font-bold text-gray-900">{item.name}</p>
-                              <p className="text-[10px] text-gray-400 font-semibold">
-                                {item.materialCode ? `Code: ${item.materialCode}` : `ID: ${item.id}`}
-                                {item.size ? ` • Size: ${item.size}` : ''}
-                                {item.location ? ` • Location: ${item.location}` : ''}
-                              </p>
+                              <div className="flex items-center gap-3">
+                                {itemPhotos.length > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPreviewingItem(item);
+                                      setPreviewImageIdx(0);
+                                    }}
+                                    className="relative group w-12 h-12 rounded-xl overflow-hidden border border-wood-200 shadow-xs shrink-0 cursor-pointer bg-slate-100"
+                                    title="Click to inspect full-size material photo"
+                                  >
+                                    <img
+                                      src={itemPhotos[0]}
+                                      alt={item.name}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center">
+                                      <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition" />
+                                    </div>
+                                    {itemPhotos.length > 1 && (
+                                      <span className="absolute bottom-0.5 right-0.5 bg-slate-900/80 text-white text-[9px] font-bold px-1 rounded">
+                                        +{itemPhotos.length - 1}
+                                      </span>
+                                    )}
+                                  </button>
+                                ) : (
+                                  <div
+                                    className="w-12 h-12 rounded-xl border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center text-gray-300 shrink-0"
+                                    title="No material photo uploaded"
+                                  >
+                                    <ImageIcon className="w-4 h-4" />
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="font-bold text-gray-900">{item.name}</p>
+                                  <p className="text-[10px] text-gray-400 font-semibold">
+                                    {item.materialCode ? `Code: ${item.materialCode}` : `ID: ${item.id}`}
+                                    {item.size ? ` • Size: ${item.size}` : ''}
+                                    {item.location ? ` • Location: ${item.location}` : ''}
+                                  </p>
+                                </div>
+                              </div>
                             </td>
                             <td className="py-3.5 px-4 uppercase text-[10px] font-bold text-gray-500">
                               {item.category}
@@ -1296,6 +1432,7 @@ export default function InventoryManager({
               ) : (
                 sortedInventory.map(item => {
                   const movement = getItemStockMovement(item);
+                  const itemPhotos = getItemImages(item);
                   return (
                     <motion.div
                       key={item.id}
@@ -1304,6 +1441,34 @@ export default function InventoryManager({
                       className="bg-white p-5 rounded-2xl border border-wood-100 shadow-xs flex flex-col justify-between"
                     >
                       <div>
+                        {itemPhotos.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPreviewingItem(item);
+                              setPreviewImageIdx(0);
+                            }}
+                            className="relative group w-full h-40 mb-3 rounded-xl overflow-hidden border border-wood-100 bg-slate-100 block cursor-pointer"
+                            title="Click to inspect full-size material photo"
+                          >
+                            <img
+                              src={itemPhotos[0]}
+                              alt={item.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition flex items-center justify-center">
+                              <span className="opacity-0 group-hover:opacity-100 transition px-2.5 py-1 rounded-lg bg-slate-900/85 text-white text-[10px] font-bold flex items-center gap-1">
+                                <ZoomIn className="w-3.5 h-3.5" />
+                                Inspect Photo
+                              </span>
+                            </div>
+                            {itemPhotos.length > 1 && (
+                              <span className="absolute top-2 right-2 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                                {itemPhotos.length} Photos
+                              </span>
+                            )}
+                          </button>
+                        )}
                         <div className="flex items-start justify-between gap-1 text-xs">
                           <span className="text-wood-800 font-bold uppercase">
                             {item.category}
@@ -1542,6 +1707,51 @@ export default function InventoryManager({
                   />
                 </div>
 
+                {/* Edit Material Identification Photos */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1.5">
+                      <Camera className="w-3.5 h-3.5 text-wood-600" />
+                      <span>Material Identification Photos ({editItemImages.length}/4)</span>
+                    </label>
+                    <label className="px-2.5 py-1 bg-wood-50 hover:bg-wood-100 text-wood-800 border border-wood-200 rounded-lg text-[10px] font-bold cursor-pointer transition">
+                      + Add Photo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => {
+                          handleMaterialImageFiles(e.target.files, 'EDIT');
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {editItemImages.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-2">
+                      {editItemImages.map((imgSrc, idx) => (
+                        <div key={idx} className="relative group h-16 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                          <img src={imgSrc} alt={`Material ${idx + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setEditItemImages(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 p-0.5 bg-red-600 text-white rounded-full opacity-90 hover:opacity-100 cursor-pointer"
+                            title="Remove photo"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-400 italic">No identification photos saved for this material.</p>
+                  )}
+                  {imageUploadError && (
+                    <p className="text-[11px] font-semibold text-red-600">{imageUploadError}</p>
+                  )}
+                </div>
+
                 {/* Edit Stock, Stock-In, Stock-Out & Balance */}
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
                   <div className="grid grid-cols-3 gap-3">
@@ -1742,6 +1952,61 @@ export default function InventoryManager({
                       className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-700"
                     />
                   </div>
+                </div>
+
+                {/* Material Identification Photos Upload */}
+                <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-700 uppercase flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-wood-600" />
+                      <span>Material Picture (Identification)</span>
+                    </label>
+                    <span className="text-[10px] font-mono font-bold text-gray-500">
+                      {newItemImages.length}/4 photos
+                    </span>
+                  </div>
+
+                  <label className="flex flex-col items-center justify-center gap-1.5 p-3 border-2 border-dashed border-wood-300 hover:border-wood-500 bg-white rounded-xl cursor-pointer transition text-center">
+                    <Camera className="w-5 h-5 text-wood-600" />
+                    <span className="text-xs font-bold text-wood-900">
+                      Click to upload or capture material picture
+                    </span>
+                    <span className="text-[10px] text-gray-400">
+                      PNG, JPG, WEBP &bull; Stored for visual search identification
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => {
+                        handleMaterialImageFiles(e.target.files, 'NEW');
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {newItemImages.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 pt-1">
+                      {newItemImages.map((imgSrc, idx) => (
+                        <div key={idx} className="relative group h-16 rounded-lg overflow-hidden border border-wood-200 bg-white">
+                          <img src={imgSrc} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setNewItemImages(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 p-0.5 bg-red-600 text-white rounded-full opacity-90 hover:opacity-100 cursor-pointer"
+                            title="Remove picture"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {imageUploadError && (
+                    <p className="text-[11px] font-semibold text-red-600">{imageUploadError}</p>
+                  )}
                 </div>
 
                 {/* Stock Movement Tracking Section (Stock, Stock-In, Stock-Out, and Balance) */}
@@ -2196,6 +2461,97 @@ export default function InventoryManager({
           </table>
         </div>
       </div>
+
+      {/* MODAL: Material Identification Photo Lightbox */}
+      <AnimatePresence>
+        {previewingItem && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
+            onClick={() => setPreviewingItem(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl border border-wood-200 shadow-2xl w-full max-w-2xl overflow-hidden"
+            >
+              <div className="bg-wood-950 p-4 text-white flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-base">{previewingItem.name}</h3>
+                  <p className="text-[11px] text-wood-200">
+                    {previewingItem.category}
+                    {previewingItem.materialCode ? ` • Code: ${previewingItem.materialCode}` : ''}
+                    {previewingItem.size ? ` • Size: ${previewingItem.size}` : ''}
+                    {previewingItem.location ? ` • Location: ${previewingItem.location}` : ''}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewingItem(null)}
+                  className="p-1.5 rounded-lg text-wood-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {(() => {
+                const photos = getItemImages(previewingItem);
+                const activeSrc = photos[previewImageIdx] || photos[0];
+                return (
+                  <div className="p-5 space-y-4">
+                    {activeSrc && (
+                      <div className="bg-slate-900 rounded-xl overflow-hidden flex items-center justify-center max-h-[60vh]">
+                        <img
+                          src={activeSrc}
+                          alt={previewingItem.name}
+                          className="max-h-[60vh] w-auto object-contain"
+                        />
+                      </div>
+                    )}
+
+                    {photos.length > 1 && (
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                        {photos.map((src, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setPreviewImageIdx(idx)}
+                            className={`w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 cursor-pointer transition ${
+                              idx === previewImageIdx ? 'border-wood-600 ring-2 ring-wood-300' : 'border-gray-200 opacity-75 hover:opacity-100'
+                            }`}
+                          >
+                            <img src={src} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-gray-400 block">Material Code</span>
+                        <span className="font-mono font-bold text-gray-800">{previewingItem.materialCode || previewingItem.id}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-gray-400 block">Size</span>
+                        <span className="font-semibold text-gray-800">{previewingItem.size || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-gray-400 block">Location/ Storage</span>
+                        <span className="font-semibold text-gray-800">{previewingItem.location || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-gray-400 block">Available Balance</span>
+                        <span className="font-mono font-black text-wood-900">{previewingItem.currentStock} {previewingItem.unit}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

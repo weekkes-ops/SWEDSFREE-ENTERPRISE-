@@ -15,6 +15,8 @@
         "materialCode": { "type": "string" },
         "size": { "type": "string" },
         "location": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
         "lastUpdated": { "type": "string" },
         "lastUpdatedTime": { "type": "string" },
         "lastUpdatedTimestamp": { "type": "string" },

@@ -15,6 +15,8 @@ export interface InventoryItem {
   materialCode?: string; // Workshop material code / SKU
   size?: string; // Dimensions / thickness / size specification
   location?: string; // Storage location / rack / shed
+  imageUrl?: string; // Primary material identification photo (data URL / URL)
+  images?: string[]; // Additional material identification photos
   lastUpdated: string;
   lastUpdatedTime?: string; // HH:MM:SS real-time of entry
   lastUpdatedTimestamp?: string; // ISO 8601 real-time timestamp
