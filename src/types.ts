@@ -12,6 +12,8 @@ export interface InventoryItem {
   currentStock: number;
   minStockThreshold: number;
   unitCost: number; // typical purchase price per unit
+  materialCode?: string; // Workshop material code / SKU
+  size?: string; // Dimensions / thickness / size specification
   location?: string; // Storage location / rack / shed
   lastUpdated: string;
   lastUpdatedTime?: string; // HH:MM:SS real-time of entry

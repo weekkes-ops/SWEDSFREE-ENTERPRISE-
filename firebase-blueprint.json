@@ -12,6 +12,8 @@
         "currentStock": { "type": "number" },
         "minStockThreshold": { "type": "number" },
         "unitCost": { "type": "number" },
+        "materialCode": { "type": "string" },
+        "size": { "type": "string" },
         "location": { "type": "string" },
         "lastUpdated": { "type": "string" },
         "lastUpdatedTime": { "type": "string" },

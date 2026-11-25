@@ -89,6 +89,8 @@ export default function InventoryManager({
   const [newItemInitialStock, setNewItemInitialStock] = useState(50);
   const [newItemStockIn, setNewItemStockIn] = useState(0);
   const [newItemStockOut, setNewItemStockOut] = useState(0);
+  const [newItemMaterialCode, setNewItemMaterialCode] = useState('');
+  const [newItemSize, setNewItemSize] = useState('');
   const [newItemLocation, setNewItemLocation] = useState('');
   const [newItemDate, setNewItemDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newItemPurpose, setNewItemPurpose] = useState('Opening Stock Receipt / Supplier Inward');
@@ -100,6 +102,8 @@ export default function InventoryManager({
   const [editItemInitialStock, setEditItemInitialStock] = useState(50);
   const [editItemStockIn, setEditItemStockIn] = useState(0);
   const [editItemStockOut, setEditItemStockOut] = useState(0);
+  const [editItemMaterialCode, setEditItemMaterialCode] = useState('');
+  const [editItemSize, setEditItemSize] = useState('');
   const [editItemLocation, setEditItemLocation] = useState('');
   const [editItemPurpose, setEditItemPurpose] = useState('Physical Stock Audit & Balance Verification');
 
@@ -149,6 +153,8 @@ export default function InventoryManager({
     setEditItemInitialStock(movement.stock);
     setEditItemStockIn(movement.stockIn);
     setEditItemStockOut(movement.stockOut);
+    setEditItemMaterialCode(item.materialCode || '');
+    setEditItemSize(item.size || '');
     setEditItemLocation(item.location || '');
     setEditItemPurpose(item.lastMovementPurpose || 'Physical Stock Audit & Balance Adjustment');
     setShowEditItemModal(true);
@@ -188,6 +194,8 @@ export default function InventoryManager({
         stockIn: safeStockIn - txIn,
         stockOut: safeStockOut - txOut,
         currentStock: calculatedBalance,
+        materialCode: editItemMaterialCode.trim(),
+        size: editItemSize.trim(),
         location: editItemLocation.trim(),
         lastUpdated: dateStr,
         lastUpdatedTime: timeStr,
@@ -275,6 +283,8 @@ export default function InventoryManager({
       currentStock: calculatedBalance,
       minStockThreshold: 5,
       unitCost: 0,
+      materialCode: newItemMaterialCode.trim(),
+      size: newItemSize.trim(),
       location: newItemLocation.trim(),
       lastUpdatedTime: timeStr,
       lastUpdatedTimestamp: now.toISOString(),
@@ -294,6 +304,8 @@ export default function InventoryManager({
     setNewItemInitialStock(50);
     setNewItemStockIn(0);
     setNewItemStockOut(0);
+    setNewItemMaterialCode('');
+    setNewItemSize('');
     setNewItemLocation('');
     setNewItemDate(new Date().toISOString().split('T')[0]);
     setNewItemPurpose('Opening Stock Receipt / Supplier Inward');
@@ -410,7 +422,13 @@ export default function InventoryManager({
 
   // Filter & Sort logic
   const filteredInventory = inventory.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || item.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const q = searchTerm.toLowerCase();
+    const matchesSearch =
+      item.name.toLowerCase().includes(q) ||
+      item.category.toLowerCase().includes(q) ||
+      (item.materialCode || '').toLowerCase().includes(q) ||
+      (item.size || '').toLowerCase().includes(q) ||
+      (item.location || '').toLowerCase().includes(q);
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -1136,7 +1154,9 @@ export default function InventoryManager({
                             <td className="py-3.5 px-4">
                               <p className="font-bold text-gray-900">{item.name}</p>
                               <p className="text-[10px] text-gray-400 font-semibold">
-                                ID: {item.id}{item.location ? ` • Location: ${item.location}` : ''}
+                                {item.materialCode ? `Code: ${item.materialCode}` : `ID: ${item.id}`}
+                                {item.size ? ` • Size: ${item.size}` : ''}
+                                {item.location ? ` • Location: ${item.location}` : ''}
                               </p>
                             </td>
                             <td className="py-3.5 px-4 uppercase text-[10px] font-bold text-gray-500">
@@ -1296,7 +1316,9 @@ export default function InventoryManager({
                           {item.name}
                         </h3>
                         <p className="text-[10px] text-gray-400 font-semibold">
-                          ID: {item.id} &bull; Unit: {item.unit}{item.location ? ` • Location: ${item.location}` : ''}
+                          {item.materialCode ? `Code: ${item.materialCode}` : `ID: ${item.id}`} &bull; Unit: {item.unit}
+                          {item.size ? ` • Size: ${item.size}` : ''}
+                          {item.location ? ` • Location: ${item.location}` : ''}
                         </p>
                       </div>
 
@@ -1486,6 +1508,29 @@ export default function InventoryManager({
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Material Code</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. MAT-LMB-001"
+                      value={editItemMaterialCode}
+                      onChange={(e) => setEditItemMaterialCode(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-mono font-semibold text-gray-800"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Size</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2x8x12 ft / 18mm"
+                      value={editItemSize}
+                      onChange={(e) => setEditItemSize(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium text-gray-800"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Location/ Storage</label>
                   <input
@@ -1650,6 +1695,29 @@ export default function InventoryManager({
                       <option value="Kg">Kg</option>
                       <option value="Boxes">Boxes</option>
                     </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Material Code</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. MAT-LMB-001"
+                      value={newItemMaterialCode}
+                      onChange={(e) => setNewItemMaterialCode(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-semibold text-gray-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Size</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2x8x12 ft / 18mm"
+                      value={newItemSize}
+                      onChange={(e) => setNewItemSize(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-700"
+                    />
                   </div>
                 </div>
 
@@ -2072,7 +2140,18 @@ export default function InventoryManager({
                 const mv = getItemStockMovement(item);
                 return (
                   <tr key={item.id} className="border-b border-slate-200">
-                    <td className="py-1.5 px-2 font-bold">{item.name}</td>
+                    <td className="py-1.5 px-2 font-bold">
+                      {item.name}
+                      {(item.materialCode || item.size || item.location) && (
+                        <span className="block text-[9px] font-normal text-slate-500">
+                          {[
+                            item.materialCode ? `Code: ${item.materialCode}` : '',
+                            item.size ? `Size: ${item.size}` : '',
+                            item.location ? `Location: ${item.location}` : ''
+                          ].filter(Boolean).join(' • ')}
+                        </span>
+                      )}
+                    </td>
                     <td className="py-1.5 px-2">{item.category}</td>
                     <td className="py-1.5 px-2 text-right font-mono">{mv.stock}</td>
                     <td className="py-1.5 px-2 text-right font-mono">+{mv.stockIn}</td>
