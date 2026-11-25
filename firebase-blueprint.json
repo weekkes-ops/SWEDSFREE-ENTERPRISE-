@@ -12,6 +12,7 @@
         "currentStock": { "type": "number" },
         "minStockThreshold": { "type": "number" },
         "unitCost": { "type": "number" },
+        "location": { "type": "string" },
         "lastUpdated": { "type": "string" },
         "lastUpdatedTime": { "type": "string" },
         "lastUpdatedTimestamp": { "type": "string" },

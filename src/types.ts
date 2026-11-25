@@ -12,6 +12,7 @@ export interface InventoryItem {
   currentStock: number;
   minStockThreshold: number;
   unitCost: number; // typical purchase price per unit
+  location?: string; // Storage location / rack / shed
   lastUpdated: string;
   lastUpdatedTime?: string; // HH:MM:SS real-time of entry
   lastUpdatedTimestamp?: string; // ISO 8601 real-time timestamp

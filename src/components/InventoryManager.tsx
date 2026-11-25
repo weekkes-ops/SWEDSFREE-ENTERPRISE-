@@ -89,7 +89,7 @@ export default function InventoryManager({
   const [newItemInitialStock, setNewItemInitialStock] = useState(50);
   const [newItemStockIn, setNewItemStockIn] = useState(0);
   const [newItemStockOut, setNewItemStockOut] = useState(0);
-  const [newItemUnitCost, setNewItemUnitCost] = useState(0);
+  const [newItemLocation, setNewItemLocation] = useState('');
   const [newItemDate, setNewItemDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newItemPurpose, setNewItemPurpose] = useState('Opening Stock Receipt / Supplier Inward');
 
@@ -100,6 +100,7 @@ export default function InventoryManager({
   const [editItemInitialStock, setEditItemInitialStock] = useState(50);
   const [editItemStockIn, setEditItemStockIn] = useState(0);
   const [editItemStockOut, setEditItemStockOut] = useState(0);
+  const [editItemLocation, setEditItemLocation] = useState('');
   const [editItemPurpose, setEditItemPurpose] = useState('Physical Stock Audit & Balance Verification');
 
   // Helper to compute Stock, Stock-In, Stock-Out, and Balance for tracking stock movement
@@ -148,6 +149,7 @@ export default function InventoryManager({
     setEditItemInitialStock(movement.stock);
     setEditItemStockIn(movement.stockIn);
     setEditItemStockOut(movement.stockOut);
+    setEditItemLocation(item.location || '');
     setEditItemPurpose(item.lastMovementPurpose || 'Physical Stock Audit & Balance Adjustment');
     setShowEditItemModal(true);
   };
@@ -186,6 +188,7 @@ export default function InventoryManager({
         stockIn: safeStockIn - txIn,
         stockOut: safeStockOut - txOut,
         currentStock: calculatedBalance,
+        location: editItemLocation.trim(),
         lastUpdated: dateStr,
         lastUpdatedTime: timeStr,
         lastUpdatedTimestamp: isoStr,
@@ -271,7 +274,8 @@ export default function InventoryManager({
       initialStock: safeInitialStock,
       currentStock: calculatedBalance,
       minStockThreshold: 5,
-      unitCost: Math.max(0, newItemUnitCost),
+      unitCost: 0,
+      location: newItemLocation.trim(),
       lastUpdatedTime: timeStr,
       lastUpdatedTimestamp: now.toISOString(),
       lastMovementPurpose: newItemPurpose.trim(),
@@ -290,7 +294,7 @@ export default function InventoryManager({
     setNewItemInitialStock(50);
     setNewItemStockIn(0);
     setNewItemStockOut(0);
-    setNewItemUnitCost(0);
+    setNewItemLocation('');
     setNewItemDate(new Date().toISOString().split('T')[0]);
     setNewItemPurpose('Opening Stock Receipt / Supplier Inward');
     setShowNewItemModal(false);
@@ -1131,7 +1135,9 @@ export default function InventoryManager({
                           >
                             <td className="py-3.5 px-4">
                               <p className="font-bold text-gray-900">{item.name}</p>
-                              <p className="text-[10px] text-gray-400 font-semibold">ID: {item.id}</p>
+                              <p className="text-[10px] text-gray-400 font-semibold">
+                                ID: {item.id}{item.location ? ` • Location: ${item.location}` : ''}
+                              </p>
                             </td>
                             <td className="py-3.5 px-4 uppercase text-[10px] font-bold text-gray-500">
                               {item.category}
@@ -1289,7 +1295,9 @@ export default function InventoryManager({
                         <h3 className="text-sm font-bold text-gray-900 mt-1.5 line-clamp-2 leading-snug">
                           {item.name}
                         </h3>
-                        <p className="text-[10px] text-gray-400 font-semibold">ID: {item.id} &bull; Unit: {item.unit}</p>
+                        <p className="text-[10px] text-gray-400 font-semibold">
+                          ID: {item.id} &bull; Unit: {item.unit}{item.location ? ` • Location: ${item.location}` : ''}
+                        </p>
                       </div>
 
                       {/* Stock Movement 4-Pillar Micro Metric */}
@@ -1478,6 +1486,17 @@ export default function InventoryManager({
                   </div>
                 </div>
 
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Location/ Storage</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Rack A2, Timber Shed 1"
+                    value={editItemLocation}
+                    onChange={(e) => setEditItemLocation(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:border-wood-300 outline-hidden text-sm font-medium text-gray-800"
+                  />
+                </div>
+
                 {/* Edit Stock, Stock-In, Stock-Out & Balance */}
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
                   <div className="grid grid-cols-3 gap-3">
@@ -1646,14 +1665,13 @@ export default function InventoryManager({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Unit Cost (Le)</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase">Location/ Storage</label>
                     <input
-                      type="number"
-                      min={0}
-                      step="any"
-                      value={newItemUnitCost}
-                      onChange={(e) => setNewItemUnitCost(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-700"
+                      type="text"
+                      placeholder="e.g. Rack A2, Shed 1"
+                      value={newItemLocation}
+                      onChange={(e) => setNewItemLocation(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-700"
                     />
                   </div>
                 </div>
