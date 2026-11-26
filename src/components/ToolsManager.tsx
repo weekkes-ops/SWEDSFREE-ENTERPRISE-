@@ -15,7 +15,12 @@ import {
   X,
   CheckCircle2,
   AlertTriangle,
-  History
+  History,
+  Camera,
+  Image as ImageIcon,
+  ZoomIn,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import {
@@ -85,6 +90,7 @@ export default function ToolsManager({
   const canManage = isAdmin || isManager;
 
   const [activeSubTab, setActiveSubTab] = useState<'REGISTRY' | 'MOVEMENTS'>('REGISTRY');
+  const [viewMode, setViewMode] = useState<'TABLE' | 'GRID'>('TABLE');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'All' | ToolCategory>('All');
   const [statusFilter, setStatusFilter] = useState<'All' | ToolStatus>('All');
@@ -96,6 +102,11 @@ export default function ToolsManager({
   // Checkout / Return Modal
   const [checkoutTool, setCheckoutTool] = useState<WorkshopTool | null>(null);
   const [returnTool, setReturnTool] = useState<WorkshopTool | null>(null);
+
+  // Photo Preview Lightbox & Upload Error
+  const [previewingTool, setPreviewingTool] = useState<WorkshopTool | null>(null);
+  const [previewImageIdx, setPreviewImageIdx] = useState(0);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
 
   // Tool Form State
   const [name, setName] = useState('');
@@ -109,6 +120,7 @@ export default function ToolsManager({
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
   const [nextServiceDate, setNextServiceDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [toolImages, setToolImages] = useState<string[]>([]);
 
   // Checkout Form State
   const [issueEmployeeId, setIssueEmployeeId] = useState('');
@@ -122,6 +134,82 @@ export default function ToolsManager({
   const [returnNotes, setReturnNotes] = useState('');
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  const getToolImages = (tool: WorkshopTool): string[] => {
+    if (Array.isArray(tool.images) && tool.images.length > 0) {
+      return tool.images.filter(Boolean);
+    }
+    return tool.imageUrl ? [tool.imageUrl] : [];
+  };
+
+  const compressToolImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('Please upload valid image files (JPG, PNG, WEBP).'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Failed to read image file.'));
+      reader.onload = (ev) => {
+        const rawDataUrl = ev.target?.result as string;
+        if (!rawDataUrl) {
+          reject(new Error('Empty image data.'));
+          return;
+        }
+        if (file.type === 'image/svg+xml') {
+          resolve(rawDataUrl);
+          return;
+        }
+        const img = new window.Image();
+        img.onerror = () => resolve(rawDataUrl);
+        img.onload = () => {
+          const maxDim = 800;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(rawDataUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.78));
+        };
+        img.src = rawDataUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleToolImageFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setImageUploadError(null);
+    const remainingSlots = Math.max(0, 4 - toolImages.length);
+    if (remainingSlots === 0) {
+      setImageUploadError('Maximum of 4 identification photos per tool.');
+      return;
+    }
+    const selectedFiles = Array.from(files).slice(0, remainingSlots);
+    if (files.length > remainingSlots) {
+      setImageUploadError('Only the first 4 identification photos can be stored per tool.');
+    }
+    try {
+      const processed = await Promise.all(selectedFiles.map(compressToolImage));
+      setToolImages((prev) => [...prev, ...processed].slice(0, 4));
+    } catch (err: any) {
+      setImageUploadError(err?.message || 'Unable to process image.');
+    }
+  };
 
   const filteredTools = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -190,6 +278,8 @@ export default function ToolsManager({
     setPurchaseDate(new Date().toISOString().split('T')[0]);
     setNextServiceDate('');
     setNotes('');
+    setToolImages([]);
+    setImageUploadError(null);
     setIsToolModalOpen(true);
   };
 
@@ -206,6 +296,8 @@ export default function ToolsManager({
     setPurchaseDate(tool.purchaseDate || new Date().toISOString().split('T')[0]);
     setNextServiceDate(tool.nextServiceDate || '');
     setNotes(tool.notes || '');
+    setToolImages(getToolImages(tool));
+    setImageUploadError(null);
     setIsToolModalOpen(true);
   };
 
@@ -247,6 +339,8 @@ export default function ToolsManager({
         unitValue: val,
         nextServiceDate: nextServiceDate || undefined,
         notes: notes.trim() || undefined,
+        imageUrl: toolImages[0] || '',
+        images: toolImages,
         lastUpdated: nowDate,
         lastModifiedBy: operatorLabel
       };
@@ -291,6 +385,8 @@ export default function ToolsManager({
         unitValue: val,
         nextServiceDate: nextServiceDate || undefined,
         notes: notes.trim() || undefined,
+        imageUrl: toolImages[0] || '',
+        images: toolImages,
         lastUpdated: nowDate,
         lastModifiedBy: operatorLabel
       };
@@ -745,6 +841,35 @@ export default function ToolsManager({
               <span>Checkout &amp; Service Log ({filteredLogs.length})</span>
             </button>
           </div>
+
+          {activeSubTab === 'REGISTRY' && (
+            <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-xl p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('TABLE')}
+                className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
+                  viewMode === 'TABLE'
+                    ? 'bg-white shadow-xs text-slate-900 border border-slate-200'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>Table View</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('GRID')}
+                className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
+                  viewMode === 'GRID'
+                    ? 'bg-white shadow-xs text-slate-900 border border-slate-200'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Photo Grid</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -788,144 +913,330 @@ export default function ToolsManager({
 
       {/* Main Content */}
       {activeSubTab === 'REGISTRY' ? (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500 font-black">
-                  <th className="py-3.5 px-4">Code &amp; Tool</th>
-                  <th className="py-3.5 px-4">Category &amp; Location</th>
-                  <th className="py-3.5 px-4 text-center">Units (Avail/Total)</th>
-                  <th className="py-3.5 px-4">Condition &amp; Status</th>
-                  <th className="py-3.5 px-4">Assigned Artisan / Job</th>
-                  <th className="py-3.5 px-4 text-right">Value (Le)</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredTools.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-14 text-center text-slate-400">
-                      <Hammer className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                      <p className="font-bold text-slate-600">No workshop tools registered yet.</p>
-                      <p className="text-[11px] mt-1">Click &ldquo;Add Tool&rdquo; to register drills, saws, clamps, or hand tools.</p>
-                    </td>
+        viewMode === 'TABLE' ? (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500 font-black">
+                    <th className="py-3.5 px-4">Photo, Code &amp; Tool</th>
+                    <th className="py-3.5 px-4">Category &amp; Location</th>
+                    <th className="py-3.5 px-4 text-center">Units (Avail/Total)</th>
+                    <th className="py-3.5 px-4">Condition &amp; Status</th>
+                    <th className="py-3.5 px-4">Assigned Artisan / Job</th>
+                    <th className="py-3.5 px-4 text-right">Value (Le)</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
-                ) : (
-                  filteredTools.map((tool) => {
-                    const checkedOut = tool.quantityTotal - tool.quantityAvailable;
-                    return (
-                      <tr key={tool.id} className="hover:bg-slate-50/70 transition">
-                        <td className="py-3.5 px-4">
-                          <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-                            {tool.toolCode}
-                          </span>
-                          <p className="font-black text-slate-900 mt-1">{tool.name}</p>
-                          {(tool.brandOrModel || tool.serialNumber) && (
-                            <p className="text-[11px] text-slate-500">
-                              {tool.brandOrModel} {tool.serialNumber ? `• SN: ${tool.serialNumber}` : ''}
-                            </p>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <p className="font-bold text-slate-800">{tool.category}</p>
-                          <p className="text-[11px] text-slate-500">{tool.location}</p>
-                        </td>
-                        <td className="py-3.5 px-4 text-center font-mono">
-                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 font-black text-slate-900">
-                            {tool.quantityAvailable} / {tool.quantityTotal}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 space-y-1">
-                          <div>
-                            <span className={`inline-block px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase border ${statusColor(tool.status)}`}>
-                              {tool.status}
-                            </span>
-                          </div>
-                          <p className="text-[11px] font-bold text-slate-600">Cond: {tool.condition}</p>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {tool.assignedToName ? (
-                            <>
-                              <p className="font-bold text-slate-900">{tool.assignedToName}</p>
-                              {tool.assignedJobTitle && (
-                                <p className="text-[11px] text-amber-700 font-semibold">{tool.assignedJobTitle}</p>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredTools.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-14 text-center text-slate-400">
+                        <Hammer className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                        <p className="font-bold text-slate-600">No workshop tools registered yet.</p>
+                        <p className="text-[11px] mt-1">Click &ldquo;Add Tool&rdquo; to register drills, saws, clamps, or hand tools.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredTools.map((tool) => {
+                      const checkedOut = tool.quantityTotal - tool.quantityAvailable;
+                      const toolPhotos = getToolImages(tool);
+                      return (
+                        <tr key={tool.id} className="hover:bg-slate-50/70 transition">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              {toolPhotos.length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPreviewingTool(tool);
+                                    setPreviewImageIdx(0);
+                                  }}
+                                  className="relative group w-12 h-12 rounded-xl overflow-hidden border border-amber-200 shadow-xs shrink-0 cursor-pointer bg-slate-100"
+                                  title="Click to inspect full-size tool photo"
+                                >
+                                  <img
+                                    src={toolPhotos[0]}
+                                    alt={tool.name}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/35 transition flex items-center justify-center">
+                                    <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition" />
+                                  </div>
+                                  {toolPhotos.length > 1 && (
+                                    <span className="absolute bottom-0.5 right-0.5 bg-slate-900/80 text-white text-[9px] font-bold px-1 rounded">
+                                      +{toolPhotos.length - 1}
+                                    </span>
+                                  )}
+                                </button>
+                              ) : (
+                                <div
+                                  className="w-12 h-12 rounded-xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-300 shrink-0"
+                                  title="No tool photo uploaded"
+                                >
+                                  <ImageIcon className="w-4 h-4" />
+                                </div>
                               )}
-                            </>
-                          ) : (
-                            <span className="text-slate-400 italic">In Tool Crib</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-mono">
-                          <p className="font-bold text-slate-900">{formatCurrency(tool.unitValue * tool.quantityTotal, 0)}</p>
-                          <p className="text-[10px] text-slate-500">{formatCurrency(tool.unitValue, 0)} ea</p>
-                        </td>
-                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5 flex-wrap justify-end">
-                            {!isAuditor && tool.quantityAvailable > 0 && tool.status !== 'Lost / Retired' && (
-                              <button
-                                type="button"
-                                onClick={() => openCheckoutModal(tool)}
-                                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-                              >
-                                <ArrowUpRight className="w-3 h-3" />
-                                <span>Issue</span>
-                              </button>
-                            )}
-                            {!isAuditor && checkedOut > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => openReturnModal(tool)}
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-                              >
-                                <RotateCcw className="w-3 h-3" />
-                                <span>Return</span>
-                              </button>
-                            )}
-                            {!isAuditor && (
+                              <div className="min-w-0">
+                                <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                  {tool.toolCode}
+                                </span>
+                                <p className="font-black text-slate-900 mt-1">{tool.name}</p>
+                                {(tool.brandOrModel || tool.serialNumber) && (
+                                  <p className="text-[11px] text-slate-500">
+                                    {tool.brandOrModel} {tool.serialNumber ? `• SN: ${tool.serialNumber}` : ''}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <p className="font-bold text-slate-800">{tool.category}</p>
+                            <p className="text-[11px] text-slate-500">{tool.location}</p>
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-mono">
+                            <span className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 font-black text-slate-900">
+                              {tool.quantityAvailable} / {tool.quantityTotal}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 space-y-1">
+                            <div>
+                              <span className={`inline-block px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase border ${statusColor(tool.status)}`}>
+                                {tool.status}
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-bold text-slate-600">Cond: {tool.condition}</p>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {tool.assignedToName ? (
                               <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleMaintenance(tool)}
-                                  className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg cursor-pointer"
-                                  title={tool.status === 'In Maintenance' ? 'Mark Repaired / Available' : 'Send to Maintenance'}
-                                >
-                                  <Wrench className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openEditModal(tool)}
-                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer"
-                                  title="Edit Tool"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </button>
+                                <p className="font-bold text-slate-900">{tool.assignedToName}</p>
+                                {tool.assignedJobTitle && (
+                                  <p className="text-[11px] text-amber-700 font-semibold">{tool.assignedJobTitle}</p>
+                                )}
                               </>
+                            ) : (
+                              <span className="text-slate-400 italic">In Tool Crib</span>
                             )}
-                            {canManage && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (window.confirm(`Delete tool "${tool.name}" (${tool.toolCode})?`)) {
-                                    onDeleteTool(tool.id);
-                                  }
-                                }}
-                                className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg cursor-pointer"
-                                title="Delete Tool"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono">
+                            <p className="font-bold text-slate-900">{formatCurrency(tool.unitValue * tool.quantityTotal, 0)}</p>
+                            <p className="text-[10px] text-slate-500">{formatCurrency(tool.unitValue, 0)} ea</p>
+                          </td>
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 flex-wrap justify-end">
+                              {!isAuditor && tool.quantityAvailable > 0 && tool.status !== 'Lost / Retired' && (
+                                <button
+                                  type="button"
+                                  onClick={() => openCheckoutModal(tool)}
+                                  className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                  <ArrowUpRight className="w-3 h-3" />
+                                  <span>Issue</span>
+                                </button>
+                              )}
+                              {!isAuditor && checkedOut > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => openReturnModal(tool)}
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                  <RotateCcw className="w-3 h-3" />
+                                  <span>Return</span>
+                                </button>
+                              )}
+                              {!isAuditor && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleMaintenance(tool)}
+                                    className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg cursor-pointer"
+                                    title={tool.status === 'In Maintenance' ? 'Mark Repaired / Available' : 'Send to Maintenance'}
+                                  >
+                                    <Wrench className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditModal(tool)}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer"
+                                    title="Edit Tool"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+                              {canManage && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm(`Delete tool "${tool.name}" (${tool.toolCode})?`)) {
+                                      onDeleteTool(tool.id);
+                                    }
+                                  }}
+                                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg cursor-pointer"
+                                  title="Delete Tool"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredTools.length === 0 ? (
+              <div className="col-span-full bg-white rounded-3xl border border-slate-200 py-14 text-center text-slate-400">
+                <Hammer className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="font-bold text-slate-600">No workshop tools match your search.</p>
+                <p className="text-[11px] mt-1">Try another search keyword or click &ldquo;Add Tool&rdquo; to register equipment.</p>
+              </div>
+            ) : (
+              filteredTools.map((tool) => {
+                const checkedOut = tool.quantityTotal - tool.quantityAvailable;
+                const toolPhotos = getToolImages(tool);
+                return (
+                  <div key={tool.id} className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+                    {toolPhotos.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviewingTool(tool);
+                          setPreviewImageIdx(0);
+                        }}
+                        className="relative group h-44 w-full bg-slate-100 overflow-hidden border-b border-slate-100 cursor-pointer"
+                        title="Click to inspect full-size tool identification photos"
+                      >
+                        <img
+                          src={toolPhotos[0]}
+                          alt={tool.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 via-transparent to-transparent" />
+                        <span className="absolute top-3 left-3 text-[10px] font-mono font-bold text-amber-800 bg-amber-50/95 border border-amber-200 px-2 py-0.5 rounded-md shadow-xs">
+                          {tool.toolCode}
+                        </span>
+                        <span className={`absolute top-3 right-3 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase border shadow-xs ${statusColor(tool.status)}`}>
+                          {tool.status}
+                        </span>
+                        <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5">
+                          {toolPhotos.length > 1 && (
+                            <span className="bg-slate-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                              {toolPhotos.length} photos
+                            </span>
+                          )}
+                          <span className="bg-white/90 text-slate-800 p-1.5 rounded-lg shadow-xs">
+                            <ZoomIn className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
+                      </button>
+                    ) : (
+                      <div className="relative h-32 w-full bg-slate-50 border-b border-slate-100 flex flex-col items-center justify-center text-slate-300">
+                        <ImageIcon className="w-7 h-7 mb-1" />
+                        <span className="text-[10px] font-semibold text-slate-400">No identification photo</span>
+                        <span className="absolute top-3 left-3 text-[10px] font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                          {tool.toolCode}
+                        </span>
+                        <span className={`absolute top-3 right-3 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase border ${statusColor(tool.status)}`}>
+                          {tool.status}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="p-4 space-y-3 flex-1 flex flex-col justify-between text-xs">
+                      <div className="space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h3 className="font-black text-slate-900 text-sm">{tool.name}</h3>
+                            {(tool.brandOrModel || tool.serialNumber) && (
+                              <p className="text-[11px] text-slate-500">
+                                {tool.brandOrModel} {tool.serialNumber ? `• SN: ${tool.serialNumber}` : ''}
+                              </p>
                             )}
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                          <span className="px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 font-mono font-black text-slate-900 shrink-0">
+                            {tool.quantityAvailable}/{tool.quantityTotal}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                          <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Category &amp; Bay</span>
+                            <span className="font-bold text-slate-800 block truncate">{tool.category}</span>
+                            <span className="text-slate-500 block truncate">{tool.location}</span>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Condition / Holder</span>
+                            <span className="font-bold text-slate-800 block">{tool.condition}</span>
+                            <span className="text-slate-500 block truncate">{tool.assignedToName || 'In Tool Crib'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <span className="font-mono font-bold text-slate-900">
+                          {formatCurrency(tool.unitValue * tool.quantityTotal, 0)}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {!isAuditor && tool.quantityAvailable > 0 && tool.status !== 'Lost / Retired' && (
+                            <button
+                              type="button"
+                              onClick={() => openCheckoutModal(tool)}
+                              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <ArrowUpRight className="w-3 h-3" />
+                              <span>Issue</span>
+                            </button>
+                          )}
+                          {!isAuditor && checkedOut > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => openReturnModal(tool)}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Return</span>
+                            </button>
+                          )}
+                          {!isAuditor && (
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(tool)}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer"
+                              title="Edit Tool"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {canManage && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`Delete tool "${tool.name}" (${tool.toolCode})?`)) {
+                                  onDeleteTool(tool.id);
+                                }
+                              }}
+                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg cursor-pointer"
+                              title="Delete Tool"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-        </div>
+        )
       ) : (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
@@ -1144,6 +1455,53 @@ export default function ToolsManager({
                   placeholder="Blade size, accessories included, warranty info..."
                   className="w-full px-3 py-2 rounded-xl border border-slate-300"
                 />
+              </div>
+
+              {/* Tool Identification Photos (up to 4) */}
+              <div className="space-y-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="font-bold text-slate-700 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-amber-600" />
+                    <span>Tool Picture (Identification) &bull; {toolImages.length}/4</span>
+                  </label>
+                  <label className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-bold cursor-pointer transition shadow-xs">
+                    + Upload Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => {
+                        handleToolImageFiles(e.target.files);
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                {toolImages.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2 pt-1">
+                    {toolImages.map((imgSrc, idx) => (
+                      <div key={idx} className="relative group h-16 rounded-xl overflow-hidden border border-slate-200 bg-white">
+                        <img src={imgSrc} alt={`Tool ${idx + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setToolImages((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-1 right-1 p-0.5 bg-red-600 text-white rounded-full opacity-90 hover:opacity-100 cursor-pointer"
+                          title="Remove photo"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    Upload up to 4 clear photos of the tool so workshop staff can visually identify it when searching.
+                  </p>
+                )}
+                {imageUploadError && (
+                  <p className="text-[11px] font-semibold text-red-600">{imageUploadError}</p>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-200 flex justify-end gap-2.5">
@@ -1380,6 +1738,102 @@ export default function ToolsManager({
           <span>Official Workshop Tools &amp; Equipment Register &bull; {new Date().toLocaleDateString()}</span>
         </div>
       </div>
+
+      {/* Tool Identification Photo Lightbox Modal */}
+      {previewingTool && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm"
+          onClick={() => setPreviewingTool(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden"
+          >
+            <div className="bg-slate-900 p-4 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-base">{previewingTool.name}</h3>
+                <p className="text-[11px] text-slate-300">
+                  {previewingTool.toolCode}
+                  {previewingTool.brandOrModel ? ` • ${previewingTool.brandOrModel}` : ''}
+                  {previewingTool.serialNumber ? ` • SN: ${previewingTool.serialNumber}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewingTool(null)}
+                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {(() => {
+              const photos = getToolImages(previewingTool);
+              const activeSrc = photos[previewImageIdx] || photos[0];
+              return (
+                <div className="p-5 space-y-4">
+                  {activeSrc && (
+                    <div className="bg-slate-950 rounded-2xl overflow-hidden flex items-center justify-center max-h-[60vh]">
+                      <img
+                        src={activeSrc}
+                        alt={previewingTool.name}
+                        className="max-h-[60vh] w-auto object-contain"
+                      />
+                    </div>
+                  )}
+
+                  {photos.length > 1 && (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {photos.map((src, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setPreviewImageIdx(idx)}
+                          className={`w-16 h-16 rounded-xl overflow-hidden border-2 shrink-0 cursor-pointer transition ${
+                            idx === previewImageIdx
+                              ? 'border-amber-600 ring-2 ring-amber-300'
+                              : 'border-slate-200 opacity-75 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={src} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Tool Code</span>
+                      <span className="font-mono font-bold text-amber-700">{previewingTool.toolCode}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Category &amp; Bay</span>
+                      <span className="font-semibold text-slate-800 block">{previewingTool.category}</span>
+                      <span className="text-[11px] text-slate-500">{previewingTool.location}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Condition &amp; Status</span>
+                      <span className="font-bold text-slate-800 block">{previewingTool.condition}</span>
+                      <span className="text-[11px] text-slate-500">{previewingTool.status}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Units (Avail / Total)</span>
+                      <span className="font-mono font-black text-slate-900">
+                        {previewingTool.quantityAvailable} / {previewingTool.quantityTotal}
+                      </span>
+                      {previewingTool.assignedToName && (
+                        <span className="text-[11px] text-amber-700 block font-semibold">
+                          With: {previewingTool.assignedToName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

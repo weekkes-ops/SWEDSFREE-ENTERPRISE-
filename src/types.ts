@@ -392,6 +392,8 @@ export interface WorkshopTool {
   lastServiceDate?: string;
   nextServiceDate?: string;
   notes?: string;
+  imageUrl?: string; // Primary tool identification photo
+  images?: string[]; // Up to 4 compressed tool identification photos
   lastUpdated: string;
   lastModifiedBy?: string;
 }

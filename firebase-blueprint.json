@@ -284,6 +284,8 @@
         "lastServiceDate": { "type": "string" },
         "nextServiceDate": { "type": "string" },
         "notes": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
         "lastUpdated": { "type": "string" },
         "lastModifiedBy": { "type": "string" }
       },
